@@ -1,0 +1,94 @@
+# Único .gitignore del repositorio: cubre backend/ y frontend/. No se crean .gitignore dentro de
+# las subcarpetas. Un patrón sin "/" inicial vale en cualquier carpeta; uno con "/" inicial es
+# relativo a esta raíz (market_Pista8/), y "/*/" significa "en backend/ o en frontend/".
+
+# Dependencias
+node_modules/
+.pnp
+.pnp.*
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/versions
+
+# Compilación, caché y tipos generados
+.next/
+/*/out/
+/*/build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Pruebas
+/*/coverage/
+
+# Variables de entorno y secretos (solo se versiona .env.example)
+.env*
+!.env.example
+*.pem
+
+# Registros
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
+yarn-error.log*
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# Configuración local de Claude Code
+**/.claude/settings.local.json
+
+# ---------------------------------------------------------------------------
+# Solo backend/
+# ---------------------------------------------------------------------------
+
+# Referencia local del esquema de BD (no se versiona; el esquema versionado es backend/db/migrations/)
+/backend/docs/schema.reference.sql
+
+# Seed de desarrollo (contiene la contraseña de prueba)
+/backend/docs/seed.dev.sql
+
+# Datos de prueba para TiDB (contiene el hash de una contraseña compartida real)
+/backend/docs/seed-prueba.sql
+
+# Reportes de migración (contienen credenciales)
+/backend/reports/
+
+# Respaldos cifrados de la base de datos (quedan aquí cuando R2_BACKUPS_* no está configurado)
+/backend/backups/
+
+# ---------------------------------------------------------------------------
+# Otros archivos sensibles y de caché
+# ---------------------------------------------------------------------------
+
+# Configuración y datos locales adicionales
+/backend/docs/entorno-local.sql
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Credenciales y certificados (adicional a *.pem)
+*.key
+*.cert
+*.crt
+
+# Caches de herramientas y carpetas de despliegue local
+.eslintcache
+.stylelintcache
+.vercel/
+.netlify/
+
+# ---------------------------------------------------------------------------
+# Archivos de Documentación
+# ---------------------------------------------------------------------------
+
+# Ignorar todos los archivos Markdown por privacidad
+*.md
+# Pero permitir el README principal
+!README.md

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/*
+ * Paleta y tipografía: CLAUDE.md sección 6 (Lineamientos de diseño) y
+ * docs/PLAN_IMPLEMENTACION_FRONTEND.md sección 6. Tres colores de marca, cada uno con un rol fijo
+ * (magenta: navegación/enlaces; púrpura: Hero/estado seleccionado; naranja: CTA/WhatsApp/
+ * promociones — nunca intercambiables), neutros cálidos (stone) y dos familias tipográficas con
+ * rol fijo (nunca se mezclan dentro de un mismo tipo de texto). Todo como token: cambiar un color
+ * después es un solo lugar.
+ */
+:root {
+  --color-fondo: #fafaf9;
+  --color-superficie: #ffffff;
+  --color-borde: #e7e5e4;
+  --color-texto: #1c1917;
+  --color-texto-secundario: #57534e;
+
+  --color-acento: #9d174d;
+  --color-acento-hover: #831843;
+  --color-acento-suave: #fdf2f8;
+
+  --color-secundario: #7c3aed;
+  --color-secundario-hover: #6d28d9;
+  --color-secundario-suave: #f5f3ff;
+
+  --color-enfasis: #ea580c;
+  --color-enfasis-hover: #c2410c;
+  --color-enfasis-suave: #fff7ed;
+}
+
+@theme inline {
+  --color-fondo: var(--color-fondo);
+  --color-superficie: var(--color-superficie);
+  --color-borde: var(--color-borde);
+  --color-texto: var(--color-texto);
+  --color-texto-secundario: var(--color-texto-secundario);
+
+  --color-acento: var(--color-acento);
+  --color-acento-hover: var(--color-acento-hover);
+  --color-acento-suave: var(--color-acento-suave);
+
+  --color-secundario: var(--color-secundario);
+  --color-secundario-hover: var(--color-secundario-hover);
+  --color-secundario-suave: var(--color-secundario-suave);
+
+  --color-enfasis: var(--color-enfasis);
+  --color-enfasis-hover: var(--color-enfasis-hover);
+  --color-enfasis-suave: var(--color-enfasis-suave);
+
+  /* Plus Jakarta Sans: títulos, nombres de emprendimiento, cifras grandes.
+     Inter: cuerpo, badges, botones, texto pequeño. */
+  --font-titulo: var(--font-plus-jakarta-sans);
+  --font-cuerpo: var(--font-inter);
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-texto);
+}

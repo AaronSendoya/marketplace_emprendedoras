@@ -1,0 +1,4003 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API del catálogo Track de Mujeres 2026",
+    "version": "0.1.0",
+    "description": "Contrato de la API para el frontend. Los errores siempre usan el formato `Error`. Las rutas protegidas requieren `Authorization: Bearer <token>`."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sistema",
+      "description": "Estado del servicio."
+    },
+    {
+      "name": "Catálogos",
+      "description": "Ciudades y rubros."
+    },
+    {
+      "name": "Autenticación",
+      "description": "Login por JWT (regla 5) y códigos OTP (regla 15)."
+    },
+    {
+      "name": "Admin",
+      "description": "Gestión de cuentas. Solo Admin (regla 5)."
+    },
+    {
+      "name": "Perfiles",
+      "description": "Feed 1: perfiles de emprendedoras (reglas 2, 3, 6, 11 y 18)."
+    },
+    {
+      "name": "Marketplace",
+      "description": "Feed 2 público: productos con su descuento vigente (reglas 7 y 8)."
+    },
+    {
+      "name": "Productos",
+      "description": "Gestión de los productos propios (reglas 7 y 18)."
+    },
+    {
+      "name": "Descuentos",
+      "description": "Motor de promociones: descuentos por porcentaje con vigencia (reglas 8 y 9)."
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de POST /auth/login. En Swagger: botón Authorize, pegar solo el token (sin 'Bearer')."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "codigo": {
+                "type": "string",
+                "enum": [
+                  "VALIDACION",
+                  "NO_AUTENTICADO",
+                  "PROHIBIDO",
+                  "NO_ENCONTRADO",
+                  "CONFLICTO",
+                  "ARCHIVO_MUY_GRANDE",
+                  "DEMASIADAS_SOLICITUDES",
+                  "ERROR_INTERNO"
+                ],
+                "example": "NO_ENCONTRADO"
+              },
+              "mensaje": {
+                "type": "string",
+                "example": "Recurso no encontrado."
+              },
+              "detalles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "campo": {
+                      "type": "string",
+                      "example": "email"
+                    },
+                    "mensaje": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "campo",
+                    "mensaje"
+                  ]
+                },
+                "description": "Solo en errores de validación y conflictos: un elemento por campo afectado."
+              }
+            },
+            "required": [
+              "codigo",
+              "mensaje"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "description": "Formato único de error de la API."
+      },
+      "Paginacion": {
+        "type": "object",
+        "properties": {
+          "pagina": {
+            "type": "integer",
+            "example": 1
+          },
+          "limite": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total de elementos que cumplen el filtro.",
+            "example": 135
+          }
+        },
+        "required": [
+          "pagina",
+          "limite",
+          "total"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "base_de_datos": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "estado",
+          "base_de_datos"
+        ]
+      },
+      "Ciudad": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "La Paz"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ]
+      },
+      "Rubro": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-2222-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Alimentos y bebidas"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ]
+      },
+      "LoginRespuesta": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT. Pegar aquí en el botón Authorize de Swagger (sin 'Bearer')."
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/Usuario"
+          }
+        },
+        "required": [
+          "token",
+          "usuario"
+        ]
+      },
+      "Usuario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "admin@gmail.com"
+          },
+          "nombres": {
+            "type": "string",
+            "example": "Administrador"
+          },
+          "apellido_paterno": {
+            "type": "string",
+            "example": "General"
+          },
+          "apellido_materno": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": null
+          },
+          "nombre_completo": {
+            "type": "string",
+            "description": "Derivado; no se guarda en la base (regla 10).",
+            "example": "Administrador General"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "Admin",
+              "Emprendedor"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "email_verificado_en": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "nombres",
+          "apellido_paterno",
+          "apellido_materno",
+          "nombre_completo",
+          "rol",
+          "activo",
+          "email_verificado_en",
+          "creado_en"
+        ]
+      },
+      "Mensaje": {
+        "type": "object",
+        "properties": {
+          "mensaje": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mensaje"
+        ]
+      },
+      "UsuarioCreado": {
+        "type": "object",
+        "properties": {
+          "usuario": {
+            "$ref": "#/components/schemas/Usuario"
+          },
+          "password_temporal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Solo si el sistema la generó; se devuelve esta única vez. Nulo si el Admin definió la contraseña.",
+            "example": "Kp7mQx4Rw2Ht"
+          }
+        },
+        "required": [
+          "usuario",
+          "password_temporal"
+        ]
+      },
+      "UsuariosPagina": {
+        "type": "object",
+        "properties": {
+          "datos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Usuario"
+            }
+          },
+          "paginacion": {
+            "$ref": "#/components/schemas/Paginacion"
+          }
+        },
+        "required": [
+          "datos",
+          "paginacion"
+        ]
+      },
+      "Perfil": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-3333-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "nombre_negocio": {
+            "type": "string",
+            "example": "Dulces de Ana"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "whatsapp": {
+            "type": "string",
+            "description": "Solo dígitos, con código de país.",
+            "example": "59171234567"
+          },
+          "instagram_username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "dulcesdeana"
+          },
+          "otra_red_social": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Tercera red social opcional; `null` si no la tiene.",
+            "example": "@dulcesdeana_tiktok"
+          },
+          "ciudad": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nombre": {
+                "type": "string",
+                "example": "La Paz"
+              }
+            },
+            "required": [
+              "id",
+              "nombre"
+            ]
+          },
+          "rubro": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nombre": {
+                "type": "string",
+                "example": "Alimentos y bebidas"
+              }
+            },
+            "required": [
+              "id",
+              "nombre"
+            ]
+          },
+          "emprendedora": {
+            "type": "string",
+            "description": "Nombre completo de la emprendedora (regla 10). El correo nunca se expone.",
+            "example": "Ana Pérez Rojas"
+          },
+          "foto_perfil_url": {
+            "type": "string",
+            "example": "https://cdn.midominio.com/perfiles/3f2a.webp"
+          },
+          "logo_url": {
+            "type": "string",
+            "example": "https://cdn.midominio.com/logos/9b1c.webp"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "nombre_negocio",
+          "descripcion",
+          "whatsapp",
+          "instagram_username",
+          "otra_red_social",
+          "ciudad",
+          "rubro",
+          "emprendedora",
+          "foto_perfil_url",
+          "logo_url",
+          "creado_en",
+          "actualizado_en"
+        ]
+      },
+      "MisProductosPagina": {
+        "type": "object",
+        "properties": {
+          "datos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductoPropio"
+            }
+          },
+          "paginacion": {
+            "$ref": "#/components/schemas/Paginacion"
+          }
+        },
+        "required": [
+          "datos",
+          "paginacion"
+        ]
+      },
+      "ProductoPropio": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-4444-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "perfil_id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imagen_url": {
+            "type": "string"
+          },
+          "precio": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "El precio real, aunque esté oculto."
+          },
+          "mostrar_precio": {
+            "type": "boolean"
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "porcentaje": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Mayor descuento vigente ahora."
+          },
+          "precio_con_descuento": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "perfil_id",
+          "nombre",
+          "descripcion",
+          "imagen_url",
+          "precio",
+          "mostrar_precio",
+          "activo",
+          "porcentaje",
+          "precio_con_descuento",
+          "creado_en",
+          "actualizado_en"
+        ]
+      },
+      "DescuentosPagina": {
+        "type": "object",
+        "properties": {
+          "datos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Descuento"
+            }
+          },
+          "paginacion": {
+            "$ref": "#/components/schemas/Paginacion"
+          }
+        },
+        "required": [
+          "datos",
+          "paginacion"
+        ]
+      },
+      "Descuento": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-5555-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "perfil_id": {
+            "type": "string"
+          },
+          "porcentaje": {
+            "type": "number",
+            "example": 15
+          },
+          "fecha_inicio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "fecha_fin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "programado",
+              "vigente",
+              "vencido"
+            ],
+            "description": "Calculado al consultar (regla 8): `programado` aún no empieza; `vencido` ya caducó."
+          },
+          "producto_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Productos a los que está asignado."
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "perfil_id",
+          "porcentaje",
+          "fecha_inicio",
+          "fecha_fin",
+          "estado",
+          "producto_ids",
+          "creado_en"
+        ]
+      },
+      "PerfilesPagina": {
+        "type": "object",
+        "properties": {
+          "datos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Perfil"
+            }
+          },
+          "paginacion": {
+            "$ref": "#/components/schemas/Paginacion"
+          }
+        },
+        "required": [
+          "datos",
+          "paginacion"
+        ]
+      },
+      "ProductosPagina": {
+        "type": "object",
+        "properties": {
+          "datos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductoPublico"
+            }
+          },
+          "paginacion": {
+            "$ref": "#/components/schemas/Paginacion"
+          }
+        },
+        "required": [
+          "datos",
+          "paginacion"
+        ]
+      },
+      "ProductoPublico": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-4444-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Torta de chocolate"
+          },
+          "descripcion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imagen_url": {
+            "type": "string",
+            "example": "https://cdn.midominio.com/productos/7d2e.webp"
+          },
+          "precio": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Nulo si no hay precio o está oculto (regla 7).",
+            "example": 120
+          },
+          "porcentaje": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Mayor descuento vigente ahora; nulo si no hay o el precio no se muestra (regla 8).",
+            "example": 15
+          },
+          "precio_con_descuento": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Calculado por el backend; el frontend no calcula precios.",
+            "example": 102
+          },
+          "consultar_precio": {
+            "type": "boolean",
+            "description": "`true` cuando no hay precio visible: mostrar el botón \"Consultar Precio\" hacia el WhatsApp del negocio."
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "perfil": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nombre_negocio": {
+                "type": "string",
+                "example": "Dulces de Ana"
+              },
+              "whatsapp": {
+                "type": "string",
+                "example": "59171234567"
+              },
+              "ciudad": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "La Paz"
+                  }
+                },
+                "required": [
+                  "id",
+                  "nombre"
+                ]
+              },
+              "rubro": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "Alimentos y bebidas"
+                  }
+                },
+                "required": [
+                  "id",
+                  "nombre"
+                ]
+              },
+              "logo_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "nombre_negocio",
+              "whatsapp",
+              "ciudad",
+              "rubro",
+              "logo_url"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "descripcion",
+          "imagen_url",
+          "precio",
+          "porcentaje",
+          "precio_con_descuento",
+          "consultar_precio",
+          "creado_en",
+          "perfil"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Estado del servicio",
+        "description": "Comprueba que el servicio responde y que la base de datos es alcanzable (`SELECT 1`).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Servicio y base de datos operativos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalogos/ciudades": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Ciudades",
+        "description": "Catálogo de ciudades, para los filtros del feed y el alta de un perfil. Orden alfabético.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Lista de ciudades.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ciudad"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalogos/rubros": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Rubros",
+        "description": "Catálogo de rubros, para los filtros del feed y el alta de un perfil. Orden alfabético.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Lista de rubros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Rubro"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Iniciar sesión",
+        "description": "Da el mismo error ante un correo inexistente o una contraseña incorrecta, y ante una cuenta desactivada (regla 5). Tras 5 intentos fallidos con el mismo correo en 15 minutos, responde 429 sin comparar la contraseña (regla 17); revisa la cabecera `Retry-After`.",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "example": "admin@gmail.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "example": "••••••••"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token y datos del usuario.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes; revisa la cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Usuario autenticado",
+        "description": "El rol y el estado (`activo`) siempre se leen de la base en el momento de la petición (regla 5).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos del usuario autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password/solicitar-codigo": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Solicitar el código para restablecer la contraseña",
+        "description": "Responde igual exista o no la cuenta (regla 15): el código solo se envía si la cuenta existe y está activa. Máximo 1 solicitud por minuto y 5 por hora por correo; al superarlo, 429 con `Retry-After`. En desarrollo el código aparece en la consola del servidor.",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "example": "aaron@gmail.com"
+                  }
+                },
+                "required": [
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Solicitud registrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensaje"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes; revisa la cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password/restablecer": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Restablecer la contraseña con el código",
+        "description": "El código vale 10 minutos, se usa una sola vez y admite 5 intentos. Un código incorrecto, vencido, usado o sin intentos da el mismo error 400. Al restablecer se cierran las demás sesiones (`token_version`, regla 5) y el correo queda verificado.",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "example": "aaron@gmail.com"
+                  },
+                  "codigo": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^\\d{6}$",
+                    "example": "482913"
+                  },
+                  "password_nueva": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 72,
+                    "example": "MiClaveNueva2026"
+                  }
+                },
+                "required": [
+                  "email",
+                  "codigo",
+                  "password_nueva"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contraseña actualizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensaje"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/solicitar-codigo": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Solicitar el código para cambiar el correo",
+        "description": "El código se envía al correo nuevo. Mismos límites de solicitudes que la recuperación de contraseña.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email_nuevo": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "example": "nuevo@gmail.com"
+                  }
+                },
+                "required": [
+                  "email_nuevo"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Código enviado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensaje"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes; revisa la cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email": {
+      "put": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Cambiar el correo con el código",
+        "description": "Confirma el código enviado al correo nuevo. El correo cambia y queda verificado; no cierra sesiones. 409 si otra cuenta ya usa ese correo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email_nuevo": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "example": "nuevo@gmail.com"
+                  },
+                  "codigo": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^\\d{6}$",
+                    "example": "482913"
+                  }
+                },
+                "required": [
+                  "email_nuevo",
+                  "codigo"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Datos actualizados del usuario.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Crear una cuenta de Emprendedor",
+        "description": "Solo Admin (regla 5). El rol siempre es Emprendedor; un cuerpo con `rol` o `rol_id` da 400. No pide OTP (regla 15): el correo queda sin verificar (`email_verificado_en` nulo) hasta el primer código que complete esa cuenta. Si el correo ya tiene cuenta, 409. La respuesta no se guarda en caché porque puede traer la contraseña temporal.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "example": "emprendedora@gmail.com"
+                  },
+                  "nombres": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "example": "María Elena"
+                  },
+                  "apellido_paterno": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "example": "Flores"
+                  },
+                  "apellido_materno": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "description": "Opcional: no todas las personas lo tienen (regla 10).",
+                    "example": "Choque"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 72,
+                    "example": "MiClaveNueva2026",
+                    "description": "Contraseña inicial. Si falta, el sistema genera una temporal y la devuelve una sola vez."
+                  }
+                },
+                "required": [
+                  "email",
+                  "nombres",
+                  "apellido_paterno"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cuenta creada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioCreado"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Listar cuentas",
+        "description": "Todas las cuentas (Admin y Emprendedor), las más recientes primero. Paginado; admite buscar por texto libre (`q`, sobre nombres, apellidos y correo, sin distinguir mayúsculas) y filtrar por estado (`estado`).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "description": "Texto a buscar en nombres, apellidos y correo."
+            },
+            "required": false,
+            "description": "Texto a buscar en nombres, apellidos y correo.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "activo",
+                "inactivo"
+              ],
+              "description": "Filtra por estado de la cuenta."
+            },
+            "required": false,
+            "description": "Filtra por estado de la cuenta.",
+            "name": "estado",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de cuentas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuariosPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}/estado": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Activar o desactivar una cuenta",
+        "description": "Desactivar no borra nada: la cuenta pierde el acceso en su siguiente petición, aunque su token siga vigente (regla 5). Un Admin no puede desactivar su propia cuenta (409). Es idempotente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activo": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "activo"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cuenta con su estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Editar una cuenta",
+        "description": "Nombres, apellidos y correo, sin OTP (regla 5 y 15). El rol nunca se edita por la API. Cambiar el correo lo deja sin verificar hasta el próximo OTP que la cuenta complete. Un cuerpo vacío no cambia nada. 409 si el correo nuevo ya tiene otra cuenta.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "format": "email",
+                    "description": "Cambiarlo lo deja sin verificar hasta el próximo OTP (regla 15).",
+                    "example": "nuevo-correo@gmail.com"
+                  },
+                  "nombres": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "example": "María Elena"
+                  },
+                  "apellido_paterno": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "example": "Flores"
+                  },
+                  "apellido_materno": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "description": "`null` la quita (regla 10).",
+                    "example": "Choque"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cuenta editada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Ver una cuenta",
+        "description": "Datos básicos de una cuenta (sin la contraseña). Base del módulo \"Emprendimientos\" del panel.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuenta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}/password": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Restablecer la contraseña de una cuenta",
+        "description": "El Admin cambia la contraseña de cualquier cuenta directamente, sin OTP (regla 5 y 15: el OTP es solo para que la propia Emprendedora se recupere). Si no se envía `password`, el sistema genera una temporal y la devuelve una sola vez. Cierra las demás sesiones de esa cuenta (regla 5).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 72,
+                    "example": "MiClaveNueva2026",
+                    "description": "Contraseña nueva. Si falta, el sistema genera una temporal y la devuelve una sola vez."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cuenta con la contraseña restablecida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioCreado"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}/perfil": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Ver el perfil de una cuenta",
+        "description": "Mismo caso de uso que `GET /mis/perfil`, pero para el `usuario_id` que indique el Admin (módulo \"Emprendimientos\"). `404` si esa cuenta todavía no tiene perfil.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil de la cuenta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}/productos": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Ver los productos de una cuenta",
+        "description": "Mismo caso de uso que `GET /mis/productos` (activos o no, con el precio real), pero para el `usuario_id` que indique el Admin (módulo \"Emprendimientos\"). Sin perfil, la lista está vacía.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de productos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisProductosPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}/descuentos": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Ver los descuentos de una cuenta",
+        "description": "Mismo caso de uso que `GET /mis/descuentos`, pero para el `usuario_id` que indique el Admin (módulo \"Emprendimientos\"). Sin perfil, la lista está vacía.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de descuentos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescuentosPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/perfiles": {
+      "get": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Feed de perfiles",
+        "description": "Público. Solo perfiles de cuentas activas (regla 18), más recientes primero. Filtra por ciudad, rubro y texto.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "ciudad_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "rubro_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "description": "Texto a buscar en el nombre del negocio y la descripción."
+            },
+            "required": false,
+            "description": "Texto a buscar en el nombre del negocio y la descripción.",
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de perfiles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilesPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Crear un perfil",
+        "description": "`multipart/form-data`. La emprendedora crea el suyo; un Admin lo crea en nombre de una cuenta Emprendedor (`usuario_id`). Un usuario tiene un solo perfil (409 si ya existe). Cada imagen se envía como archivo o con la marca `usar_*_predeterminad*=true`; nunca se aplica una predeterminada por omisión (regla 11). Las imágenes se convierten a WebP, se redimensionan y pierden sus metadatos (regla 16).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "usuario_id": {
+                    "type": "string",
+                    "description": "Solo Admin: cuenta Emprendedor a la que pertenece el perfil. Una emprendedora crea el suyo."
+                  },
+                  "nombre_negocio": {
+                    "type": "string",
+                    "example": "Dulces de Ana"
+                  },
+                  "descripcion": {
+                    "type": "string"
+                  },
+                  "whatsapp": {
+                    "type": "string",
+                    "example": "+591 71234567"
+                  },
+                  "instagram": {
+                    "type": "string",
+                    "example": "@mitienda"
+                  },
+                  "otra_red_social": {
+                    "type": "string",
+                    "description": "Opcional, hasta 50 caracteres.",
+                    "example": "@mitienda_tiktok"
+                  },
+                  "ciudad_id": {
+                    "type": "string"
+                  },
+                  "rubro_id": {
+                    "type": "string"
+                  },
+                  "foto_perfil": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG o WebP de hasta 5 MB. Obligatorio salvo `usar_foto_predeterminada=true`."
+                  },
+                  "usar_foto_predeterminada": {
+                    "type": "boolean",
+                    "description": "Excepción explícita: usa la foto anónima predeterminada (regla 11)."
+                  },
+                  "logo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG o WebP de hasta 5 MB. Obligatorio salvo `usar_logo_predeterminado=true`."
+                  },
+                  "usar_logo_predeterminado": {
+                    "type": "boolean",
+                    "description": "Excepción explícita: usa el logo vacío predeterminado (regla 11)."
+                  }
+                },
+                "required": [
+                  "nombre_negocio",
+                  "descripcion",
+                  "whatsapp",
+                  "ciudad_id",
+                  "rubro_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Perfil creado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamaño permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/perfiles/{id}": {
+      "get": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Detalle de un perfil",
+        "description": "Público. Un perfil de una cuenta desactivada responde 404.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del perfil."
+            },
+            "required": true,
+            "description": "Id del perfil.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Editar los datos de un perfil",
+        "description": "Solo su dueña o un Admin. Cambia solo los campos enviados; las imágenes tienen sus propias rutas.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del perfil."
+            },
+            "required": true,
+            "description": "Id del perfil.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre_negocio": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "whatsapp": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "Con o sin `+591`, espacios o guiones; se guarda solo dígitos con el código de país (regla 2).",
+                    "example": "+591 71234567"
+                  },
+                  "instagram": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 200,
+                    "description": "`null` o texto vacío quita el Instagram.",
+                    "example": "@mitienda"
+                  },
+                  "otra_red_social": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 50,
+                    "description": "`null` o texto vacío quita la otra red social.",
+                    "example": "@mitienda_tiktok"
+                  },
+                  "ciudad_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "rubro_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mis/perfil": {
+      "get": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Mi perfil",
+        "description": "El perfil de la cuenta autenticada. 404 si todavía no tiene uno (también para un Admin, que no tiene perfil).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil propio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/perfiles/{id}/foto-perfil": {
+      "put": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Reemplazar la foto de perfil",
+        "description": "`multipart/form-data` con `archivo`, o `usar_predeterminada=true`. Solo su dueña o un Admin. La imagen anterior se borra del almacenamiento (salvo las predeterminadas).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del perfil."
+            },
+            "required": true,
+            "description": "Id del perfil.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG o WebP de hasta 5 MB."
+                  },
+                  "usar_predeterminada": {
+                    "type": "boolean",
+                    "description": "Excepción explícita: usa la imagen predeterminada (regla 11)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamaño permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/perfiles/{id}/logo": {
+      "put": {
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Reemplazar el logo",
+        "description": "`multipart/form-data` con `archivo`, o `usar_predeterminada=true`. Solo su dueña o un Admin. La imagen anterior se borra del almacenamiento (salvo las predeterminadas).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del perfil."
+            },
+            "required": true,
+            "description": "Id del perfil.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG o WebP de hasta 5 MB."
+                  },
+                  "usar_predeterminada": {
+                    "type": "boolean",
+                    "description": "Excepción explícita: usa la imagen predeterminada (regla 11)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamaño permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marketplace/productos": {
+      "get": {
+        "tags": [
+          "Marketplace"
+        ],
+        "summary": "Feed de productos",
+        "description": "Público. Solo productos activos de cuentas activas (regla 18), más recientes primero. Cada producto trae el mayor descuento vigente y su precio con descuento, calculados al consultar (regla 8). Con el precio oculto o ausente, `precio`, `porcentaje` y `precio_con_descuento` son nulos y `consultar_precio` es `true`.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "perfil_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "ciudad_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "rubro_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "description": "Texto a buscar en el nombre y la descripción."
+            },
+            "required": false,
+            "description": "Texto a buscar en el nombre y la descripción.",
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de productos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductosPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marketplace/productos/{id}": {
+      "get": {
+        "tags": [
+          "Marketplace"
+        ],
+        "summary": "Detalle de un producto",
+        "description": "Público. Un producto inactivo o de una cuenta desactivada responde 404.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del producto."
+            },
+            "required": true,
+            "description": "Id del producto.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoPublico"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mis/productos": {
+      "get": {
+        "tags": [
+          "Productos"
+        ],
+        "summary": "Mis productos",
+        "description": "Los productos del perfil de la cuenta autenticada, activos o no, con el precio real. Sin perfil, la lista está vacía.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de productos propios.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisProductosPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/productos": {
+      "post": {
+        "tags": [
+          "Productos"
+        ],
+        "summary": "Crear un producto",
+        "description": "`multipart/form-data`. La emprendedora lo crea en su perfil (409 si aún no tiene uno); un Admin indica el `perfil_id`. La imagen es obligatoria y se convierte a WebP (regla 16). El precio es opcional.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "perfil_id": {
+                    "type": "string",
+                    "description": "Solo Admin: perfil al que pertenece el producto. Una emprendedora usa el suyo."
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "Torta de chocolate"
+                  },
+                  "descripcion": {
+                    "type": "string"
+                  },
+                  "precio": {
+                    "type": "string",
+                    "example": "120.00"
+                  },
+                  "mostrar_precio": {
+                    "type": "boolean",
+                    "description": "Por defecto `true`."
+                  },
+                  "imagen": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG o WebP de hasta 5 MB. Obligatoria."
+                  }
+                },
+                "required": [
+                  "nombre",
+                  "imagen"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Producto creado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoPropio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamaño permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/productos/{id}": {
+      "patch": {
+        "tags": [
+          "Productos"
+        ],
+        "summary": "Editar un producto",
+        "description": "Solo su dueña o un Admin. Cambia solo los campos enviados. `activo: true` reactiva un producto desactivado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del producto."
+            },
+            "required": true,
+            "description": "Id del producto.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "descripcion": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000,
+                    "description": "`null` o texto vacío quita la descripción."
+                  },
+                  "precio": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 99999999.99,
+                    "description": "`null` quita el precio: el producto muestra \"Consultar Precio\".",
+                    "example": 25.5
+                  },
+                  "mostrar_precio": {
+                    "type": "boolean"
+                  },
+                  "activo": {
+                    "type": "boolean",
+                    "description": "`false` desactiva el producto; `true` lo reactiva."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoPropio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Productos"
+        ],
+        "summary": "Desactivar un producto",
+        "description": "Soft delete: el producto deja de mostrarse (`activo = false`) pero no se borra. Es idempotente. Se reactiva con `PATCH`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del producto."
+            },
+            "required": true,
+            "description": "Id del producto.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Producto desactivado."
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/productos/{id}/imagen": {
+      "put": {
+        "tags": [
+          "Productos"
+        ],
+        "summary": "Reemplazar la imagen de un producto",
+        "description": "`multipart/form-data` con `archivo`. Solo su dueña o un Admin. La imagen anterior se borra del almacenamiento.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del producto."
+            },
+            "required": true,
+            "description": "Id del producto.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG o WebP de hasta 5 MB."
+                  }
+                },
+                "required": [
+                  "archivo"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoPropio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamaño permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mis/descuentos": {
+      "get": {
+        "tags": [
+          "Descuentos"
+        ],
+        "summary": "Mis descuentos",
+        "description": "Los descuentos del perfil de la cuenta autenticada, con su estado (`programado`, `vigente` o `vencido`) y sus productos.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de descuentos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescuentosPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/descuentos": {
+      "post": {
+        "tags": [
+          "Descuentos"
+        ],
+        "summary": "Crear un descuento",
+        "description": "Siempre por porcentaje. Las fechas son opcionales e independientes; si hay ambas, la de fin debe ser posterior. Un descuento con inicio futuro se activa solo al llegar esa fecha (regla 8). Se asigna a productos con `POST /descuentos/{id}/productos`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "perfil_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Solo Admin: perfil al que pertenece. Una emprendedora usa el suyo."
+                  },
+                  "porcentaje": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 100,
+                    "example": 15
+                  },
+                  "fecha_inicio": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "Sin fecha rige desde que se crea.",
+                    "example": "2026-12-01"
+                  },
+                  "fecha_fin": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "Sin fecha es permanente.",
+                    "example": "2026-12-31"
+                  }
+                },
+                "required": [
+                  "porcentaje"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Descuento creado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Descuento"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/descuentos/{id}": {
+      "patch": {
+        "tags": [
+          "Descuentos"
+        ],
+        "summary": "Editar un descuento",
+        "description": "Solo su dueña o un Admin. Cambia el porcentaje o las fechas. No hay `DELETE`: un descuento se termina editando `fecha_fin`. El rango se valida con lo que quedaría guardado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del descuento."
+            },
+            "required": true,
+            "description": "Id del descuento.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "porcentaje": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 100,
+                    "example": 15
+                  },
+                  "fecha_inicio": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "`null` quita la fecha.",
+                    "example": "2026-12-01"
+                  },
+                  "fecha_fin": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "`null` la quita (permanente). Un descuento no se borra: se termina con la fecha de fin.",
+                    "example": "2026-12-01"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Descuento actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Descuento"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/descuentos/{id}/productos": {
+      "post": {
+        "tags": [
+          "Descuentos"
+        ],
+        "summary": "Asignar un descuento a productos",
+        "description": "Los productos deben ser del mismo perfil que el descuento (regla 9): si alguno es de otro perfil, 403 y no se asigna ninguno. Es idempotente. Si un producto tiene varios descuentos vigentes, se aplica el de mayor porcentaje.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del descuento."
+            },
+            "required": true,
+            "description": "Id del descuento.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "producto_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "description": "Productos del mismo perfil que el descuento."
+                  }
+                },
+                "required": [
+                  "producto_ids"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Descuento con sus productos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Descuento"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/descuentos/{id}/productos/{producto_id}": {
+      "delete": {
+        "tags": [
+          "Descuentos"
+        ],
+        "summary": "Quitar un descuento de un producto",
+        "description": "Quita solo la asignación; el descuento no se borra. Es idempotente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del descuento."
+            },
+            "required": true,
+            "description": "Id del descuento.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del producto."
+            },
+            "required": true,
+            "description": "Id del producto.",
+            "name": "producto_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Asignación quitada."
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}
