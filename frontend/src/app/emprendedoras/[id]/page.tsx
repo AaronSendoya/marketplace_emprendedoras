@@ -75,6 +75,7 @@ export default async function PaginaDetallePerfil({ params }: PageProps<"/empren
           <p className="font-cuerpo text-sm whitespace-pre-line text-texto-secundario">{perfil.descripcion}</p>
 
           <SocialLinks
+            perfilId={perfil.id}
             whatsapp={perfil.whatsapp}
             instagramUsername={perfil.instagram_username}
             otraRedSocial={perfil.otra_red_social}

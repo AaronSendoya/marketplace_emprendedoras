@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/atoms/Avatar";
 import { Badge } from "@/components/atoms/Badge";
 import { clasesBoton } from "@/components/atoms/Button";
+import { EstadoVacio } from "@/components/molecules/EstadoVacio";
+import { EncabezadoPaginaAdmin } from "@/components/organisms/EncabezadoPaginaAdmin";
 import { Paginador } from "@/components/molecules/Paginador";
 import { AdminToolbar } from "@/components/organisms/AdminToolbar";
 import { MenuAccionesCuenta } from "@/components/organisms/MenuAccionesCuenta";
@@ -13,6 +15,7 @@ import { listarUsuarios } from "@/lib/api/admin";
 import { obtenerMe } from "@/lib/api/auth";
 import { ErrorApi } from "@/lib/api/cliente";
 import { haySesion } from "@/lib/auth/sesion";
+import { CLASES_PANEL_ADMIN } from "@/lib/estilos";
 
 export const metadata: Metadata = {
   title: "Cuentas — Panel del Admin",
@@ -75,16 +78,16 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-titulo text-2xl font-extrabold text-texto">Gestión de cuentas</h1>
-          <p className="mt-1 font-cuerpo text-sm text-texto-secundario">Administra las cuentas de administradores y emprendedoras.</p>
-        </div>
-        <Link href="/admin/nueva" className={clasesBoton("primario")}>
-          Crear una cuenta nueva
-        </Link>
-      </div>
+    <div className="space-y-8">
+      <EncabezadoPaginaAdmin
+        titulo="Gestión de cuentas"
+        descripcion="Administra las cuentas de administradores y emprendedoras."
+        acciones={
+          <Link href="/admin/nueva" className={clasesBoton("primario", "w-full sm:w-auto")}>
+            Crear una cuenta nueva
+          </Link>
+        }
+      />
 
       {conError && (
         <p role="alert" className="flex items-center gap-2 font-cuerpo text-sm text-texto">
@@ -93,38 +96,60 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
         </p>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-borde bg-superficie">
-        <div className="border-b border-borde p-4">
+      <div className={`${CLASES_PANEL_ADMIN} overflow-hidden`}>
+        <div className="border-b border-borde p-4 sm:p-5">
           <AdminToolbar />
         </div>
 
         {usuarios.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 px-4 py-16 text-center">
-            <UsersIcon size={28} strokeWidth={1.5} aria-hidden="true" className="text-texto-secundario" />
-            <p className="font-cuerpo text-sm font-medium text-texto">No se encontraron cuentas</p>
-            <p className="font-cuerpo text-sm text-texto-secundario">
-              {q || estado ? "Prueba ajustar la búsqueda o el filtro de estado." : "Todavía no hay cuentas para mostrar."}
-            </p>
+          <div className="p-4">
+            <EstadoVacio
+              icono={UsersIcon}
+              titulo="No se encontraron cuentas"
+              descripcion={q || estado ? "Prueba ajustar la búsqueda o el filtro de estado." : "Todavía no hay cuentas para mostrar."}
+            />
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Angosto (incluida una tablet vertical con su barra de cabecera, no con
+                barra lateral): tarjetas apiladas, sin scroll horizontal de tabla; una tabla de 5
+                columnas necesita unos 670 px. Desde `md`, la tabla de siempre (regla 12, sección 6). */}
+            <ul className="divide-y divide-borde md:hidden">
+              {usuarios.map((usuario) => (
+                <li key={usuario.id} className="flex items-center gap-3 p-4">
+                  <Avatar nombreCompleto={usuario.nombre_completo} tamano="md" tono={usuario.rol === "Admin" ? "secundario" : "neutro"} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-cuerpo text-base font-semibold text-texto">{usuario.nombre_completo}</p>
+                    <p className="truncate font-cuerpo text-sm text-texto-secundario">{usuario.email}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge variante={usuario.rol === "Admin" ? "secundario" : "neutro"}>{usuario.rol}</Badge>
+                      <Badge variante={usuario.activo ? "neutro" : "acento"} punto>
+                        {usuario.activo ? "Activa" : "Suspendida"}
+                      </Badge>
+                    </div>
+                  </div>
+                  {usuario.id !== yo.id && <MenuAccionesCuenta usuario={usuario} volverA={crearHref(pagina)} />}
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left font-cuerpo text-sm">
                 <thead className="border-b border-borde bg-fondo">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold tracking-wide text-texto-secundario uppercase">
+                    <th scope="col" className="px-4 py-3.5 text-sm font-semibold text-texto-secundario">
                       Nombre
                     </th>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold tracking-wide text-texto-secundario uppercase">
+                    <th scope="col" className="px-4 py-3.5 text-sm font-semibold text-texto-secundario">
                       Correo
                     </th>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold tracking-wide text-texto-secundario uppercase">
+                    <th scope="col" className="px-4 py-3.5 text-sm font-semibold text-texto-secundario">
                       Rol
                     </th>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold tracking-wide text-texto-secundario uppercase">
+                    <th scope="col" className="px-4 py-3.5 text-sm font-semibold text-texto-secundario">
                       Estado
                     </th>
-                    <th scope="col" className="w-12 px-2 py-3">
+                    <th scope="col" className="w-14 px-2 py-3">
                       <span className="sr-only">Acciones</span>
                     </th>
                   </tr>
@@ -132,20 +157,22 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
                 <tbody className="divide-y divide-borde">
                   {usuarios.map((usuario) => (
                     <tr key={usuario.id} className="transition-colors hover:bg-fondo/60">
-                      <td className="px-4 py-3 text-texto">
-                        <div className="flex items-center gap-3 whitespace-nowrap">
-                          <Avatar nombreCompleto={usuario.nombre_completo} />
-                          <span className="font-medium">{usuario.nombre_completo}</span>
+                      <td className="px-4 py-4 text-texto">
+                        <div className="flex items-center gap-3.5">
+                          <Avatar nombreCompleto={usuario.nombre_completo} tamano="md" tono={usuario.rol === "Admin" ? "secundario" : "neutro"} />
+                          <span className="text-base font-semibold">{usuario.nombre_completo}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-texto-secundario">{usuario.email}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-4 whitespace-nowrap text-texto-secundario">{usuario.email}</td>
+                      <td className="px-4 py-4">
                         <Badge variante={usuario.rol === "Admin" ? "secundario" : "neutro"}>{usuario.rol}</Badge>
                       </td>
-                      <td className="px-4 py-3">
-                        <Badge variante={usuario.activo ? "neutro" : "acento"}>{usuario.activo ? "Activa" : "Suspendida"}</Badge>
+                      <td className="px-4 py-4">
+                        <Badge variante={usuario.activo ? "neutro" : "acento"} punto>
+                          {usuario.activo ? "Activa" : "Suspendida"}
+                        </Badge>
                       </td>
-                      <td className="px-2 py-3 text-right">
+                      <td className="px-2 py-4 text-right">
                         {/* La propia cuenta del Admin no muestra el menú: la regla 5 del backend
                             responde 409 si intenta desactivarse a sí mismo, pero es mejor no ofrecer
                             la acción que dejarla fallar. */}
@@ -157,14 +184,14 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
               </table>
             </div>
 
-            <div className="flex flex-col items-center gap-3 border-t border-borde px-4 py-3 sm:flex-row sm:justify-between">
+            <div className="flex flex-col items-center gap-3 border-t border-borde px-4 py-4 sm:px-5 xl:flex-row xl:justify-between">
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
                 <p className="font-cuerpo text-sm text-texto-secundario">
                   Mostrando {desde} a {hasta} de {paginacion.total} {paginacion.total === 1 ? "resultado" : "resultados"}
                 </p>
                 <SelectorLimite valor={limite} />
               </div>
-              <Paginador paginacion={paginacion} crearHref={crearHref} />
+              <Paginador paginacion={paginacion} crearHref={crearHref} tactil />
             </div>
           </>
         )}

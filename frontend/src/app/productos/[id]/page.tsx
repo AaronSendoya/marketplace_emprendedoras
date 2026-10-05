@@ -73,6 +73,7 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
           )}
 
           <PriceTag
+            perfilId={producto.perfil.id}
             precio={producto.precio}
             porcentaje={producto.porcentaje}
             precioConDescuento={producto.precio_con_descuento}

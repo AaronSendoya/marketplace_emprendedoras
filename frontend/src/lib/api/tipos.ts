@@ -10,6 +10,67 @@ export interface ReferenciaCatalogo {
 export type Ciudad = ReferenciaCatalogo;
 export type Rubro = ReferenciaCatalogo;
 
+// POST /perfiles/{id}/clics (regla 19): evento anónimo, sin ningún dato del visitante.
+export type TipoClic = "whatsapp" | "instagram";
+
+// GET /admin/metricas/resumen.
+export interface ResumenClics {
+  whatsapp: number;
+  instagram: number;
+}
+
+// GET /admin/metricas/mapa-calor (regla 19): las cuentas con más clics del período, cruzadas con el
+// tiempo. El backend decide qué representa cada columna según los días del período (hasta 45 días,
+// un día; hasta 180, una semana de lunes a domingo; más, un mes) y recorta la primera y la última
+// al período: el frontend solo dibuja lo que llega.
+export type GranularidadMapaCalor = "dia" | "semana" | "mes";
+
+// Con qué se arma y se ordena el top: los clics totales o los de un solo canal.
+export type OrdenMapaCalor = "total" | "whatsapp" | "instagram";
+
+// Días de La Paz (YYYY-MM-DD), ambos inclusive.
+export interface ColumnaMapaCalor {
+  inicio: string;
+  fin: string;
+}
+
+export interface CeldaMapaCalor {
+  whatsapp: number;
+  instagram: number;
+}
+
+// `celdas` trae una por columna, en el mismo orden; los totales de la fila son la suma de sus celdas.
+// `total_anterior` son los clics totales de la cuenta en el período inmediatamente anterior de igual
+// duración (0 si no tuvo), con los que se calcula la tendencia.
+export interface FilaMapaCalor {
+  perfil_id: string;
+  nombre_negocio: string;
+  whatsapp: number;
+  instagram: number;
+  total: number;
+  total_anterior: number;
+  celdas: CeldaMapaCalor[];
+}
+
+export interface MapaCalorClics {
+  granularidad: GranularidadMapaCalor;
+  columnas: ColumnaMapaCalor[];
+  filas: FilaMapaCalor[];
+}
+
+// GET /admin/metricas/serie: un punto por día de La Paz, completo (días sin clics vienen en 0).
+export interface ItemSerieClic {
+  fecha: string;
+  whatsapp: number;
+  instagram: number;
+}
+
+// GET /admin/metricas/por-rubro.
+export interface ItemRubroClic {
+  rubro: string;
+  total: number;
+}
+
 export interface Health {
   estado: "ok";
   base_de_datos: "ok";
@@ -80,13 +141,17 @@ export interface ProductoPropio {
 
 // GET /admin/usuarios/{id}/descuentos (y GET /mis/descuentos, mismo formato). `estado` se calcula
 // al consultar (regla 8, backend): el frontend no decide vigencia, solo la muestra.
+// Calculado por el backend al consultar (regla 8), no es una columna: programado aún no empieza,
+// vencido ya caducó.
+export type EstadoDescuento = "programado" | "vigente" | "vencido";
+
 export interface Descuento {
   id: string;
   perfil_id: string;
   porcentaje: number;
   fecha_inicio: string | null;
   fecha_fin: string | null;
-  estado: "programado" | "vigente" | "vencido";
+  estado: EstadoDescuento;
   producto_ids: string[];
   creado_en: string;
 }

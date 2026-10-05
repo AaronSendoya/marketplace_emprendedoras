@@ -56,7 +56,7 @@ export function ConfirmModal({ abierto, titulo, descripcion, textoConfirmar, var
         aria-labelledby="confirmar-titulo"
         aria-describedby="confirmar-descripcion"
         onClick={(evento) => evento.stopPropagation()}
-        className="max-h-[calc(100vh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
       >
         <h2 id="confirmar-titulo" className="font-titulo text-lg font-bold text-texto">
           {titulo}
@@ -65,10 +65,10 @@ export function ConfirmModal({ abierto, titulo, descripcion, textoConfirmar, var
           {descripcion}
         </p>
         <div className="flex justify-end gap-3 pt-2">
-          <button ref={cancelarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario")}>
+          <button ref={cancelarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
             Cancelar
           </button>
-          <button type="button" onClick={confirmar} disabled={pendiente} className={clasesBoton(variante)}>
+          <button type="button" onClick={confirmar} disabled={pendiente} className={clasesBoton(variante, "min-h-11 lg:min-h-0")}>
             {pendiente ? "Guardando…" : textoConfirmar}
           </button>
         </div>

@@ -4,10 +4,20 @@ import { esquemaPaginacion } from "@/api/http/paginacion";
 import { esPrecioValido, PRECIO_MAXIMO } from "@/core/productos/domain/Producto";
 import { AUTENTICADO, esquemaPagina, PUBLICO, respuestasDeError } from "../componentes";
 
-const texto = (maximo: number) => z.string().trim().min(1).max(maximo);
 const booleanoTexto = z.enum(["true", "false"]).transform((valor) => valor === "true");
 const MENSAJE_PRECIO = "El precio debe ser 0 o más, con hasta 2 decimales.";
 const LIMITE = { nombre: 150, descripcion: 2000 };
+
+// Unicode: acepta nombres con tildes/ñ sin falsos negativos. Exige al menos 3 caracteres y una
+// letra para frenar texto sin sentido ("12345", "!!!"), sin intentar juzgar si el nombre "tiene
+// sentido" (eso necesitaría un diccionario/IA y rechazaría marcas legítimas poco comunes).
+const CONTIENE_LETRA = /\p{L}/u;
+const nombreProducto = z
+  .string()
+  .trim()
+  .min(3, "El nombre debe tener al menos 3 caracteres.")
+  .max(LIMITE.nombre, `El nombre no puede superar los ${LIMITE.nombre} caracteres.`)
+  .regex(CONTIENE_LETRA, "El nombre debe incluir al menos una letra.");
 
 // Formulario multipart: el precio llega como texto, con punto decimal y hasta 2 decimales.
 const precioTexto = z
@@ -23,7 +33,7 @@ const precioNumero = z.number().min(0, MENSAJE_PRECIO).max(PRECIO_MAXIMO, MENSAJ
 export const EsquemaCrearProductoForm = z
   .object({
     perfil_id: z.uuid().optional(),
-    nombre: texto(LIMITE.nombre),
+    nombre: nombreProducto,
     descripcion: z.string().trim().max(LIMITE.descripcion).optional(),
     precio: precioTexto.optional(),
     mostrar_precio: booleanoTexto.optional(),
@@ -32,7 +42,7 @@ export const EsquemaCrearProductoForm = z
 
 export const EsquemaEditarProductoBody = z
   .object({
-    nombre: texto(LIMITE.nombre).optional(),
+    nombre: nombreProducto.optional(),
     descripcion: z.string().trim().max(LIMITE.descripcion).nullable().optional().meta({ description: "`null` o texto vacío quita la descripción." }),
     precio: precioNumero.nullable().optional().meta({ description: "`null` quita el precio: el producto muestra \"Consultar Precio\".", example: 25.5 }),
     mostrar_precio: z.boolean().optional(),
@@ -104,7 +114,7 @@ export const EsquemaMisProductosPagina = esquemaPagina(EsquemaProductoPropio, "M
 // Solo documentación: describe las partes del formulario, incluido el archivo.
 const EsquemaCrearProductoMultipart = z.object({
   perfil_id: z.string().optional().meta({ description: "Solo Admin: perfil al que pertenece el producto. Una emprendedora usa el suyo." }),
-  nombre: z.string().meta({ example: "Torta de chocolate" }),
+  nombre: z.string().meta({ description: "3 a 150 caracteres, con al menos una letra.", example: "Torta de chocolate" }),
   descripcion: z.string().optional(),
   precio: z.string().optional().meta({ example: "120.00" }),
   mostrar_precio: z.boolean().optional().meta({ description: "Por defecto `true`." }),

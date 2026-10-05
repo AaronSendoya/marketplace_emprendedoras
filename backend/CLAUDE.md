@@ -1,0 +1,392 @@
+@AGENTS.md
+
+# Proyecto: Catálogo "Track de Mujeres 2026"
+
+> Este documento es la referencia de arquitectura y reglas de negocio del proyecto. Se irá completando de forma incremental a medida que se agreguen nuevas necesidades, **antes** de implementar el código correspondiente. Cuando una sección quede desactualizada respecto al código real, el código manda y esta sección debe corregirse.
+
+## Regla de mantenimiento de este documento (obligatoria)
+
+Cada vez que el usuario cree o modifique una regla de negocio (seguridad, datos, comportamiento del catálogo, reglas de visualización, etc.), Claude debe reflejarla **automáticamente y sin pedir confirmación**:
+
+1.  En el `CLAUDE.md` de **ambas carpetas** (`backend/CLAUDE.md` y `frontend/CLAUDE.md`, rutas en la sección 0), aunque la sesión esté abierta en una sola. Las secciones 1 a 4 son contrato compartido y deben quedar idénticas en los dos (salvo la marca "esta carpeta" de la sección 1 y la nota introductoria de la sección 4).
+2.  En el backend, en `docs/schema.reference.sql` cuando la regla afecte el esquema de la base de datos, y en `docs/seed.dev.sql` cuando afecte los datos iniciales (ambos archivos están ignorados por git, pero igual se mantienen al día).
+3.  **Primero la documentación, después el código.** La regla se documenta antes de implementarla.
+
+Si la regla nueva contradice una existente, se reemplaza la anterior en lugar de acumular ambas. Al terminar, informar brevemente qué secciones se tocaron. Lo que aplica a una sola carpeta (por ejemplo, los lineamientos de diseño del frontend) vive únicamente en el `CLAUDE.md` de esa carpeta.
+
+## 0. Alcance de esta carpeta
+
+Este directorio (`C:\Users\LOQ\Desktop\market_Pista8\backend`) es el **Backend**: API Node.js/Next.js con Arquitectura Hexagonal, desplegada en Hostinger, que expone los datos del catálogo al frontend.
+
+El **Frontend** es su hermano dentro del mismo repositorio:
+
+*   **Ruta local (solo desarrollo):** `C:\Users\LOQ\Desktop\market_Pista8\frontend` (desde este directorio: `..\frontend`)
+
+`market_Pista8` es un **único repositorio git** con dos aplicaciones independientes, `backend/` y `frontend/`. No usa espacios de trabajo de pnpm: cada aplicación tiene su propio `package.json`, `pnpm-lock.yaml` y `CLAUDE.md`, se instala y se prueba dentro de su carpeta y se despliega como una app aparte en Hostinger (sección 1). La raíz solo aporta el `.gitignore` único, el `README.md` con el mapa del proyecto y un `CLAUDE.md` mínimo. Reunirlas en un repositorio no cambia ninguna regla de negocio ni la separación entre ambas aplicaciones.
+
+```text
+market_Pista8/          (repositorio git único; su README.md es el mapa)
+  .gitignore            (único: cubre backend/ y frontend/)
+  backend/              API en http://localhost:3001 (esta carpeta)
+  frontend/             Next.js en http://localhost:3000
+```
+
+Ambas aplicaciones se usan en paralelo durante el desarrollo local. Para que no choquen, el frontend corre en `http://localhost:3000` (puerto por defecto de Next) y este backend en `http://localhost:3001` (`pnpm dev` lo fija). Todas las secciones de este documento (infraestructura, reglas de negocio, modelo de datos y estructura de directorios) aplican directamente a esta carpeta.
+
+## 1. Arquitectura de Infraestructura
+*   **Frontend:** Next.js (`frontend/`) desplegado en Hostinger (plan Web Apps Unlimited, Node.js 22 LTS; Next 16 exige Node.js 20.9 o superior). El plan Premium no sirve: no incluye Node.js.
+*   **Backend:** API Node.js/Next.js (`backend/`, esta carpeta) desplegado en Hostinger, en el mismo plan que el frontend (dos apps Node.js). Frontend y backend son dominios separados (ej. `catalogo.midominio.com` y `api.midominio.com`).
+*   **Base de Datos:** TiDB Cloud (compatible con MySQL 8.0), como base **temporal** de producción por decisión del cliente; la MySQL del plan de Hostinger queda como alternativa. No se usa PostgreSQL. En desarrollo sigue siendo MySQL local. Codificación `utf8mb4` y colación `utf8mb4_unicode_ci`, fijada en cada tabla (el valor por defecto de TiDB es `utf8mb4_bin`, que distingue mayúsculas). El código debe funcionar en TiDB, MySQL 8.0 o superior y MariaDB 10.4 o superior. TiDB corta las conexiones inactivas a los 340 s: el pool las recicla a los 60 s (`idleTimeout`, `maxIdle`). Producción usa una base y un usuario propios (nunca `root`) y `?ssl=true` en `DATABASE_URL`. Guía en `docs/TIDB.md` del backend.
+*   **Almacenamiento:** Cloudflare R2 (URLs públicas inmutables) con dominio propio (ej. `cdn.midominio.com`).
+*   **CDN, DNS y SSL:** Cloudflare en su plan gratuito, con los nameservers del dominio en Cloudflare (el dominio de R2 lo exige). La CDN de Hostinger se desactiva (solo puede haber una CDN activa) y el SSL va en modo Full (strict). Solo se cachea `/_next/static/*` y las imágenes; `/api/*` y las páginas con sesión se excluyen para no servir descuentos vencidos ni datos de otra persona.
+*   **Fase actual (desarrollo):** todo corre en local. MySQL en el computador (administrado con DBeaver), backend en `http://localhost:3001` y frontend en `http://localhost:3000`. Cloudflare R2 (un bucket de desarrollo aparte del de producción) **se conectará más adelante**: el cliente lo postergó porque el alta exige una tarjeta. Mientras tanto, en desarrollo las imágenes se guardan en memoria (se pierden al reiniciar y sus URLs no abren en un navegador) y el resto del entorno queda listo para conectar R2 solo con completar las variables `R2_*` de `.env.local`. **Pendiente:** cargar las variables `R2_*` (desarrollo en `.env.local`, producción en el panel de Hostinger) y correr `pnpm r2:subir-defaults`. Hostinger, su base de datos y su dominio se usarán al desplegar; hasta entonces sus credenciales quedan como líneas comentadas en `.env.example`. Guía en `docs/ENTORNO_LOCAL.md` del backend.
+*   **Patrón Arquitectónico:** Arquitectura Hexagonal estricta en el Backend.
+*   **Documentación de la API:** El backend expone documentación Swagger (OpenAPI) **solo en desarrollo** (regla 17) para probar las peticiones; como contrato para el frontend se entrega el archivo `docs/openapi.json` del backend, y en producción no hay Swagger.
+*   **Multi-statement en TiDB (2026-09-27):** TiDB rechaza por defecto una consulta con varias sentencias en un solo envío; el migrador (`scripts/lib/conexion.ts`) lo habilita solo para su propia sesión antes de aplicar cada archivo de `db/migrations/`, sin tocar la configuración del clúster. Al administrar el usuario o el esquema a mano (DBeaver, SQL Editor), cada sentencia se ejecuta por separado (detalle en `docs/TIDB.md`).
+*   **Pendiente (verificar en TiDB Cloud antes del despliegue):** que las claves foráneas y los `CHECK` se apliquen (`docs/TIDB.md`, comprobaciones), que `GET_LOCK` funcione para las migraciones, la cuota real del plan gratuito y el modo de colaciones nuevas del clúster.
+*   **Pendiente (verificar en hPanel antes del despliegue):** límite de conexiones simultáneas por usuario, que las apps Node.js permanezcan siempre activas, que el build funcione con `pnpm`, el envío por SMTP y que hPanel permita desplegar cada app desde su subcarpeta (`backend/` y `frontend/`) del repositorio único.
+
+## 2. Reglas de Negocio Críticas (Seguridad y Backend)
+1.  **CORS Estricto:** El backend debe validar la cabecera `Origin`. Solo se permite el dominio en producción del frontend (ej. `https://catalogo.midominio.com`). Rechazar peticiones preflight (`OPTIONS`) de otros orígenes. Las llamadas del servidor del frontend al backend no llevan `Origin` (no son de navegador) y se protegen con el JWT (regla 5).
+2.  **Sanitización de WhatsApp:** Limpiar todos los espacios, guiones y asegurar el código de país (ej. `+591` para Bolivia). Almacenar solo la cadena numérica.
+3.  **Sanitización de Instagram:** Los usuarios escriben `@usuario`, `instagram.com/usuario` o `usuario`. El backend debe extraer y persistir únicamente el `username` limpio.
+    *   **Tercera red social:** además de WhatsApp e Instagram, el perfil admite una tercera red opcional en `otra_red_social` (texto libre de hasta 50 caracteres, por ejemplo el usuario de TikTok o de Facebook). Por ahora no se sanea ni se normaliza: solo se recorta y se valida la longitud (el texto vacío equivale a no indicarla). En la API es opcional al crear y al editar (`otra_red_social`; en la edición `null` la quita) y siempre sale en las respuestas del perfil, con `null` cuando no hay valor. Cuando el cliente decida qué red es, se define su saneamiento como el de Instagram.
+4.  **Migración de Imágenes (Deuda Técnica Cero):** Un script de migración debe descargar los archivos de Google Drive (columnas "Sube tu foto" y "Sube el logo"), comprimirlos a WebP y subirlos a Cloudflare R2. La base de datos almacenará la clave de R2 (`foto_perfil_key`, `logo_key`), nunca el enlace de Drive. Si el archivo falta o el enlace está roto, se aplica la excepción de imágenes predeterminadas (regla 11).
+5.  **Autenticación y roles inmutables:** No existen rutas públicas de registro (no hay `POST /api/register`). Las cuentas solo las crea un Admin, y el backend inyecta el `rol_id` de "Emprendedor" al crearlas. Todas las rutas de creación y administración de cuentas pasan por un middleware de autorización que valida el token de un Admin.
+    *   **JWT:** el backend autentica con JSON Web Tokens. El token identifica al usuario; la clave de firma vive en una variable de entorno del backend, nunca en el repositorio. La duración depende del rol: el token de Emprendedor no expira (la plataforma funciona como una red social, con sesión permanente) y el de Admin expira a las 24 horas.
+    *   **Revocación:** como el token de Emprendedor no expira, en cada petición autenticada el backend comprueba en la base de datos que el usuario exista y siga `activo`, y en las rutas de Admin que su rol sea `Admin`. El rol se lee de la base de datos, no del token. Desactivar la cuenta (`activo = false`) revoca el acceso. Además, `usuarios.token_version` se incrementa al restablecer la contraseña y el token lleva la versión con la que se emitió: si no coincide, deja de valer, así que cambiar la contraseña cierra las sesiones abiertas.
+    *   **Control de creación de cuentas:** no hay rutas públicas de registro y el endpoint de creación exige un token de Admin válido (firma, vigencia, usuario activo y rol Admin). El rol nunca viene en el cuerpo de la petición: el backend siempre inyecta `Emprendedor`, por lo que la API no puede crear cuentas Admin. Las cuentas Admin se crean solo con una consulta directa en la base de datos (regla 14).
+    *   **Credenciales:** las cuentas de emprendedoras las crea un Admin, que define la contraseña inicial o deja que el sistema la genere. Solo se guarda el hash (bcrypt, coste 12, regla 17), nunca la contraseña. Después solo se cambia por OTP (regla 15). La contraseña inicial que define el Admin cumple la misma política que la nueva (mínimo 8 caracteres y máximo 72 bytes, regla 15); si la genera el sistema, se devuelve una sola vez en la respuesta de creación y esa respuesta no se guarda en caché.
+    *   **Gestión de cuentas (Admin):** el Admin crea cuentas directamente (nombres, apellidos, correo y contraseña inicial, sin OTP — regla 15), lista las cuentas con paginación, puede buscarlas por texto libre (`q`, sobre nombres, apellidos y correo, sin distinguir mayúsculas) y filtrarlas por estado (`activo` o `inactivo`), las edita (nombres, apellidos y correo, también sin OTP — cambiar el correo la deja sin verificar hasta el próximo OTP que la cuenta complete, igual que el alta), les restablece la contraseña directamente sin OTP (si no define una, el sistema genera una temporal y la devuelve una sola vez, igual que el alta) y las activa o desactiva. Desactivar no borra nada: solo cambia `activo` y revoca el acceso en la siguiente petición. Un Admin no puede desactivar su propia cuenta (`409`), para no quedarse sin acceso. Si el correo ya tiene cuenta, la creación o la edición responden `409`. **No existe borrar una cuenta por la API:** la cascada del esquema (perfil → productos → descuentos, regla 6) lo haría irreversible y huérfano; el único borrado es el soft delete de `activo = false`. Los eventos de creación, edición, restablecimiento de contraseña y cambio de estado se registran (regla 17).
+    *   **Transporte del token:** el navegador nunca ve el JWT. Como el token de Emprendedor no expira, no debe quedar al alcance de scripts de la página (`localStorage`), y las cookies emitidas por el dominio del backend las bloquean varios navegadores por ser de terceros. Por eso el frontend actúa como intermediario: guarda el JWT en una cookie `httpOnly`, `Secure` y `SameSite=Lax` de su propio dominio, y su servidor lo reenvía al backend en la cabecera `Authorization: Bearer`. La cookie del Emprendedor se renueva en cada visita con la vigencia máxima que aceptan los navegadores (unos 400 días); la del Admin dura 24 horas.
+6.  **Cardinalidad usuario-negocio (1:1):** Cada usuario Emprendedor tiene un solo perfil, por eso `perfiles_emprendedores.usuario_id` es `UNIQUE`. Cada perfil tiene una sola foto de perfil (`foto_perfil_key`) y un solo logo (`logo_key`). Las fotografías adicionales para el feed no cuentan como foto de perfil y son una funcionalidad futura aún sin decidir; por ahora no se modelan.
+7.  **Precios y visibilidad:** `precio` es opcional. `mostrar_precio` permite guardar el precio real y ocultarlo en el frontend. Cuando el precio no existe o está oculto, se muestra un botón "Consultar Precio" hacia WhatsApp.
+    *   **Producto:** la imagen es obligatoria (la imagen predeterminada de la regla 11 es solo del perfil). `precio` es mayor o igual a 0, con hasta 2 decimales y máximo 99.999.999,99; se envía con punto decimal. El nombre es obligatorio, de 3 a 150 caracteres y debe incluir al menos una letra (rechaza nombres hechos solo de números o símbolos). Un producto no se borra: se desactiva (`activo = false`) y se puede reactivar. La dueña ve y edita el precio real aunque esté oculto.
+    *   **Respuesta pública:** con el precio oculto o ausente, la API devuelve `precio`, `porcentaje` y `precio_con_descuento` en `null` y `consultar_precio: true` (el frontend no decide cuándo mostrar el botón).
+8.  **Descuentos con vigencia:** Los descuentos son siempre por porcentaje, son opcionales y se aplican al precio del producto (que también es opcional). Un producto puede tener ninguno, uno o varios descuentos, con o sin fechas. Un descuento nunca se borra para que caduque; su vigencia se evalúa al consultar. **Filtro por estado (2026-10-05):** `GET /mis/descuentos` y `GET /admin/usuarios/{id}/descuentos` aceptan `estado` (`programado`, `vigente` o `vencido`; sin él, todos) para listar solo los descuentos en ese estado, con la paginación y el `total` ya filtrados. El estado **no es una columna de la tabla `descuentos`**: es un dato derivado de `fecha_inicio`, `fecha_fin` y la hora actual, así que guardarlo obligaría a actualizarlo con un proceso programado (y quedaría desactualizado entre una ejecución y otra) y repetiría en la tabla algo que ya dicen otras columnas (3FN). Por eso el filtro se evalúa en la consulta, con la hora actual y la misma precedencia que el `estado` de la respuesta: `programado` si tiene `fecha_inicio` y es futura; si no, `vencido` si tiene `fecha_fin` y ya pasó; si no, `vigente`. No requiere migración: la base de desarrollo y la de pruebas no cambian.
+    *   `fecha_inicio` y `fecha_fin` son opcionales e independientes. `fecha_inicio` `NULL` significa vigente desde que se crea; `fecha_fin` `NULL` significa permanente.
+    *   La hora es opcional para la emprendedora. Ambas columnas son `DATETIME(3)` y se guardan en UTC; si no se indica hora, el backend completa con la zona `America/La_Paz` (UTC-4, sin horario de verano): el inicio a las `00:00:00` y el fin a las `23:59:59` del día indicado, de modo que el último día cuenta completo.
+    *   Si existen ambas fechas, `fecha_fin` debe ser posterior a `fecha_inicio`.
+    *   **Programación automática:** un descuento con `fecha_inicio` futura no se aplica hasta esa fecha y se activa solo al llegar, sin tareas programadas, porque la vigencia se evalúa al consultar. Ejemplo: el producto 1 con un descuento permanente y el producto 2 con un descuento navideño del 1 al 31 de diciembre, que solo se aplica en ese periodo.
+    *   Un descuento está vigente cuando ya empezó y aún no caducó. El Feed del Marketplace debe usar esta consulta:
+
+    ```sql
+    SELECT p.*,
+           dv.porcentaje,
+           ROUND(p.precio * (1 - dv.porcentaje / 100), 2) AS precio_con_descuento
+    FROM productos p
+    LEFT JOIN (
+        SELECT pd.producto_id, MAX(d.porcentaje) AS porcentaje
+        FROM producto_descuentos pd
+        JOIN descuentos d ON d.id = pd.descuento_id
+        WHERE (d.fecha_inicio IS NULL OR d.fecha_inicio <= ?)
+          AND (d.fecha_fin IS NULL OR d.fecha_fin >= ?)
+        GROUP BY pd.producto_id
+    ) dv ON dv.producto_id = p.id
+    WHERE p.activo = 1;
+    ```
+
+    *   Los dos `?` son `ahora`: la hora actual en UTC que pasa la aplicación, en lugar de `NOW()`. Así la vigencia no depende de la zona horaria del servidor y se puede probar con un reloj falso. Se usa `MAX` con `GROUP BY` porque `LATERAL` no existe en MariaDB.
+
+    *   El backend calcula `precio_con_descuento` (nulo si no hay precio o descuento vigente); el frontend no calcula precios ni vigencia.
+    *   Si el producto tiene precio visible y un descuento vigente, se muestran tres datos: el porcentaje de descuento (`porcentaje`), el precio con descuento (`precio_con_descuento`) y el precio sin descuento (`precio`). Si no hay precio o está oculto, no se muestra descuento, porque no hay sobre qué aplicarlo.
+    *   **Formato de las fechas en la API:** `YYYY-MM-DD` (día completo: el inicio a las 00:00:00 y el fin a las 23:59:59, hora de La Paz), `YYYY-MM-DDTHH:mm` o `YYYY-MM-DDTHH:mm:ss` (se interpreta como hora de La Paz) o ISO 8601 con zona (se respeta). Al editar, `null` quita la fecha.
+    *   **Descuentos simultáneos:** si un producto tiene varios descuentos vigentes a la vez, se aplica solo el de mayor porcentaje; no se acumulan. La consulta devuelve una sola fila por producto.
+    *   **Caché:** como la activación y la caducidad se evalúan al consultar, el frontend no debe guardar el feed en caché por más tiempo del retraso que se tolere (frecuencia de revalidación por definir).
+9.  **Consistencia descuento-producto:** Un descuento solo puede aplicarse a productos de su mismo perfil. Se valida en el caso de uso del backend antes de insertar en `producto_descuentos` (`403` si el producto es de otro perfil). Asignar es idempotente (repetirlo no falla) y quitar una asignación que no existe tampoco falla.
+10. **Nombre de la persona:** Se guarda en `usuarios` (depende de la persona, no del negocio; los Admin también tienen nombre y no tienen perfil) separado en `nombres`, `apellido_paterno` y `apellido_materno`. No se almacena `nombre_completo`: es un dato derivado y la API lo compone al responder. `apellido_materno` es opcional porque no todas las personas lo tienen. El Excel original trae un solo campo de nombre completo, así que el script de migración lo separa así: con 3 o más palabras, las dos últimas son los apellidos y el resto los nombres; con 2 palabras, la primera es el nombre y la segunda el apellido paterno. Los casos ambiguos (apellidos compuestos como "de la Cruz", personas con un solo apellido) se listan en un reporte para revisión manual.
+11. **Imágenes obligatorias con excepción:** `foto_perfil_key` y `logo_key` son obligatorias (`NOT NULL`, sin valor por defecto en la base de datos). En casos especiales sin foto o sin logo se usan imágenes predeterminadas en R2: un icono de persona anónima (`defaults/foto-perfil-anonima.webp`) y un logo vacío (`defaults/logo-vacio.webp`). La excepción se aplica de forma explícita, nunca por omisión silenciosa: en la migración cuando el archivo de Drive falta o el enlace está roto (queda registrado en el reporte de revisión), y en el alta o edición del perfil cuando se solicita expresamente. La foto de perfil y el logo se suben y almacenan siempre por separado (también las predeterminadas): son dos archivos independientes y solo el frontend los une visualmente (collage). Nunca se genera una imagen combinada en el backend ni en R2. Las dos imágenes predeterminadas son neutras (sin emojis) y las genera el script `pnpm r2:subir-defaults` del backend, que las sube a R2. **Pendiente (al configurar el bucket de R2):** ejecutar ese script una vez por bucket (desarrollo y producción).
+12. **Migración de credenciales y beneficios:**
+    *   **Credenciales:** el script genera una contraseña aleatoria por cada emprendedora migrada, guarda solo su hash y escribe las credenciales (correo y contraseña temporal) en un reporte local dentro de `reports/` (ignorado por git) para que el Admin las entregue. Los correos del Excel quedan sin verificar (`email_verificado_en` nulo) hasta el primer OTP (regla 15).
+    *   **Beneficios:** el Excel trae el beneficio como texto libre y las emprendedoras migradas todavía no tienen productos, así que la migración no crea descuentos. El texto de cada beneficio queda en el reporte de revisión para crear el descuento (siempre por porcentaje) cuando la emprendedora cargue sus productos.
+13. **Datos iniciales (seed de desarrollo):** `docs/seed.dev.sql` (local, ignorado por git, solo desarrollo y nunca producción) carga los roles `Admin` y `Emprendedor`, ciudades y rubros provisionales, y 11 cuentas: 1 Admin y 10 Emprendedor, todas con la misma contraseña de desarrollo, cuyo hash bcrypt está en el propio archivo. Es idempotente (cada inserción comprueba antes que la fila no exista). Los correos son ficticios, por lo que en desarrollo el OTP se escribe en consola (regla 15). La migración incorporará las ciudades y rubros reales del Excel.
+14. **Primer Admin en producción:** Se crea con una consulta directa sobre la base de datos MySQL (phpMyAdmin de hPanel, o un cliente MySQL con acceso remoto restringido a tu IP); la API nunca crea cuentas Admin (regla 5), y los Admin siguientes, si hacen falta, se crean del mismo modo. Antes deben existir los roles. Se pega solo el hash bcrypt de la contraseña, generado localmente, para que la contraseña en texto plano no quede en el historial de la base de datos. El correo debe ser real y se marca como verificado en la misma consulta (`email_verificado_en`). El Admin no recupera su contraseña por OTP (regla 15): un cambio de contraseña de Admin se hace del mismo modo, con una consulta directa y solo el hash. La plantilla de la consulta está en `docs/schema.reference.sql` (directriz 10).
+15. **Contraseña solo por OTP, y solo para Emprendedora:** La contraseña de una cuenta Emprendedor solo se puede cambiar o recuperar con un código de un solo uso (OTP) enviado al correo de la cuenta; no existe cambio con "contraseña actual". El mismo mecanismo verifica un correo nuevo cuando una cuenta ya autenticada lo cambia. El alta de una cuenta ya no usa OTP (regla 5): el Admin la crea directamente y el correo queda sin verificar hasta el primer código que esa cuenta complete. El Admin nunca ingresa ni recibe un código OTP, para nada (regla 14).
+    *   **Propósitos:** `restablecer_password` (cambio y recuperación, solo cuentas Emprendedor) y `verificar_email` (cambio de correo de una cuenta ya autenticada). El código se envía al correo que se quiere verificar (el nuevo, si es un cambio).
+    *   **Solo Emprendedora se recupera por OTP:** `restablecer_password` nunca genera ni envía un código si el correo es de una cuenta Admin. Si el correo pertenece a un Admin, o no existe, o está desactivada, la respuesta es la misma de siempre (regla de no enumeración, más abajo) para no delatar ni la existencia de la cuenta ni su rol.
+    *   **Alta de cuenta sin OTP:** el Admin crea la cuenta con nombres, apellidos, correo y contraseña inicial, sin pedir ni ingresar ningún código. El correo queda sin verificar (`email_verificado_en` nulo) hasta el primer OTP que esa cuenta complete — el mismo criterio que ya tenían las cuentas migradas del Excel (regla 12).
+    *   **Correos aceptados:** cualquier proveedor (Gmail, iCloud, Hotmail, etc.); no hay lista de dominios permitidos.
+    *   **Parámetros iniciales (ajustables):** código numérico de 6 dígitos, vigencia de 10 minutos, máximo 5 intentos, un solo uso; se guarda solo su hash y solo el último código de cada propósito vale (uno nuevo invalida los anteriores) y cada verificación cuenta como intento, también la correcta. Máximo 1 solicitud por minuto y 5 por hora por correo (se cuentan sin distinguir el propósito); al superarlo responde `429` con `Retry-After`.
+    *   **Sin enumeración de cuentas:** la respuesta al solicitar un código es la misma exista o no la cuenta, esté o no activa, y sea Admin o Emprendedor. La solicitud se registra siempre (cuenta para los límites) y el código solo se envía si es una cuenta Emprendedor activa; en el restablecimiento de contraseña el envío no se espera, para que el tiempo de respuesta tampoco lo delate. Un código incorrecto, vencido, usado o con intentos agotados da el mismo error de validación (`400`).
+    *   **Al restablecer la contraseña** se incrementa `token_version` y se cierran las demás sesiones (regla 5). La contraseña nueva exige mínimo 8 caracteres y máximo 72 bytes (límite de bcrypt).
+    *   **Cambio de correo:** la cuenta autenticada pide el código para el correo nuevo y lo confirma con él; el correo cambia y queda verificado (`email_verificado_en`). No cierra sesiones.
+    *   **Envío real:** los correos salen de una cuenta de correo real mediante un servicio configurado con variables de entorno del backend (las credenciales nunca van en el repositorio), detrás del puerto `IEmailSender` para poder cambiar de proveedor. En desarrollo se usa un adaptador que escribe el código en consola y nunca se envía correo a las direcciones ficticias del seed. El adaptador de consola no se permite en producción (`APP_ENV=production` exige `EMAIL_DRIVER=smtp`), porque escribiría los códigos en los logs.
+    *   **Pendiente (se define al implementar el backend):** elegir el proveedor de correo y la cuenta remitente.
+    *   **Recuperación por SMS (cambio de plan, 2026-09-29; origen del número decidido 2026-10-03):** cuando se construya el panel de la Emprendedora, `restablecer_password` deja de enviarse por correo y pasa a enviarse por SMS (el correo resultó poco práctico para esta base de usuarias). El número es `perfiles_emprendedores.whatsapp` (no se agrega un campo nuevo a `usuarios`): es el dato que ya existe, ya está saneado (regla 2) y, en la práctica, es el teléfono que la emprendedora revisa. Limitación aceptada: es el contacto del *negocio*, no necesariamente el de la persona dueña de la cuenta; se documenta como riesgo conocido, no se resuelve con una columna nueva.
+    *   **Cuenta sin perfil todavía:** si la cuenta Emprendedor no tiene perfil (y por lo tanto no hay `whatsapp` al que mandar el SMS), `restablecer_password` no envía nada — misma respuesta que siempre (no delata si la cuenta existe, igual que cualquier otro caso sin envío). La única recuperación posible ahí es que el Admin le restablezca la contraseña directamente (ya existe, regla 5, sin OTP), consistente con que un Admin también se la puede resetear en cualquier otro momento.
+    *   **Pendiente:** elegir el proveedor de SMS y su puerto (mismo patrón que `IEmailSender`). No cambia nada más de la regla: sigue siendo solo para Emprendedora, el Admin nunca pasa por OTP.
+16. **Almacenamiento y optimización de imágenes:** Todas las imágenes (foto de perfil, logo, productos y predeterminadas) se guardan en Cloudflare R2 y la base de datos guarda solo su clave. El cliente exige optimizar el espacio multimedia, así que toda imagen, tanto en la migración como en cada subida nueva, pasa por el mismo proceso antes de guardarse:
+    *   Se convierte a WebP (formato liviano y compatible con los navegadores modernos), con calidad aproximada de 80.
+    *   Se redimensiona sin ampliar: foto de perfil hasta 800 px, logo hasta 512 px y producto hasta 1200 px por el lado mayor. Son valores iniciales, ajustables.
+    *   Se eliminan los metadatos (EXIF), incluida la ubicación GPS, por privacidad y peso.
+    *   Solo se aceptan JPEG, PNG y WebP de hasta 5 MB de entrada.
+    *   Se guarda una sola versión por imagen, con clave única y cabecera `Cache-Control: public, max-age=31536000, immutable`; el frontend ajusta el tamaño de visualización con `next/image`. **Pendiente:** decidir si esas imágenes pasan por el optimizador de Next (consume CPU del hosting compartido) o se sirven tal cual desde el dominio de R2, que ya las entrega redimensionadas y en WebP.
+17. **Seguridad y protección de datos (nivel medio-alto):** Para un catálogo de este tamaño, sin presupuesto para WAF, SIEM o auditorías externas, "medio-alto" significa controles concretos y verificables, no una certificación formal. Se aplican en toda la aplicación, no solo al desplegar.
+    *   **Control de errores:** ningún error expone detalles internos. Todo error de dominio, de validación o desconocido sale como la respuesta estándar de errores; uno no controlado se registra (sin datos sensibles) y responde `500` genérico. El traductor de errores de la base de datos nunca copia el mensaje del motor, porque lleva los valores que escribió el usuario (p. ej. un correo).
+    *   **Transporte cifrado:** HTTPS de punta a punta (Cloudflare Full-strict, regla 1). El backend se niega a conectar a MySQL sin TLS salvo que el host sea `localhost` o `127.0.0.1` (`?ssl=true` o `?ssl=no-verify` en `DATABASE_URL`); protege la migración desde el computador hacia Hostinger (regla 14) y cualquier acceso remoto futuro.
+    *   **Cabeceras de seguridad:** en toda respuesta de `/api/*`: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` y `Strict-Transport-Security` (regla 1, `src/proxy.ts`). `/docs` (Swagger) lleva además una política de contenido (CSP) restrictiva.
+    *   **Secretos:** `JWT_SECRET` y las credenciales de la base de datos, de R2 y de correo viven solo en variables de entorno del backend, nunca en el repositorio ni en el código.
+    *   **Contraseñas:** hash con bcrypt, coste 12 (regla 5). Nunca se guarda ni se registra la contraseña en texto plano.
+    *   **Freno a los intentos de acceso:** además del límite de la regla 15 sobre los códigos OTP, el login frena los intentos fallidos por correo con una espera escalonada (tabla `intentos_login`): cada 5 intentos fallidos suma un escalón — 15 segundos, 30 segundos, 1 minuto, 5 minutos y 10 minutos, este último como tope para cualquier racha más larga. Mientras dura la espera, el siguiente intento responde `429` con `Retry-After` sin llegar a comparar la contraseña (evita el gasto de CPU de bcrypt en un ataque y no revela si la cuenta existe). Un inicio de sesión correcto reinicia el conteo a cero. Son valores iniciales, ajustables como los de la regla 15.
+    *   **Validación estricta de entradas:** todo cuerpo de petición se valida con Zod en modo estricto (rechaza campos que no están definidos); un id con formato inválido, un campo desconocido o un tipo incorrecto se rechazan con `400` antes de tocar la base de datos.
+    *   **Datos en reposo:** en un hosting compartido no hay forma de verificar el cifrado en disco de MySQL (queda como no verificado). Lo que sí controla el proyecto: las contraseñas y los códigos OTP se guardan solo como hash; `pnpm db:backup` vuelca la base, la comprime y la cifra (AES-256-GCM, `BACKUP_ENCRYPTION_KEY`) antes de subirla a un bucket de R2 **privado** y separado del bucket público de las imágenes (regla 16, variables `R2_BACKUPS_*`, guía en `docs/RESPALDOS.md`); sin esas variables el respaldo cifrado queda solo en `backups/` local (ignorado por git) y hay que moverlo aparte a mano. `pnpm db:restaurar` lo descifra para restaurarlo. El usuario de la base de datos tiene privilegios solo sobre su propia base, nunca acceso global. **Pendiente (paso 16):** programar `pnpm db:backup` como tarea diaria en Hostinger. El correo no se cifra en la base (rompería el índice único que evita cuentas duplicadas); se protege limitando dónde se expone: nunca aparece en el catálogo público, solo en las respuestas de la propia cuenta y del panel de Admin.
+    *   **Dependencias:** `pnpm audit` antes de cada despliegue, no solo al final del proyecto.
+    *   **Auditoría:** los eventos de autenticación (inicio de sesión, creación y desactivación de cuentas, restablecimiento de contraseña) se registran con el mismo logger que redacta datos sensibles (nunca la contraseña, el token ni el código OTP), para poder investigar un incidente.
+    *   **Swagger solo en desarrollo:** la documentación interactiva (`/docs` y `/api/v1/openapi.json`) existe únicamente con `APP_ENV=development` y `SWAGGER_ENABLED=true`. Es un doble control: con `SWAGGER_ENABLED=true` fuera de desarrollo el servidor se niega a arrancar, y aunque llegara a arrancar, esas rutas responden `404` salvo en desarrollo. El contrato para el frontend se entrega como archivo (`docs/openapi.json`), no como servicio en producción.
+    *   **Límites de tamaño:** un cuerpo JSON admite hasta 100 KB y uno multipart hasta 11 MB (dos imágenes de 5 MB más los campos); al pasarse responde `413`. Todo campo de texto de un cuerpo tiene una longitud máxima y todo número un rango, para que una entrada enorme no llegue a procesarse.
+    *   **Cabeceras y huella:** las cabeceras de seguridad de esta regla se aplican también fuera de `/api/*` y no se envía `X-Powered-By`.
+    *   **Verificación automatizada (caja blanca):** las pruebas de `tests/seguridad/` leen el código y fallan si una ruta nueva queda sin autenticación o sin documentar, si un cuerpo no es estricto o no limita sus campos, si una consulta SQL arma texto con datos en vez de parámetros, si un registro de eventos lleva datos personales, si aparece un secreto en el código, o si Swagger queda habilitado fuera de desarrollo. Corren con `pnpm test`.
+18. **Permisos y visibilidad del catálogo:**
+    *   **Catálogo público:** cualquier visitante ve perfiles, productos y descuentos vigentes sin iniciar sesión. Nunca se expone el correo (regla 17); el WhatsApp, el Instagram y la tercera red social sí, porque son el contacto del negocio.
+    *   **Cuenta desactivada:** su perfil y sus productos dejan de mostrarse en el catálogo (regla 5).
+    *   **Perfil:** la emprendedora crea y edita solo el suyo; el Admin puede crearlo y editarlo en nombre de cualquier cuenta Emprendedor (nunca de un Admin, que no tiene perfil). Un perfil no se borra por la API.
+    *   **Productos y descuentos:** solo su dueña o un Admin los crean y editan. Un descuento no se borra: se termina editando `fecha_fin` (regla 8). Solo se puede quitar su asignación a un producto.
+    *   **Ciudades y rubros:** solo lectura por la API; se administran con SQL.
+    *   **Precio oculto** (`mostrar_precio = false`): la API omite `precio`, `precio_con_descuento` y `porcentaje` para que no viajen al navegador (regla 7).
+    *   **Cuentas:** solo el Admin las crea, lista, activa y desactiva (regla 5).
+    *   **Panel del Admin, lectura por `usuario_id` (módulo "Emprendimientos"):** para que el Admin administre el perfil de una cuenta Emprendedor a partir de su `usuario_id` (el único dato que tiene la lista de Cuentas), existen 4 rutas de solo lectura, todas `requireAdmin`: `GET /admin/usuarios/{id}` (datos básicos de la cuenta), `GET /admin/usuarios/{id}/perfil` (su perfil, `404` si todavía no tiene), `GET /admin/usuarios/{id}/productos` (todos sus productos, activos o no, con el precio real — mismo formato que "mis productos") y `GET /admin/usuarios/{id}/descuentos` (mismo formato que "mis descuentos"). Son solo de lectura: la creación y edición ya usan las rutas de esta misma regla (`POST`/`PATCH /perfiles`, `POST`/`PATCH /productos`, `PUT .../foto-perfil`, `PUT .../logo`, `PUT .../imagen`, `POST`/`PATCH /descuentos`, `POST`/`DELETE /descuentos/{id}/productos/...`), que ya aceptan el `usuario_id`/`perfil_id` que indique el Admin.
+19. **Métricas de contacto (clics):** el catálogo público registra un evento anónimo cada vez que alguien hace clic en el WhatsApp o el Instagram de un perfil — `POST /perfiles/{id}/clics`, público, sin autenticar, cuerpo `{ "tipo": "whatsapp" | "instagram" }`. Solo se guarda `perfil_id`, `tipo` y la fecha; nunca un dato del visitante (ni IP, ni user-agent, ni cookie). `404` si el perfil no existe o su cuenta está desactivada (regla 18). Solo el Admin lee estas métricas, siempre agregadas (totales, ranking, serie diaria, distribución por rubro y mapa de calor de las cuentas activas), nunca el evento individual: `GET /admin/metricas/resumen`, `GET /admin/metricas/ranking` (top por clics totales), `GET /admin/metricas/serie` (un punto por día de La Paz — UTC-4, regla 8 —, completo: los días sin clics vienen en 0) , `GET /admin/metricas/por-rubro` (suma de clics agrupada por rubro) y `GET /admin/metricas/mapa-calor` (los clics de WhatsApp e Instagram de las cuentas más contactadas cruzados con el tiempo, ver más abajo). Las cinco aceptan `desde`/`hasta` (query, `YYYY-MM-DD`, día de La Paz) para acotar el período a mostrar; sin ninguno de los dos, los últimos 30 días hasta hoy. `hasta` no puede ser anterior a `desde` ni el rango superar los 2 años (`400`). `ranking` y `mapa-calor` además admiten `limite` (por defecto 10, máximo 20) y `mapa-calor` también `orden`. **Mapa de calor (2026-10-04, rediseñado el mismo día):** una fila por cuenta del top y, por cada una, sus clics del período por canal, su evolución en el tiempo y su comparación con el período anterior. El top son las cuentas activas con más clics del período según `orden` (query: `total` por defecto, `whatsapp` o `instagram`; el empate se resuelve por clics totales y luego por nombre), de modo que el Top 10 por WhatsApp son de verdad las 10 con más clics de WhatsApp y no un reordenamiento del top por total. Para la evolución, el backend decide la granularidad según los días del período, de modo que las columnas nunca pasan de unas 45: hasta 45 días, un día por columna; hasta 180, una semana (lunes a domingo); más de 180, un mes de calendario. Todo en días de La Paz (UTC-4, regla 8); la primera y la última columna se recortan al período, así que una semana o un mes parciales siguen siendo una sola columna, con su `inicio` y su `fin` reales. La respuesta es `{ granularidad: "dia" | "semana" | "mes", columnas: [{ inicio, fin }], filas: [{ perfil_id, nombre_negocio, whatsapp, instagram, total, total_anterior, celdas: [{ whatsapp, instagram }] }] }` (fechas `YYYY-MM-DD`): una celda por columna, en el mismo orden, con 0 donde no hubo clics (igual que la serie diaria); `whatsapp`, `instagram` y `total` de cada fila son la suma de sus celdas, así que siempre cuadran; y `total_anterior` son los clics totales (WhatsApp + Instagram) de esa misma cuenta en el período inmediatamente anterior de igual duración en días de La Paz (el que termina el día previo a `desde`), con el que el frontend calcula la tendencia (0 si no tuvo clics). Las filas salen en el orden pedido. Sigue siendo solo agregado (conteos por cuenta e intervalo, nunca el evento individual) y solo de cuentas activas (regla 18). Sin deduplicación ni límite de frecuencia por clic (igual que el resto de la API pública, regla 17: catálogo chico, sin presupuesto de controles anti-abuso dedicados). Las búsquedas del catálogo no se registran todavía (fuera de esta regla).
+
+## 3. Modelo de Base de Datos (MySQL - 3NF)
+Aplicando principios ACID y la Tercera Forma Normal (3NF) para eliminar redundancias. La referencia SQL completa vive en el backend (`docs/schema.reference.sql`, archivo local ignorado por git, solo consulta). Convenciones del motor (MySQL 8.0+, MariaDB 10.4+ y TiDB, InnoDB, `utf8mb4`):
+*   **Identificadores:** `CHAR(36)` con un UUID v4 que genera la aplicación (`crypto.randomUUID()`). La base no tiene valor por defecto para ellos.
+*   **Fechas y horas:** `DATETIME(3)` siempre en UTC. La aplicación fija la zona de la sesión en `+00:00` y pasa la hora actual (`ahora`) como parámetro en lugar de usar `NOW()`.
+*   **Booleanos:** `BOOLEAN` (`TINYINT(1)`, valores 0 y 1).
+*   **CHECK:** el motor solo los aplica desde MySQL 8.0.16, MariaDB 10.2.1 y TiDB 7.2 (en TiDB depende de `tidb_enable_check_constraint`); la validación del dominio los replica de todos modos.
+*   **Claves foráneas:** TiDB solo las aplica desde la v8.5.0; hay que comprobarlo en el clúster antes de migrar.
+*   **Sin transacciones en el DDL:** cada sentencia de definición (`CREATE TABLE`, `CREATE INDEX`) confirma sola, así que una migración que falla a la mitad puede dejar el esquema parcial (ver el plan, paso 2).
+
+### Dominio 1: Catálogos base y autenticación
+
+#### Tabla: `roles`
+*   `id` CHAR(36) PRIMARY KEY
+*   `nombre` VARCHAR(50) UNIQUE NOT NULL
+
+#### Tabla: `ciudades`
+*   `id` CHAR(36) PRIMARY KEY
+*   `nombre` VARCHAR(50) UNIQUE NOT NULL (ej. "La Paz", "Cochabamba")
+
+#### Tabla: `rubros`
+*   `id` CHAR(36) PRIMARY KEY
+*   `nombre` VARCHAR(100) UNIQUE NOT NULL (ej. "Alimentos y bebidas")
+
+#### Tabla: `usuarios`
+*   `id` CHAR(36) PRIMARY KEY
+*   `email` VARCHAR(150) UNIQUE NOT NULL
+*   `nombres` VARCHAR(100) NOT NULL
+*   `apellido_paterno` VARCHAR(50) NOT NULL
+*   `apellido_materno` VARCHAR(50) NULL (opcional, ver regla 10)
+*   `password_hash` VARCHAR(255) NOT NULL (hash bcrypt coste 12, ver reglas 5 y 17)
+*   `rol_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `roles(id)` ON DELETE RESTRICT
+*   `activo` BOOLEAN NOT NULL DEFAULT TRUE (soft delete administrativo)
+*   `email_verificado_en` DATETIME(3) NULL (nulo = correo sin verificar, ver regla 15)
+*   `token_version` INTEGER NOT NULL DEFAULT 0 (se incrementa al restablecer la contraseña, ver regla 5)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+
+#### Tabla: `intentos_login` (freno a login, regla 17)
+*   `id` CHAR(36) PRIMARY KEY
+*   `email` VARCHAR(150) NOT NULL (no referencia a `usuarios`: un correo inexistente también debe frenarse, para no revelar si la cuenta existe)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+*   Índice sobre (`email`, `creado_en`)
+
+### Dominio 2: Perfiles de emprendedores (Feed 1)
+
+#### Tabla: `perfiles_emprendedores`
+*   `id` CHAR(36) PRIMARY KEY
+*   `usuario_id` CHAR(36) NOT NULL UNIQUE FOREIGN KEY REFERENCES `usuarios(id)` ON DELETE CASCADE (relación 1:1, ver regla 6)
+*   `nombre_negocio` VARCHAR(150) NOT NULL
+*   `descripcion` TEXT NOT NULL
+*   `whatsapp` VARCHAR(20) NOT NULL (solo números, formateado por el backend)
+*   `instagram_username` VARCHAR(50) NULL (solo username limpio, sin `@`)
+*   `otra_red_social` VARCHAR(50) NULL (tercera red social opcional, texto libre, ver regla 3)
+*   `ciudad_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `ciudades(id)` ON DELETE RESTRICT
+*   `rubro_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `rubros(id)` ON DELETE RESTRICT
+*   `foto_perfil_key` VARCHAR(255) NOT NULL (clave del archivo WebP en R2; puede ser la imagen predeterminada, regla 11)
+*   `logo_key` VARCHAR(255) NOT NULL (clave del archivo WebP en R2; puede ser la imagen predeterminada, regla 11)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+*   `actualizado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+
+### Dominio 3: Marketplace (Feed 2)
+
+#### Tabla: `productos`
+*   `id` CHAR(36) PRIMARY KEY
+*   `perfil_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `perfiles_emprendedores(id)` ON DELETE CASCADE
+*   `nombre` VARCHAR(150) NOT NULL
+*   `descripcion` TEXT NULL
+*   `precio` DECIMAL(10,2) NULL (opcional, ver reglas 7 y 8)
+*   `mostrar_precio` BOOLEAN NOT NULL DEFAULT TRUE
+*   `imagen_key` VARCHAR(255) NOT NULL (clave del archivo WebP en R2)
+*   `activo` BOOLEAN NOT NULL DEFAULT TRUE (soft delete por la emprendedora)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+*   `actualizado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+
+### Dominio 4: Motor de promociones
+
+#### Tabla: `descuentos`
+*   `id` CHAR(36) PRIMARY KEY
+*   `perfil_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `perfiles_emprendedores(id)` ON DELETE CASCADE
+*   `porcentaje` DECIMAL(5,2) NOT NULL CHECK (`porcentaje` > 0 AND `porcentaje` <= 100)
+*   `fecha_inicio` DATETIME(3) NULL (ver regla 8)
+*   `fecha_fin` DATETIME(3) NULL (ver regla 8)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+*   CHECK: `fecha_inicio` y `fecha_fin` nulas, o `fecha_fin` > `fecha_inicio`
+
+#### Tabla: `producto_descuentos` (pivote N:M)
+*   `producto_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `productos(id)` ON DELETE CASCADE
+*   `descuento_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `descuentos(id)` ON DELETE CASCADE
+*   PRIMARY KEY (`producto_id`, `descuento_id`)
+
+### Dominio 5: Verificación por OTP
+
+#### Tabla: `otp_codigos`
+*   `id` CHAR(36) PRIMARY KEY
+*   `email` VARCHAR(150) NOT NULL (no referencia a `usuarios`: el correo puede pertenecer a una cuenta que aún no existe)
+*   `proposito` VARCHAR(30) NOT NULL CHECK (`verificar_email` o `restablecer_password`)
+*   `codigo_hash` VARCHAR(255) NOT NULL (hash del código, nunca el código en texto plano)
+*   `intentos` SMALLINT NOT NULL DEFAULT 0
+*   `expira_en` DATETIME(3) NOT NULL
+*   `usado_en` DATETIME(3) NULL (nulo mientras no se consuma)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+*   Índice sobre (`email`, `proposito`, `creado_en`)
+
+### Dominio 6: Métricas de contacto
+
+#### Tabla: `clics_contacto` (regla 19)
+*   `id` CHAR(36) PRIMARY KEY
+*   `perfil_id` CHAR(36) NOT NULL FOREIGN KEY REFERENCES `perfiles_emprendedores(id)` ON DELETE CASCADE
+*   `tipo` VARCHAR(20) NOT NULL CHECK (`whatsapp` o `instagram`)
+*   `creado_en` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+*   Índice sobre (`perfil_id`, `tipo`)
+*   Un evento por clic, sin ningún dato del visitante (regla 19): a diferencia de `otp_codigos` e `intentos_login`, sí referencia a `perfiles_emprendedores`, porque el clic siempre pertenece a un perfil que ya existe.
+
+### Notas de normalización
+*   Todas las tablas cumplen 1NF (valores atómicos), 2NF y 3NF (cada atributo depende solo de la clave de su tabla). Los catálogos (`roles`, `ciudades`, `rubros`) están aislados.
+*   El nombre de la persona vive en `usuarios` porque depende de la persona y no del negocio (los Admin también tienen nombre y no tienen perfil). Está separado en `nombres`, `apellido_paterno` y `apellido_materno` para que cada columna sea atómica (1NF), y `nombre_completo` no se almacena porque es un dato derivado (regla 10).
+*   `otp_codigos` e `intentos_login` no referencian a `usuarios`: son dominios independientes porque el correo puede pertenecer a una cuenta que aún no existe (o no existir nunca). Cumplen 3NF.
+*   `producto_descuentos` **no** lleva `perfil_id`: se derivaría de `producto_id` (dependencia parcial, viola 2NF). La coherencia entre perfiles se garantiza en el caso de uso (regla 9), no en la tabla.
+
+## 4. Estructura de Directorios Backend (Arquitectura Hexagonal)
+
+Estructura real del código del backend (paso 17 del plan). Todas las rutas de esta sección son relativas a `backend/`. El código vive en `src/` (alias `@/*`); las rutas HTTP son delgadas (`src/app/api/v1/**/route.ts`) y delegan en los casos de uso. Cada módulo de negocio de `/core` sigue la misma división: `domain` (reglas puras y puertos), `application` (casos de uso) e `infrastructure` (adaptadores de salida).
+
+```text
+/src
+  proxy.ts (CORS estricto, regla 1, y cabeceras de seguridad de /api/*, regla 17)
+  instrumentation.ts (valida el entorno al arrancar; en producción detiene el servidor si es inválido)
+  /app (rutas de Next, delgadas)
+    /api/v1/**/route.ts (adaptadores HTTP: validan, llaman al caso de uso y responden)
+    /docs/route.ts (Swagger UI, solo en desarrollo, regla 17)
+  /api (Adaptadores de Entrada HTTP)
+    /controllers (serializan las respuestas con listas explícitas de campos)
+    /composicion (cablean los casos de uso con sus adaptadores; la única capa que une ambos lados)
+    /http
+      respuestas.ts (respuesta estándar de errores y paginada)
+      validacion.ts (cuerpo JSON acotado a 100 KB, consulta y parámetros de ruta con Zod)
+      cuerpo.ts (lectura de cuerpos con límite de tamaño)
+      multipart.ts (formularios con archivos, con límite)
+      imagenes.ts (imagen o excepción explícita de la predeterminada, regla 11)
+      paginacion.ts
+    /middlewares
+      requireAuth.ts (valida el token y que el usuario exista, esté activo y su token_version coincida)
+      requireAdmin.ts (además exige el rol Admin, leído de la base, regla 5)
+      withErrorHandling.ts (todo error sale como la respuesta estándar, sin detalles internos)
+    /openapi (registro de rutas y esquemas Zod: una sola fuente para validar y documentar)
+  /core
+    /auth (usuarios, sesiones y códigos OTP)
+      /domain
+        Usuario.ts, Rol.ts, Otp.ts, Password.ts
+        IUsuarioRepository.ts, IPasswordHasher.ts, ITokenService.ts, IOtpRepository.ts
+        IIntentosLoginRepository.ts (freno a login, regla 17)
+      /application
+        LoginUseCase.ts (frena con espera escalonada cada 5 intentos fallidos y registra los eventos de acceso, regla 17)
+        CreateUsuarioUseCase.ts (solo Admin; inyecta el rol "Emprendedor" y exige el OTP del correo, reglas 5, 10 y 15)
+        ListUsuariosUseCase.ts, CambiarEstadoUsuarioUseCase.ts (solo Admin, regla 5)
+        RequestOtpUseCase.ts, VerificadorOtp.ts (genera, envía, valida y consume el código, regla 15)
+        ResetPasswordUseCase.ts, CambiarEmailUseCase.ts (regla 15)
+      /infrastructure
+        MySqlUsuarioRepository.ts, MySqlOtpRepository.ts, MySqlIntentosLoginRepository.ts
+        BcryptPasswordHasher.ts (coste 12, regla 17)
+        JwtTokenService.ts (sin expiración para Emprendedor, 24 horas para Admin; algoritmo fijado a HS256)
+        generarCodigoOtp.ts, generarPasswordTemporal.ts
+    /perfiles (Feed 1)
+      /domain
+        Perfil.ts, IPerfilRepository.ts
+        Whatsapp.ts, Instagram.ts (sanean los datos, reglas 2 y 3)
+      /application
+        CreatePerfilUseCase.ts (aplica las imágenes predeterminadas solo si se piden, reglas 6 y 11)
+        UpdatePerfilUseCase.ts, ReemplazarImagenPerfilUseCase.ts
+        ConsultasPerfil.ts (feed público, detalle y "mi perfil"; excluyen cuentas desactivadas, regla 18)
+        resolverPerfilDeGestion.ts, prepararImagen.ts
+      /infrastructure
+        MySqlPerfilRepository.ts
+    /productos (Feed 2)
+      /domain
+        Producto.ts, IProductoRepository.ts
+      /application
+        ConsultasProducto.ts (GetMarketplaceUseCase: vigencia, mayor descuento y precio con descuento, regla 8)
+        CreateProductoUseCase.ts
+        GestionProductoUseCases.ts (UpdateProductoUseCase, DeactivateProductoUseCase, ReemplazarImagenProductoUseCase)
+      /infrastructure
+        MySqlProductoRepository.ts (contiene la consulta de la regla 8)
+    /descuentos
+      /domain
+        Descuento.ts, IDescuentoRepository.ts
+        VigenciaDescuento.ts (fechas por defecto en La Paz, rango y estado, regla 8)
+      /application
+        DescuentoUseCases.ts (Create, Update, ListMis, AsignarDescuentoAProducto con la regla 9, QuitarDescuentoDeProducto)
+      /infrastructure
+        MySqlDescuentoRepository.ts
+    /catalogos (ciudades y rubros)
+      /domain
+        Ciudad.ts, Rubro.ts, ICatalogoRepository.ts
+      /application
+        GetCatalogosUseCase.ts
+      /infrastructure
+        MySqlCatalogoRepository.ts
+  /shared
+    /config
+      env.ts (variables de entorno validadas; Swagger solo en desarrollo)
+      validarEntornoAlArrancar.ts
+    /domain
+      errors.ts, IClock.ts, ILogger.ts, Actor.ts, Paginacion.ts
+      IImageStorage.ts, IImageProcessor.ts, imagenes.ts (puertos y constantes de imágenes, reglas 11 y 16)
+      IEmailSender.ts (puerto de envío de correo, regla 15)
+    /infrastructure
+      MySqlClient.ts (pool de conexiones `mysql2`), opcionesMySql.ts (TLS obligatorio fuera del computador), errorMySql.ts (traduce errores sin copiar el mensaje del motor)
+      ConsoleLogger.ts (registro de eventos que redacta datos sensibles), logger.ts, SystemClock.ts
+      ImageProcessorService.ts (WebP, redimensión y limpieza de metadatos, regla 16)
+      CloudflareImageService.ts (Implementa IImageStorage sobre R2), ImageStorageEnMemoria.ts (desarrollo sin R2 y pruebas), crearImageStorage.ts
+      ConsoleEmailSender.ts (solo desarrollo), crearEmailSender.ts (el envío real, EmailSenderService, llega con el proveedor de correo, paso 8b)
+/db/migrations (SQL versionado, aplicado por `pnpm db:migrate`)
+/scripts (adaptadores de entrada por línea de comandos)
+  migrate.ts, seed-dev.ts, export-openapi.ts, subir-defaults-r2.ts, backup.ts, restaurar-backup.ts (regla 17)
+  (migrarDesdeExcel.ts llega con el paso 14, reglas 4, 10, 11, 12 y 16)
+/tests
+  /seguridad (pruebas de caja blanca: rutas, esquemas, SQL, registros, secretos, JWT, arquitectura, Swagger, exposición y robustez)
+  /integration (contra la base MySQL de pruebas: restricciones, vigencia de descuentos, índices y carga concurrente)
+```
+
+## 5. Estado actual
+
+Implementación en curso, paso a paso, según `docs/PLAN_IMPLEMENTACION_BACKEND.md`. El modelo de datos (sección 3) y las reglas de negocio (sección 2) están definidos; la referencia SQL está en `docs/schema.reference.sql` y el seed de desarrollo en `docs/seed.dev.sql` (ambos locales, ignorados por git).
+
+*   **Hecho (pasos 0 y 1):** proyecto solo API sobre Next.js 16 / React 19 / TypeScript estricto / pnpm, sin Tailwind ni código de frontend. El código vive en `src/` (alias `@/*` → `./src/*`). Las variables de entorno se validan con Zod en `src/shared/config/env.ts` y el servidor no arranca si falta alguna (se comprueba en `src/instrumentation.ts`; `next build` no las exige). `.env.example` lista todas las variables. Pruebas con Vitest.
+*   **Hecho (paso 2, base de datos):** migraciones SQL para MySQL versionadas en `db/migrations/` (`pnpm db:migrate`, con historial en la tabla `_migraciones`), seed de desarrollo (`pnpm db:seed:dev`, solo con `APP_ENV=development`) y pruebas de integración contra una base MySQL aparte (`DATABASE_URL_TEST`, `pnpm test:integration`).
+*   **Hecho (paso 3, núcleo compartido):** errores de dominio con código (`src/shared/domain/errors.ts`) y su respuesta HTTP estándar (`src/api/http/respuestas.ts`), validación con Zod, paginación, `IClock`, registro de eventos que redacta datos sensibles y `MySqlClient` (pool de `mysql2`).
+*   **Hecho (paso 4, Swagger y OpenAPI):** `GET /api/v1/health`, especificación en `GET /api/v1/openapi.json` y Swagger UI en `GET /docs` (solo con `SWAGGER_ENABLED=true`; si no, 404). El contrato versionado para el frontend está en `docs/openapi.json` (`pnpm openapi:export` lo regenera).
+*   **Hecho (paso 5, seguridad transversal):** `src/proxy.ts` con CORS estricto (regla 1) y cabeceras de seguridad (regla 17) para `/api/*`.
+*   **Entorno local (2026-09-21):** la guía paso a paso para crear `catalogo_dev` y `catalogo_test` en el MySQL del computador con DBeaver, conectar el backend, sembrar los datos y configurar R2 está en `docs/ENTORNO_LOCAL.md` (con el script `docs/entorno-local.sql`). No se despliega en Hostinger hasta que se indique.
+*   **Migración a Hostinger y MySQL (2026-09-21):** el proyecto pasó de Vercel, Neon y PostgreSQL a Hostinger Unlimited (frontend, backend y MySQL) con Cloudflare R2 para las imágenes, para ajustarse al presupuesto del cliente. Se reescribieron el esquema, las migraciones, el seed, el cliente de base de datos, el traductor de errores y las pruebas de integración; las reglas de negocio no cambiaron. Detalle y costos en `docs/PLAN_IMPLEMENTACION_BACKEND.md`.
+*   **Seguridad reforzada (2026-09-22, regla 17):** coste de bcrypt subido a 12; el backend exige TLS para conectar a MySQL fuera del computador (`src/shared/infrastructure/opcionesMySql.ts`); cabecera `Strict-Transport-Security` agregada al proxy; tabla `intentos_login` (migraciones `0003` y `0004`) para frenar los intentos de login. Probado contra MySQL 9.4 y MariaDB 10.4 reales; 211 pruebas unitarias y 74 de integración en verde.
+*   **Hecho (paso 6, catálogos):** primer corte vertical completo (`src/core/catalogos/`), `GET /api/v1/catalogos/ciudades` y `GET /api/v1/catalogos/rubros`, públicos, sin paginar.
+*   **Hecho (paso 7, autenticación con JWT):** `src/core/auth/` (`Usuario`, `LoginUseCase`, `BcryptPasswordHasher` coste 12, `JwtTokenService` con `jose`, `MySqlUsuarioRepository`, `MySqlIntentosLoginRepository`); `POST /api/v1/auth/login` y `GET /api/v1/auth/me`; envoltorios `requireAuth` y `requireAdmin` (`src/api/middlewares/`) que verifican el token, cargan el usuario de la base, exigen `activo` y comparan `token_version`; el rol se lee siempre de la base, nunca del token. El login frena con espera escalonada por correo (`intentos_login`, regla 17: 15 s, 30 s, 1 min, 5 min y 10 min tope cada 5 intentos fallidos, reinicia con un ingreso correcto) con 429 y `Retry-After`.
+*   **Hecho (paso 8a, OTP sin proveedor real, regla 15):** `POST /api/v1/auth/password/solicitar-codigo` y `POST /auth/password/restablecer` (públicos), `POST /auth/email/solicitar-codigo` y `PUT /auth/email` (autenticados). `RequestOtpUseCase`, `VerificadorOtp` (valida y consume; lo reutilizará el alta de cuentas del paso 9), `ResetPasswordUseCase` y `CambiarEmailUseCase` en `src/core/auth/`; `MySqlOtpRepository` con intentos y consumo atómicos; puerto `IEmailSender` y `ConsoleEmailSender` (escribe el código en la consola del servidor; no se permite con `APP_ENV=production`). Probado en un servidor real: código por consola, 429 con `Retry-After`, respuesta idéntica con o sin cuenta, y el token anterior deja de valer tras restablecer.
+*   **Hecho (paso 9, cuentas del Admin, reglas 5, 10 y 15):** `POST /admin/usuarios`, `GET /admin/usuarios` (paginado, con búsqueda `q` y filtro `estado`) y `PATCH /admin/usuarios/{id}/estado`, todos con `requireAdmin` y sin caché (`Cache-Control: no-store` en `/api/v1/admin/*`). `CreateUsuarioUseCase` (inyecta el rol Emprendedor; el cuerpo con `rol` o `rol_id` da 400), `ListUsuariosUseCase` y `CambiarEstadoUsuarioUseCase`. Probado en un servidor real: 401 sin token, 403 con token de Emprendedor, creación con contraseña temporal, 409 por correo repetido, y el token de una cuenta desactivada deja de valer en la siguiente petición. Los valores por defecto de los supuestos 2 (permisos) y 8 (un Admin no se desactiva a sí mismo) quedaron aplicados y documentados en la regla 5.
+*   **Alta de cuenta sin OTP (2026-09-28, regla 15):** el alta ya no pasa por `POST /admin/usuarios/verificacion-correo` (eliminado): el Admin crea la cuenta en un solo paso, sin código, y el correo queda sin verificar (`email_verificado_en` nulo) hasta el primer OTP que esa cuenta complete. El OTP queda reservado a `restablecer_password` (solo cuentas Emprendedor, nunca Admin) y a `verificar_email` para el cambio de correo de una cuenta ya autenticada.
+*   **Hecho (paso 10, imágenes, reglas 11 y 16):** puertos `IImageStorage` e `IImageProcessor` (`src/shared/domain/`), `ImageProcessorService` (sharp: tipo real por el contenido, orientación EXIF, sin metadatos, WebP calidad 80, 800/512/1200 px sin ampliar, 5 MB máximo), `CloudflareImageService` (R2 con caché inmutable), `ImageStorageEnMemoria` (pruebas y desarrollo sin R2; sus URLs `memoria://` no abren en un navegador) y el lector multipart con límite de tamaño (`src/api/http/multipart.ts`). `pnpm r2:subir-defaults` genera y sube las dos imágenes predeterminadas. **Sin verificar contra un bucket real:** `.env.local` tiene las variables `R2_*` vacías (paso 10b).
+*   **Hecho (paso 11, perfiles, reglas 2, 3, 6, 11 y 18):** `GET /api/v1/perfiles` (filtros `ciudad_id`, `rubro_id`, `q`, paginado), `GET /perfiles/{id}`, `GET /mis/perfil`, `POST /perfiles` (multipart), `PATCH /perfiles/{id}`, `PUT /perfiles/{id}/foto-perfil` y `/logo` en `src/core/perfiles/`. Las imágenes predeterminadas solo se aplican con la marca explícita (`usar_foto_predeterminada`, `usar_logo_predeterminado`, `usar_predeterminada`); sin archivo ni marca da 400. Un fallo en el alta borra las imágenes ya subidas; al reemplazar una imagen se borra la anterior (salvo las predeterminadas). Probado en un servidor real (401/403/404/409/413, cuenta desactivada oculta en el feed). Los supuestos 1, 3, 4, 6 y 7 del plan quedaron documentados en la regla 18.
+*   **Hecho (paso 12, productos y marketplace, reglas 7, 8 y 18):** `GET /api/v1/marketplace/productos` (filtros `perfil_id`, `ciudad_id`, `rubro_id`, `q`, paginado) y `/marketplace/productos/{id}` (públicos), `GET /mis/productos`, `POST /productos` (multipart, imagen obligatoria), `PATCH /productos/{id}` (también reactiva con `activo: true`), `PUT /productos/{id}/imagen` y `DELETE /productos/{id}` (soft delete, 204) en `src/core/productos/`. El feed usa la consulta de la regla 8 (`MAX` con `GROUP BY`, `ahora` como parámetro): una fila por producto, mayor descuento vigente y precio con descuento calculados al consultar. Con el precio oculto o ausente, la respuesta pública lleva `precio`, `porcentaje` y `precio_con_descuento` en `null` y `consultar_precio: true`; la dueña ve el precio real.
+*   **Hecho (paso 13, descuentos, reglas 8 y 9):** `GET /mis/descuentos` (con `estado`: `programado`, `vigente` o `vencido`), `POST /descuentos`, `PATCH /descuentos/{id}`, `POST /descuentos/{id}/productos` (todo o nada; 403 si algún producto es de otro perfil) y `DELETE /descuentos/{id}/productos/{producto_id}` en `src/core/descuentos/`. `VigenciaDescuento` interpreta las fechas (día completo en La Paz, hora de La Paz o zona explícita). No existe `DELETE` de descuentos. Probado en un servidor real: gana el mayor de varios descuentos vigentes, uno con inicio futuro se activa al llegar la fecha y uno terminado con `fecha_fin` vuelve al anterior. Los supuestos 5 y 7 del plan quedaron en la regla 18.
+*   **Hecho (paso 15, endurecimiento, regla 17):** Swagger **solo en desarrollo** con doble control (con `SWAGGER_ENABLED=true` fuera de `development` el servidor no arranca, y `/docs` y `/api/v1/openapi.json` responden 404 salvo en desarrollo); en producción un entorno inválido detiene el proceso (`src/shared/config/validarEntornoAlArrancar.ts`); cuerpo JSON acotado a 100 KB (413), página máxima y longitud máxima en todo campo; auditoría de login (`login_exitoso`, `login_fallido`, `login_bloqueado`); cabeceras de seguridad también fuera de `/api` y sin `X-Powered-By`. **Pruebas no funcionales de caja blanca** en `tests/seguridad/` (rutas y autenticación, esquemas estrictos y acotados, SQL sin datos interpolados, registros sin datos personales, secretos, JWT hostiles, arquitectura hexagonal, Swagger, lista blanca de campos y robustez ante ReDoS, cuerpos y imágenes hostiles) y `tests/integration/rendimiento.integration.test.ts` (índices y carga concurrente). Se comprobó que detectan fallos rompiendo el código a propósito (9 de 9). `pnpm audit` sin vulnerabilidades. Revisión OWASP en `docs/SEGURIDAD.md`. Probado en un servidor real en modo producción: se detiene con Swagger habilitado y, con configuración válida, `/docs` y `/api/v1/openapi.json` dan 404.
+*   **Hecho (paso 17, cierre):** sección 4 corregida con la estructura real; `README.md` (instalar, variables, migrar, sembrar, Swagger y pruebas); `docs/MATRIZ_PERMISOS.md` y `docs/openapi.json` para el frontend. Verificación final: 1273 pruebas unitarias y de caja blanca, 171 de integración, `typecheck`, `lint` y `build` en verde.
+*   **Pendiente:** los pasos 8b, 10b, 14 y 16 del plan. El paso 8b necesita un proveedor de correo (con `EMAIL_DRIVER=smtp` el servidor falla al enviar hasta entonces), el 10b (verificar contra el bucket) las variables `R2_*`, y el 14 el Excel original. **R2 postergado por el cliente** (requiere tarjeta): el entorno ya está listo, solo falta cargar las variables `R2_*` (desarrollo en `.env.local` y producción en el panel de Hostinger, ver `.env.example`), correr `pnpm r2:subir-defaults` y verificar subiendo una imagen real.

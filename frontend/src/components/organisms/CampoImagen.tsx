@@ -4,6 +4,7 @@ import { CircleAlert } from "lucide-react";
 import Image from "next/image";
 import { useActionState } from "react";
 import { Button } from "@/components/atoms/Button";
+import { EntradaArchivoImagen } from "@/components/atoms/EntradaArchivoImagen";
 import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
 import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
 
@@ -43,13 +44,7 @@ export function CampoImagen({ titulo, urlActual, alt, accion, textoPredeterminad
         </div>
 
         <form action={ejecutar} className="flex-1 space-y-2">
-          <input
-            type="file"
-            name="archivo"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={pendiente}
-            className="block w-full font-cuerpo text-sm text-texto-secundario file:mr-3 file:rounded-md file:border file:border-borde file:bg-superficie file:px-3 file:py-1.5 file:font-cuerpo file:text-sm file:font-medium file:text-texto hover:file:border-acento"
-          />
+          <EntradaArchivoImagen name="archivo" accept="image/jpeg,image/png,image/webp" disabled={pendiente} />
 
           {textoPredeterminada && (
             <label className="flex items-center gap-2 font-cuerpo text-xs text-texto-secundario">
@@ -65,7 +60,7 @@ export function CampoImagen({ titulo, urlActual, alt, accion, textoPredeterminad
             </p>
           )}
 
-          <Button type="submit" variante="secundario" disabled={pendiente}>
+          <Button type="submit" variante="secundario" disabled={pendiente} className="min-h-11 lg:min-h-0">
             {pendiente ? "Subiendo…" : "Reemplazar"}
           </Button>
         </form>

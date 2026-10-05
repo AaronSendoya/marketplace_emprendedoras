@@ -52,7 +52,15 @@ export const EsquemaQuitarProductoParams = z.object({
   id: z.uuid().meta({ description: "Id del descuento." }),
   producto_id: z.uuid().meta({ description: "Id del producto." }),
 });
-export const EsquemaMisDescuentosQuery = esquemaPaginacion;
+// `estado` filtra la lista (regla 8): solo los descuentos en ese estado, con la paginación y el total ya
+// filtrados. Sin él, todos. Lo comparten GET /mis/descuentos y GET /admin/usuarios/{id}/descuentos.
+export const EsquemaMisDescuentosQuery = esquemaPaginacion.extend({
+  estado: z.enum(["programado", "vigente", "vencido"]).optional().meta({
+    description:
+      "Solo los descuentos en ese estado: `programado` (aún no empieza), `vigente` o `vencido` (ya caducó). Se calcula al " +
+      "consultar, no es una columna. Sin este parámetro, todos.",
+  }),
+});
 
 export const EsquemaDescuento = z
   .object({

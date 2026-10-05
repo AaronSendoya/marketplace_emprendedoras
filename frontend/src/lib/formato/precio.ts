@@ -9,3 +9,11 @@ const formateador = new Intl.NumberFormat("es-BO", {
 export function formatearPrecio(monto: number): string {
   return formateador.format(monto);
 }
+
+// "15%" o "12,5%": hasta 2 decimales (el backend no admite más, regla 8) con coma decimal, sin
+// ceros de relleno.
+const formateadorPorcentaje = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 2 });
+
+export function formatearPorcentaje(valor: number): string {
+  return `${formateadorPorcentaje.format(valor)}%`;
+}

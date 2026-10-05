@@ -166,6 +166,41 @@ describe("ListMisDescuentosUseCase", () => {
     expect(datos.map((d) => d.estado)).toEqual(["vigente", "programado", "vencido"]);
     expect(await listar.ejecutar("usuario-9", { pagina: 1, limite: 20 })).toEqual({ datos: [], total: 0 });
   });
+
+  describe("filtro por estado (regla 8)", () => {
+    // AHORA es 2026-09-23: el de fábrica (sin fechas) es vigente; el de diciembre, programado; el de enero, vencido.
+    async function conTresEstados() {
+      const base = construir();
+      await base.crear.ejecutar(duena, { porcentaje: 30, fechaInicio: "2026-12-01", fechaFin: "2026-12-31" });
+      await base.crear.ejecutar(duena, { porcentaje: 5, fechaFin: "2026-01-31" });
+      return base;
+    }
+
+    it.each([
+      ["vigente", [15]],
+      ["programado", [30]],
+      ["vencido", [5]],
+    ] as const)("estado=%s trae solo esos y el total cuenta solo esos", async (estado, porcentajes) => {
+      const { listar } = await conTresEstados();
+
+      const { datos, total } = await listar.ejecutar("usuario-1", { pagina: 1, limite: 20 }, estado);
+
+      expect(datos.map((d) => d.porcentaje)).toEqual(porcentajes);
+      expect(datos.every((d) => d.estado === estado)).toBe(true);
+      expect(total).toBe(1);
+    });
+
+    it("sin estado trae todos, y un estado sin descuentos da una lista vacía", async () => {
+      const { listar } = construir();
+
+      expect((await listar.ejecutar("usuario-1", { pagina: 1, limite: 20 })).total).toBe(1);
+      expect(await listar.ejecutar("usuario-1", { pagina: 1, limite: 20 }, "vencido")).toEqual({ datos: [], total: 0 });
+    });
+
+    it("sin perfil sigue devolviendo la lista vacía con cualquier estado", async () => {
+      expect(await construir().listar.ejecutar("usuario-9", { pagina: 1, limite: 20 }, "vigente")).toEqual({ datos: [], total: 0 });
+    });
+  });
 });
 
 describe("AsignarDescuentoAProductoUseCase (regla 9)", () => {

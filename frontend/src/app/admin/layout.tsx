@@ -22,9 +22,9 @@ export default async function LayoutAdmin({ children }: LayoutProps<"/admin">) {
   if (usuario.rol !== "Admin") redirect("/");
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-fondo md:flex-row">
+    <div className="tema-admin flex min-h-full flex-1 flex-col bg-fondo lg:flex-row">
       <AdminSidebar nombreCompleto={usuario.nombre_completo} />
-      <main className="min-w-0 flex-1 space-y-8 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
+      <main className="min-w-0 flex-1 space-y-10 px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10">{children}</main>
     </div>
   );
 }

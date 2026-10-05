@@ -112,23 +112,24 @@ export default function PaginaComponentes() {
       </Seccion>
 
       <Seccion titulo="SocialLinks — completo">
-        <SocialLinks whatsapp="59171234567" instagramUsername="dulcesdeana" otraRedSocial="TikTok: @dulcesdeana" />
+        <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername="dulcesdeana" otraRedSocial="TikTok: @dulcesdeana" />
       </Seccion>
 
       <Seccion titulo="SocialLinks — solo WhatsApp">
-        <SocialLinks whatsapp="59171234567" instagramUsername={null} otraRedSocial={null} />
+        <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername={null} otraRedSocial={null} />
       </Seccion>
 
       <Seccion titulo="PriceTag — precio normal">
-        <PriceTag precio={120} porcentaje={null} precioConDescuento={null} consultarPrecio={false} whatsapp="59171234567" />
+        <PriceTag perfilId="dev-perfil" precio={120} porcentaje={null} precioConDescuento={null} consultarPrecio={false} whatsapp="59171234567" />
       </Seccion>
 
       <Seccion titulo="PriceTag — con descuento vigente">
-        <PriceTag precio={120} porcentaje={20} precioConDescuento={96} consultarPrecio={false} whatsapp="59171234567" />
+        <PriceTag perfilId="dev-perfil" precio={120} porcentaje={20} precioConDescuento={96} consultarPrecio={false} whatsapp="59171234567" />
       </Seccion>
 
       <Seccion titulo="PriceTag — consultar precio">
         <PriceTag
+          perfilId="dev-perfil"
           precio={null}
           porcentaje={null}
           precioConDescuento={null}

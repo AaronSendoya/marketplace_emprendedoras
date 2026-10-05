@@ -1,8 +1,10 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
+import Link from "next/link";
 import { useActionState } from "react";
-import { Button } from "@/components/atoms/Button";
+import { Button, clasesBoton } from "@/components/atoms/Button";
+import { EntradaArchivoImagen } from "@/components/atoms/EntradaArchivoImagen";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { Textarea } from "@/components/atoms/Textarea";
@@ -11,25 +13,38 @@ import type { Perfil, ReferenciaCatalogo } from "@/lib/api/tipos";
 
 const ESTADO_INICIAL: EstadoFormularioPerfil = {};
 
+// Alta y edición del perfil. Por defecto son las acciones del Admin; el panel de la Emprendedora
+// pasa las suyas (mismo formulario, otra ruta a revalidar y a dónde volver después de guardar).
+export interface AccionesFormularioPerfil {
+  crear: (estadoPrevio: EstadoFormularioPerfil, formData: FormData) => Promise<EstadoFormularioPerfil>;
+  editar: (perfilId: string, estadoPrevio: EstadoFormularioPerfil, formData: FormData) => Promise<EstadoFormularioPerfil>;
+}
+
 interface PropsPerfilFormulario {
-  usuarioId: string;
+  // Solo lo manda un Admin (crea el perfil en nombre de una cuenta); una emprendedora crea el suyo.
+  usuarioId?: string;
   perfil: Perfil | null;
   ciudades: ReferenciaCatalogo[];
   rubros: ReferenciaCatalogo[];
+  acciones?: AccionesFormularioPerfil;
+  // Enlace "Cancelar" antes del botón de guardar (el panel de la Emprendedora vuelve a la vista del
+  // perfil); el Admin no lo usa.
+  cancelarHref?: string;
 }
 
 const CLASES_LABEL = "font-cuerpo text-sm font-medium text-texto";
 
 // Alta y edición comparten el mismo formulario de datos: la diferencia es si hay perfil (edición,
 // PATCH sin imágenes) o no (alta, multipart con usuario_id y las dos imágenes, regla 18 backend).
-export function PerfilFormulario({ usuarioId, perfil, ciudades, rubros }: PropsPerfilFormulario) {
-  const accionCrear = crearPerfilAction.bind(null, usuarioId);
-  const accionEditar = editarPerfilAction.bind(null, perfil?.id ?? "", usuarioId);
+export function PerfilFormulario({ usuarioId = "", perfil, ciudades, rubros, acciones, cancelarHref }: PropsPerfilFormulario) {
+  const perfilId = perfil?.id ?? "";
+  const accionCrear = acciones?.crear ?? crearPerfilAction.bind(null, usuarioId);
+  const accionEditar = acciones ? acciones.editar.bind(null, perfilId) : editarPerfilAction.bind(null, perfilId, usuarioId);
   const [estado, accion, pendiente] = useActionState(perfil ? accionEditar : accionCrear, ESTADO_INICIAL);
 
   return (
     <form action={accion} className="space-y-4">
-      {!perfil && <input type="hidden" name="usuario_id" value={usuarioId} />}
+      {!perfil && usuarioId && <input type="hidden" name="usuario_id" value={usuarioId} />}
 
       <div className="space-y-1">
         <label htmlFor="nombre_negocio" className={CLASES_LABEL}>
@@ -106,14 +121,7 @@ export function PerfilFormulario({ usuarioId, perfil, ciudades, rubros }: PropsP
             <label htmlFor="foto_perfil" className={CLASES_LABEL}>
               Foto de perfil
             </label>
-            <input
-              type="file"
-              id="foto_perfil"
-              name="foto_perfil"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={pendiente}
-              className="block w-full font-cuerpo text-sm text-texto-secundario file:mr-3 file:rounded-md file:border file:border-borde file:bg-superficie file:px-3 file:py-1.5 file:font-cuerpo file:text-sm file:font-medium file:text-texto hover:file:border-acento"
-            />
+            <EntradaArchivoImagen id="foto_perfil" name="foto_perfil" accept="image/jpeg,image/png,image/webp" disabled={pendiente} />
             <label className="flex items-center gap-2 font-cuerpo text-xs text-texto-secundario">
               <input type="checkbox" name="usar_foto_predeterminada" value="true" disabled={pendiente} />
               Usar la foto predeterminada
@@ -123,14 +131,7 @@ export function PerfilFormulario({ usuarioId, perfil, ciudades, rubros }: PropsP
             <label htmlFor="logo" className={CLASES_LABEL}>
               Logo
             </label>
-            <input
-              type="file"
-              id="logo"
-              name="logo"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={pendiente}
-              className="block w-full font-cuerpo text-sm text-texto-secundario file:mr-3 file:rounded-md file:border file:border-borde file:bg-superficie file:px-3 file:py-1.5 file:font-cuerpo file:text-sm file:font-medium file:text-texto hover:file:border-acento"
-            />
+            <EntradaArchivoImagen id="logo" name="logo" accept="image/jpeg,image/png,image/webp" disabled={pendiente} />
             <label className="flex items-center gap-2 font-cuerpo text-xs text-texto-secundario">
               <input type="checkbox" name="usar_logo_predeterminado" value="true" disabled={pendiente} />
               Usar el logo predeterminado
@@ -146,8 +147,13 @@ export function PerfilFormulario({ usuarioId, perfil, ciudades, rubros }: PropsP
         </p>
       )}
 
-      <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={pendiente}>
+      <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        {cancelarHref && (
+          <Link href={cancelarHref} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
+            Cancelar
+          </Link>
+        )}
+        <Button type="submit" disabled={pendiente} className="min-h-11 lg:min-h-0">
           {pendiente ? "Guardando…" : perfil ? "Guardar los cambios" : "Crear el perfil"}
         </Button>
       </div>

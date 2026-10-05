@@ -28,6 +28,18 @@ export async function obtenerPerfilDeUsuario(usuarioId: string): Promise<Perfil 
   }
 }
 
+// GET /mis/perfil (panel de la Emprendedora): el perfil de la cuenta autenticada, `null` cuando
+// todavía no lo creó. Mismo criterio que obtenerPerfilDeUsuario: un 404 no es un error de carga,
+// es el estado "sin perfil" que la pantalla resuelve guiando a crearlo.
+export async function obtenerMiPerfil(): Promise<Perfil | null> {
+  try {
+    return await obtenerJsonAutenticado<Perfil>("/mis/perfil");
+  } catch (error) {
+    if (error instanceof ErrorApi && error.status === 404) return null;
+    throw error;
+  }
+}
+
 // POST /perfiles (multipart/form-data): alta en nombre de una cuenta Emprendedor. El propio
 // FormData ya trae `usuario_id`, los campos de texto y las imágenes (archivo o
 // `usar_foto_predeterminada`/`usar_logo_predeterminado`), armados por el formulario del panel.

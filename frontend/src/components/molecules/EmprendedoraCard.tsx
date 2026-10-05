@@ -57,6 +57,7 @@ export function EmprendedoraCard({ perfil }: PropsEmprendedoraCard) {
         <p className="line-clamp-2 font-cuerpo text-sm text-texto-secundario">{perfil.descripcion}</p>
 
         <SocialLinks
+          perfilId={perfil.id}
           whatsapp={perfil.whatsapp}
           instagramUsername={perfil.instagram_username}
           otraRedSocial={perfil.otra_red_social}

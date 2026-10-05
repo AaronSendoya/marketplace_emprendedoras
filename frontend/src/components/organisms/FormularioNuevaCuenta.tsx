@@ -7,6 +7,7 @@ import { Button, clasesBoton } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { CampoPassword } from "@/components/molecules/CampoPassword";
 import { crearCuentaAction, type EstadoCrearCuenta } from "@/lib/admin/acciones";
+import { CLASES_PANEL_ADMIN } from "@/lib/estilos";
 
 const ESTADO_INICIAL: EstadoCrearCuenta = {};
 
@@ -29,7 +30,7 @@ export function FormularioNuevaCuenta() {
 
   if (estado.creada) {
     return (
-      <div className="max-w-sm space-y-4 rounded-lg border border-borde bg-superficie p-6">
+      <div className={`${CLASES_PANEL_ADMIN} max-w-lg space-y-4 p-5 sm:p-7`}>
         <div className="flex items-center gap-2">
           <CircleCheck size={20} strokeWidth={1.5} className="text-enfasis" aria-hidden="true" />
           <h2 className="font-titulo text-lg font-bold text-texto">Cuenta creada</h2>
@@ -47,7 +48,7 @@ export function FormularioNuevaCuenta() {
           </div>
         )}
 
-        <Link href="/admin" className={clasesBoton("secundario", "w-full")}>
+        <Link href="/admin" className={clasesBoton("secundario", "w-full min-h-11 lg:min-h-0")}>
           Volver a cuentas
         </Link>
       </div>
@@ -55,7 +56,7 @@ export function FormularioNuevaCuenta() {
   }
 
   return (
-    <form action={accion} className="max-w-sm space-y-4">
+    <form action={accion} className={`${CLASES_PANEL_ADMIN} max-w-lg space-y-5 p-5 sm:p-7`}>
       <div className="space-y-1">
         <label htmlFor="email" className={CLASES_LABEL}>
           Correo de la emprendedora
@@ -94,7 +95,7 @@ export function FormularioNuevaCuenta() {
 
       {estado.error && <MensajeError mensaje={estado.error} />}
 
-      <Button type="submit" disabled={pendiente} className="w-full">
+      <Button type="submit" disabled={pendiente} className="w-full min-h-11 lg:min-h-0">
         {pendiente ? "Creando..." : "Crear cuenta"}
       </Button>
     </form>

@@ -26,7 +26,7 @@ export function SelectorLimite({ valor }: PropsSelectorLimite) {
   return (
     <label className="flex items-center gap-2 font-cuerpo text-sm text-texto-secundario">
       Mostrar
-      <Select value={String(valor)} onChange={(evento) => cambiar(evento.target.value)} aria-label="Cuentas por página" className="w-auto">
+      <Select value={String(valor)} onChange={(evento) => cambiar(evento.target.value)} aria-label="Cuentas por página" className="w-auto min-h-11 lg:min-h-0">
         {OPCIONES.map((opcion) => (
           <option key={opcion} value={opcion}>
             {opcion}

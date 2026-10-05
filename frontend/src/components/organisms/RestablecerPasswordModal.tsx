@@ -49,7 +49,7 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
           aria-modal="true"
           aria-labelledby="password-lista-titulo"
           onClick={(evento) => evento.stopPropagation()}
-          className="max-h-[calc(100vh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
+          className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
         >
           <h2 id="password-lista-titulo" className="font-titulo text-lg font-bold text-texto">
             Contraseña restablecida
@@ -69,7 +69,7 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
           )}
 
           <div className="flex justify-end pt-2">
-            <Button type="button" onClick={onCerrar}>
+            <Button type="button" onClick={onCerrar} className="min-h-11 lg:min-h-0">
               Listo
             </Button>
           </div>
@@ -86,7 +86,7 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
         aria-labelledby="restablecer-password-titulo"
         aria-describedby="restablecer-password-descripcion"
         onClick={(evento) => evento.stopPropagation()}
-        className="max-h-[calc(100vh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
       >
         <h2 id="restablecer-password-titulo" className="font-titulo text-lg font-bold text-texto">
           Restablecer la contraseña de esta cuenta
@@ -112,10 +112,10 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button ref={cerrarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario")}>
+            <button ref={cerrarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
               Cancelar
             </button>
-            <Button type="submit" variante="peligro" disabled={pendiente}>
+            <Button type="submit" variante="peligro" disabled={pendiente} className="min-h-11 lg:min-h-0">
               {pendiente ? "Restableciendo la contraseña…" : "Restablecer la contraseña"}
             </Button>
           </div>

@@ -55,6 +55,7 @@ export function ProductoCard({ producto }: PropsProductoCard) {
         )}
 
         <PriceTag
+          perfilId={producto.perfil.id}
           precio={producto.precio}
           porcentaje={producto.porcentaje}
           precioConDescuento={producto.precio_con_descuento}

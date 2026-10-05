@@ -178,5 +178,94 @@ describe("MySqlDescuentoRepository", () => {
     it("un perfil sin descuentos devuelve una lista vacía", async () => {
       expect(await repositorio.listarPorPerfil(randomUUID(), { pagina: 1, limite: 20 })).toEqual({ datos: [], total: 0 });
     });
+
+    describe("filtro por estado (regla 8)", () => {
+      // Perfil propio: los totales de los demás tests de este archivo no se alteran.
+      const dueno = randomUUID();
+      const perfil = randomUUID();
+      const ahora = enMin(0);
+      let porNombre: Record<string, string>;
+
+      beforeAll(async () => {
+        await cliente.ejecutar("INSERT INTO usuarios (id, email, nombres, apellido_paterno, password_hash, rol_id) VALUES (?, ?, 'María', 'Flores', 'hash', ?)", [
+          dueno,
+          `${prefijo}-filtro@prueba.test`,
+          ids.rol,
+        ]);
+        await cliente.ejecutar(
+          `INSERT INTO perfiles_emprendedores (id, usuario_id, nombre_negocio, descripcion, whatsapp, ciudad_id, rubro_id, foto_perfil_key, logo_key)
+           VALUES (?, ?, ?, 'd', '59171234567', ?, ?, 'perfiles/f.webp', 'logos/l.webp')`,
+          [perfil, dueno, `${prefijo} Negocio filtro`, ids.ciudad, ids.rubro],
+        );
+        const casos: Record<string, { fechaInicio: Date | null; fechaFin: Date | null }> = {
+          sinFechas: { fechaInicio: null, fechaFin: null }, // vigente: permanente
+          empezoYSinFin: { fechaInicio: enMin(-60), fechaFin: null }, // vigente
+          dentroDelRango: { fechaInicio: enMin(-60), fechaFin: enMin(60) }, // vigente
+          terminaJusto: { fechaInicio: null, fechaFin: enMin(0) }, // vigente: el último instante de fin todavía cuenta
+          empiezaJusto: { fechaInicio: enMin(0), fechaFin: null }, // vigente: ya empezó
+          futuro: { fechaInicio: enMin(1), fechaFin: enMin(100) }, // programado
+          futuroSinFin: { fechaInicio: enMin(1), fechaFin: null }, // programado
+          caducoHaceUnMinuto: { fechaInicio: null, fechaFin: enMin(-1) }, // vencido
+          caduco: { fechaInicio: enMin(-120), fechaFin: enMin(-60) }, // vencido
+        };
+        porNombre = {};
+        for (const [nombre, fechas] of Object.entries(casos)) {
+          porNombre[nombre] = (await repositorio.crear(nuevo({ perfilId: perfil, ...fechas }))).id;
+        }
+      });
+
+      const idsDe = async (estado?: "programado" | "vigente" | "vencido") => {
+        const { datos, total } = await repositorio.listarPorPerfil(perfil, { pagina: 1, limite: 50 }, estado ? { estado, ahora } : undefined);
+        return { ids: new Set(datos.map((d) => d.id)), total };
+      };
+      const nombres = (conjunto: Set<string>) => Object.keys(porNombre).filter((n) => conjunto.has(porNombre[n])).sort();
+
+      it("vigente: ya empezó (o no tiene inicio) y aún no caducó; el último instante de fin todavía cuenta", async () => {
+        const { ids: encontrados, total } = await idsDe("vigente");
+
+        expect(nombres(encontrados)).toEqual(["dentroDelRango", "empezoYSinFin", "empiezaJusto", "sinFechas", "terminaJusto"]);
+        expect(total).toBe(5);
+      });
+
+      it("programado: tiene inicio y todavía es futuro", async () => {
+        const { ids: encontrados, total } = await idsDe("programado");
+
+        expect(nombres(encontrados)).toEqual(["futuro", "futuroSinFin"]);
+        expect(total).toBe(2);
+      });
+
+      it("vencido: tiene fin y ya pasó", async () => {
+        const { ids: encontrados, total } = await idsDe("vencido");
+
+        expect(nombres(encontrados)).toEqual(["caduco", "caducoHaceUnMinuto"]);
+        expect(total).toBe(2);
+      });
+
+      it("los tres estados reparten todos los descuentos sin repetir ninguno; sin filtro, todos", async () => {
+        const [vigentes, programados, vencidos, todos] = await Promise.all([idsDe("vigente"), idsDe("programado"), idsDe("vencido"), idsDe()]);
+
+        expect(vigentes.total + programados.total + vencidos.total).toBe(todos.total);
+        expect(todos.total).toBe(Object.keys(porNombre).length);
+      });
+
+      it("el total y la paginación cuentan solo los del estado filtrado", async () => {
+        const pagina1 = await repositorio.listarPorPerfil(perfil, { pagina: 1, limite: 2 }, { estado: "vigente", ahora });
+        const pagina3 = await repositorio.listarPorPerfil(perfil, { pagina: 3, limite: 2 }, { estado: "vigente", ahora });
+
+        expect(pagina1.total).toBe(5);
+        expect(pagina1.datos).toHaveLength(2);
+        expect(pagina3.datos).toHaveLength(1); // 5 vigentes en páginas de 2: 2 + 2 + 1
+      });
+
+      it("coincide con el estado que calcula el dominio para cada descuento", async () => {
+        const { estadoDescuento } = await import("../domain/VigenciaDescuento");
+        const { datos } = await repositorio.listarPorPerfil(perfil, { pagina: 1, limite: 50 });
+        for (const estado of ["programado", "vigente", "vencido"] as const) {
+          const esperados = datos.filter((d) => estadoDescuento({ inicio: d.fechaInicio, fin: d.fechaFin }, ahora) === estado).map((d) => d.id);
+          const { ids: delSql } = await idsDe(estado);
+          expect([...delSql].sort()).toEqual([...esperados].sort());
+        }
+      });
+    });
   });
 });

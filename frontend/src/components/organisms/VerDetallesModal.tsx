@@ -58,7 +58,7 @@ export function VerDetallesModal({ usuario, abierto, onCerrar }: PropsVerDetalle
         aria-modal="true"
         aria-labelledby="detalles-cuenta-titulo"
         onClick={(evento) => evento.stopPropagation()}
-        className="max-h-[calc(100vh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
       >
         <h2 id="detalles-cuenta-titulo" className="font-titulo text-lg font-bold text-texto">
           Datos de la cuenta
@@ -76,13 +76,15 @@ export function VerDetallesModal({ usuario, abierto, onCerrar }: PropsVerDetalle
             <Badge variante={usuario.rol === "Admin" ? "secundario" : "neutro"}>{usuario.rol}</Badge>
           </Fila>
           <Fila etiqueta="Estado">
-            <Badge variante={usuario.activo ? "neutro" : "acento"}>{usuario.activo ? "Activa" : "Suspendida"}</Badge>
+            <Badge variante={usuario.activo ? "neutro" : "acento"} punto>
+              {usuario.activo ? "Activa" : "Suspendida"}
+            </Badge>
           </Fila>
           <Fila etiqueta="Cuenta creada">{formatearFecha(usuario.creado_en)}</Fila>
         </dl>
 
         <div className="flex justify-end pt-2">
-          <button ref={cerrarRef} type="button" onClick={onCerrar} className={clasesBoton("secundario")}>
+          <button ref={cerrarRef} type="button" onClick={onCerrar} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
             Cerrar
           </button>
         </div>

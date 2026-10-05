@@ -4,6 +4,7 @@ import {
   EsquemaAsignarProductosBody,
   EsquemaCrearDescuentoBody,
   EsquemaEditarDescuentoBody,
+  EsquemaMisDescuentosQuery,
   EsquemaQuitarProductoParams,
 } from "./descuentos";
 import { EsquemaCrearProductoForm, EsquemaEditarProductoBody, EsquemaMarketplaceQuery } from "./productos";
@@ -19,16 +20,22 @@ describe("EsquemaCrearProductoForm", () => {
   });
 
   it.each(["0", "0.5", "99999999.99", "120"])("acepta el precio %s", (precio) => {
-    expect(EsquemaCrearProductoForm.safeParse({ nombre: "T", precio }).success).toBe(true);
+    expect(EsquemaCrearProductoForm.safeParse({ nombre: "Torta", precio }).success).toBe(true);
   });
 
   it.each(["-1", "12,50", "12.345", "abc", "100000000", "", "1e3", ".5"])("rechaza el precio %j", (precio) => {
-    expect(EsquemaCrearProductoForm.safeParse({ nombre: "T", precio }).success).toBe(false);
+    expect(EsquemaCrearProductoForm.safeParse({ nombre: "Torta", precio }).success).toBe(false);
+  });
+
+  it("acepta un nombre con tildes/ñ en el mínimo de 3 caracteres", () => {
+    expect(EsquemaCrearProductoForm.safeParse({ nombre: "Café" }).success).toBe(true);
   });
 
   it.each([
     ["campo desconocido", { activo: "true" }],
     ["nombre vacío", { nombre: " " }],
+    ["nombre corto", { nombre: "ab" }],
+    ["nombre sin letras", { nombre: "12345" }],
     ["nombre largo", { nombre: "a".repeat(151) }],
     ["descripción larga", { descripcion: "a".repeat(2001) }],
     ["perfil_id inválido", { perfil_id: "x" }],
@@ -94,5 +101,21 @@ describe("EsquemaAsignarProductosBody y EsquemaQuitarProductoParams", () => {
   it("los dos ids de la ruta deben ser UUID", () => {
     expect(EsquemaQuitarProductoParams.safeParse({ id: ID, producto_id: ID }).success).toBe(true);
     expect(EsquemaQuitarProductoParams.safeParse({ id: ID, producto_id: "1; DROP" }).success).toBe(false);
+  });
+});
+
+describe("EsquemaMisDescuentosQuery (filtro por estado, regla 8)", () => {
+  it("sin estado, la consulta queda sin filtro", () => {
+    expect(EsquemaMisDescuentosQuery.parse({}).estado).toBeUndefined();
+  });
+
+  it.each(["programado", "vigente", "vencido"])("acepta estado=%s junto con la paginación", (estado) => {
+    expect(EsquemaMisDescuentosQuery.parse({ estado, pagina: "2", limite: "5" })).toMatchObject({ estado, pagina: 2, limite: 5 });
+  });
+
+  it("rechaza un estado desconocido (por ejemplo los de los productos o cuentas)", () => {
+    for (const estado of ["activo", "inactivo", "expirado", "", "vigente; DROP TABLE descuentos"]) {
+      expect(EsquemaMisDescuentosQuery.safeParse({ estado }).success, estado).toBe(false);
+    }
   });
 });

@@ -14,6 +14,11 @@ export const obtenerProducto = (id: string) => obtenerJson<ProductoPublico>(`/ma
 export const listarProductosDeUsuario = (usuarioId: string, pagina: ParametrosPagina = {}) =>
   obtenerJsonAutenticado<Pagina<ProductoPropio>>(`/admin/usuarios/${usuarioId}/productos`, { parametros: { ...pagina } });
 
+// GET /mis/productos (panel de la Emprendedora): mismo formato que el de arriba, pero de la cuenta
+// autenticada. Sin perfil, la lista viene vacía.
+export const listarMisProductos = (pagina: ParametrosPagina = {}) =>
+  obtenerJsonAutenticado<Pagina<ProductoPropio>>("/mis/productos", { parametros: { ...pagina } });
+
 // POST /productos (multipart/form-data): el FormData trae `perfil_id`, nombre, descripción, precio,
 // mostrar_precio y la imagen (obligatoria), armados por el formulario del panel.
 export const crearProductoAdmin = (formData: FormData) => enviarFormDataAutenticado<ProductoPropio>("/productos", formData);

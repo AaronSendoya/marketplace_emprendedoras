@@ -12,6 +12,7 @@
   --color-fondo: #fafaf9;
   --color-superficie: #ffffff;
   --color-borde: #e7e5e4;
+  --color-borde-fuerte: #d6d3d1;
   --color-texto: #1c1917;
   --color-texto-secundario: #57534e;
 
@@ -26,12 +27,58 @@
   --color-enfasis: #ea580c;
   --color-enfasis-hover: #c2410c;
   --color-enfasis-suave: #fff7ed;
+
+  /* Color de cada canal de contacto en los gráficos y tablas del Admin (sección 6, regla 13): WhatsApp
+     en el naranja de la marca (y su versión fuerte, con texto blanco encima) e Instagram en el púrpura
+     de `secundario`. Separados de `enfasis` para que el tema del Admin pueda oscurecer el botón sin
+     alterar el color del canal. */
+  --color-whatsapp: #ea580c;
+  --color-whatsapp-fuerte: #c2410c;
+
+  /* Solo el panel de la Emprendedora (sección 6, regla 11): neutros cálidos y el tono del estado
+     "Publicado". No se usan en el catálogo público ni en /admin. */
+  --color-arena: #faf7f4;
+  --color-riel: #f3eee8;
+  --color-salvia: #3f6b4f;
+  --color-salvia-suave: #edf4ef;
+}
+
+/* Ámbito del panel de la Emprendedora. Cambia el valor de tres tokens ya existentes para todo lo
+   que haya adentro, sin tocar los componentes: fondo cálido y un naranja de CTA que con texto
+   blanco llega a AA (#ea580c da 3,6:1; #c2410c, 5,2:1; su hover #9a3412, 7,3:1). */
+.tema-negocio {
+  --color-fondo: var(--color-arena);
+  --color-enfasis: #c2410c;
+  --color-enfasis-hover: #9a3412;
+}
+
+/* Ámbito del panel del Admin (sección 6, regla 13). Mismo mecanismo que `tema-negocio`: cambia el valor
+   de tokens ya existentes para todo lo que haya adentro, así los átomos compartidos con el catálogo
+   público no cambian fuera de /admin. Escala un escalón más legible (cuerpo 15 px, metadata 13 px),
+   fondo stone-100, radios de 12 px en paneles y 8 px en controles, controles de 44 px y el naranja
+   del botón principal en su versión que con texto blanco llega a AA. */
+.tema-admin {
+  --color-fondo: #f5f5f4;
+  --color-enfasis: #c2410c;
+  --color-enfasis-hover: #9a3412;
+
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.25 / 0.8125);
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: calc(1.4 / 0.9375);
+
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --control-py: 0.6875rem;
+  --badge-py: 0.25rem;
 }
 
 @theme inline {
   --color-fondo: var(--color-fondo);
   --color-superficie: var(--color-superficie);
   --color-borde: var(--color-borde);
+  --color-borde-fuerte: var(--color-borde-fuerte);
   --color-texto: var(--color-texto);
   --color-texto-secundario: var(--color-texto-secundario);
 
@@ -47,10 +94,27 @@
   --color-enfasis-hover: var(--color-enfasis-hover);
   --color-enfasis-suave: var(--color-enfasis-suave);
 
+  --color-whatsapp: var(--color-whatsapp);
+  --color-whatsapp-fuerte: var(--color-whatsapp-fuerte);
+
+  --color-arena: var(--color-arena);
+  --color-riel: var(--color-riel);
+  --color-salvia: var(--color-salvia);
+  --color-salvia-suave: var(--color-salvia-suave);
+
   /* Plus Jakarta Sans: títulos, nombres de emprendimiento, cifras grandes.
      Inter: cuerpo, badges, botones, texto pequeño. */
   --font-titulo: var(--font-plus-jakarta-sans);
   --font-cuerpo: var(--font-inter);
+
+  /* Tamaños de utilidad del panel del Admin (regla 13): título de página, de sección y cifra de un
+     indicador. Solo se usan dentro de /admin. */
+  --text-pagina: 2rem;
+  --text-pagina--line-height: 1.15;
+  --text-seccion: 1.3125rem;
+  --text-seccion--line-height: 1.25;
+  --text-kpi: 2.875rem;
+  --text-kpi--line-height: 1;
 }
 
 body {

@@ -430,13 +430,14 @@ describe("restricciones con mensaje propio (errorMySql)", () => {
   });
 });
 
-describe("índices explícitos (migraciones 0002, 0004 y 0005)", () => {
+describe("índices explícitos (migraciones 0002, 0004, 0005 y 0007)", () => {
   it("existen todos", async () => {
     const [filas] = await db.query<RowDataPacket[]>(
       "SELECT DISTINCT INDEX_NAME AS nombre FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND INDEX_NAME LIKE 'idx\\_%'",
     );
 
     expect(filas.map((fila) => fila.nombre).sort()).toEqual([
+      "idx_clics_contacto_perfil_tipo",
       "idx_descuentos_perfil_id",
       "idx_intentos_login_email_creado",
       "idx_otp_codigos_email_proposito",

@@ -9,6 +9,7 @@ import type {
   UpdateDescuentoUseCase,
 } from "@/core/descuentos/application/DescuentoUseCases";
 import type { DescuentoConEstado } from "@/core/descuentos/domain/Descuento";
+import type { EstadoDescuento } from "@/core/descuentos/domain/VigenciaDescuento";
 import type { Actor } from "@/shared/domain/Actor";
 import type { ParametrosPagina } from "@/shared/domain/Paginacion";
 
@@ -25,8 +26,13 @@ export function serializarDescuento(descuento: DescuentoConEstado) {
   };
 }
 
-export async function listarMisDescuentos(usecase: ListMisDescuentosUseCase, usuarioId: string, pagina: ParametrosPagina): Promise<Response> {
-  const resultado = await usecase.ejecutar(usuarioId, pagina);
+export async function listarMisDescuentos(
+  usecase: ListMisDescuentosUseCase,
+  usuarioId: string,
+  pagina: ParametrosPagina,
+  estado?: EstadoDescuento,
+): Promise<Response> {
+  const resultado = await usecase.ejecutar(usuarioId, pagina, estado);
   return paginado({ ...resultado, datos: resultado.datos.map(serializarDescuento) }, pagina);
 }
 

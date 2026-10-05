@@ -1,10 +1,20 @@
 import { actualizarJsonAutenticado, eliminarAutenticado, enviarJsonAutenticado, obtenerJsonAutenticado } from "./cliente";
-import type { Descuento, Pagina, ParametrosPagina } from "./tipos";
+import type { Descuento, EstadoDescuento, Pagina, ParametrosPagina } from "./tipos";
+
+// `estado` filtra en el backend (regla 8): solo los descuentos en ese estado, con el total ya filtrado.
+export interface FiltrosDescuentos extends ParametrosPagina {
+  estado?: EstadoDescuento;
+}
 
 // GET /admin/usuarios/{id}/descuentos (módulo "Emprendimientos"): los descuentos del perfil de esa
 // cuenta, con su vigencia calculada al consultar. Sin perfil, la lista viene vacía.
-export const listarDescuentosDeUsuario = (usuarioId: string, pagina: ParametrosPagina = {}) =>
-  obtenerJsonAutenticado<Pagina<Descuento>>(`/admin/usuarios/${usuarioId}/descuentos`, { parametros: { ...pagina } });
+export const listarDescuentosDeUsuario = (usuarioId: string, filtros: FiltrosDescuentos = {}) =>
+  obtenerJsonAutenticado<Pagina<Descuento>>(`/admin/usuarios/${usuarioId}/descuentos`, { parametros: { ...filtros } });
+
+// GET /mis/descuentos (panel de la Emprendedora): mismo formato que el de arriba, pero de la cuenta
+// autenticada, con `estado` (programado, vigente o vencido) calculado por el backend.
+export const listarMisDescuentos = (filtros: FiltrosDescuentos = {}) =>
+  obtenerJsonAutenticado<Pagina<Descuento>>("/mis/descuentos", { parametros: { ...filtros } });
 
 export interface DatosNuevoDescuento {
   perfil_id: string;

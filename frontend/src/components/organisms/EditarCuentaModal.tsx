@@ -54,7 +54,7 @@ export function EditarCuentaModal({ usuario, abierto, onCerrar }: PropsEditarCue
         aria-modal="true"
         aria-labelledby="editar-cuenta-titulo"
         onClick={(evento) => evento.stopPropagation()}
-        className="max-h-[calc(100vh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
       >
         <h2 id="editar-cuenta-titulo" className="font-titulo text-lg font-bold text-texto">
           Editar los datos de la cuenta
@@ -108,10 +108,10 @@ export function EditarCuentaModal({ usuario, abierto, onCerrar }: PropsEditarCue
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button ref={cerrarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario")}>
+            <button ref={cerrarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
               Cancelar
             </button>
-            <Button type="submit" disabled={pendiente}>
+            <Button type="submit" disabled={pendiente} className="min-h-11 lg:min-h-0">
               {pendiente ? "Guardando los cambios…" : "Guardar los cambios"}
             </Button>
           </div>

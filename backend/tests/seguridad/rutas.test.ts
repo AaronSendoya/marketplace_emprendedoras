@@ -16,6 +16,7 @@ const PUBLICAS = new Set([
   "POST /auth/login",
   "POST /auth/password/solicitar-codigo",
   "POST /auth/password/restablecer",
+  "POST /perfiles/{id}/clics", // regla 19: evento anónimo, sin datos del visitante
 ]);
 
 // Rutas que existen pero no se documentan a sí mismas (plan, paso 4).

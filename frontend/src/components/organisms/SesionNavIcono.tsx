@@ -1,7 +1,8 @@
-import { LayoutDashboard, LogIn, LogOut } from "lucide-react";
+import { LayoutDashboard, LogIn, LogOut, Store } from "lucide-react";
 import Link from "next/link";
 import { cerrarSesionAction } from "@/lib/auth/acciones";
 import { obtenerMe } from "@/lib/api/auth";
+import type { Rol } from "@/lib/api/tipos";
 import { haySesion } from "@/lib/auth/sesion";
 import { CLASES_FOCO_ENLACE } from "@/lib/estilos";
 
@@ -11,10 +12,9 @@ const CLASES_BOTON = `rounded-md p-2 text-texto-secundario transition-colors hov
 // pasa como children/prop al Navbar (Client Component) — así el Navbar no necesita convertirse en
 // async ni leer cookies él mismo. Sin sesión, un solo ícono para entrar, sin texto ni color de
 // marca: no se lee como invitación para un visitante casual, pero quien ya sabe qué busca lo
-// reconoce (aria-label). Con sesión, un segundo ícono "ir a mi panel" solo para Admin (pedido
-// explícito 2026-10-01: son dos acciones distintas, no una repetición como el CTA que ya
-// corregimos) — la Emprendedora no tiene panel propio todavía, así que solo ve el de cerrar
-// sesión.
+// reconoce (aria-label). Con sesión, un segundo ícono "ir a mi panel" (pedido explícito
+// 2026-10-01: son dos acciones distintas, no una repetición como el CTA que ya corregimos): el
+// Admin va a /admin y la Emprendedora a /mi-negocio.
 export async function SesionNavIcono() {
   const sesionActiva = await haySesion();
 
@@ -26,10 +26,10 @@ export async function SesionNavIcono() {
     );
   }
 
-  let esAdmin = false;
+  let rol: Rol | null = null;
   try {
     const yo = await obtenerMe();
-    esAdmin = yo.rol === "Admin";
+    rol = yo.rol;
   } catch {
     // Cookie presente pero token inválido o vencido (ej. el Admin tras 24 h): se sigue mostrando
     // el botón de cerrar sesión para poder limpiar la cookie, sin caerse toda la página por esto.
@@ -37,9 +37,14 @@ export async function SesionNavIcono() {
 
   return (
     <div className="flex items-center gap-1">
-      {esAdmin && (
+      {rol === "Admin" && (
         <Link href="/admin" aria-label="Ir a mi panel" className={CLASES_BOTON}>
           <LayoutDashboard size={20} strokeWidth={1.5} aria-hidden="true" />
+        </Link>
+      )}
+      {rol === "Emprendedor" && (
+        <Link href="/mi-negocio" aria-label="Ir a mi negocio" className={CLASES_BOTON}>
+          <Store size={20} strokeWidth={1.5} aria-hidden="true" />
         </Link>
       )}
       <form action={cerrarSesionAction}>

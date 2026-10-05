@@ -42,6 +42,10 @@
     {
       "name": "Descuentos",
       "description": "Motor de promociones: descuentos por porcentaje con vigencia (reglas 8 y 9)."
+    },
+    {
+      "name": "Métricas",
+      "description": "Clics de contacto del catálogo público, anónimos (regla 19)."
     }
   ],
   "components": {
@@ -752,6 +756,209 @@
           "consultar_precio",
           "creado_en",
           "perfil"
+        ]
+      },
+      "ResumenClics": {
+        "type": "object",
+        "properties": {
+          "whatsapp": {
+            "type": "integer",
+            "example": 128
+          },
+          "instagram": {
+            "type": "integer",
+            "example": 46
+          }
+        },
+        "required": [
+          "whatsapp",
+          "instagram"
+        ]
+      },
+      "ItemRankingClic": {
+        "type": "object",
+        "properties": {
+          "perfil_id": {
+            "type": "string"
+          },
+          "nombre_negocio": {
+            "type": "string",
+            "example": "Dulces de Ana"
+          },
+          "whatsapp": {
+            "type": "integer",
+            "example": 20
+          },
+          "instagram": {
+            "type": "integer",
+            "example": 8
+          },
+          "total": {
+            "type": "integer",
+            "example": 28
+          }
+        },
+        "required": [
+          "perfil_id",
+          "nombre_negocio",
+          "whatsapp",
+          "instagram",
+          "total"
+        ]
+      },
+      "ItemSerieClic": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "description": "YYYY-MM-DD, día de La Paz.",
+            "example": "2026-10-01"
+          },
+          "whatsapp": {
+            "type": "integer",
+            "example": 3
+          },
+          "instagram": {
+            "type": "integer",
+            "example": 1
+          }
+        },
+        "required": [
+          "fecha",
+          "whatsapp",
+          "instagram"
+        ]
+      },
+      "ItemRubroClic": {
+        "type": "object",
+        "properties": {
+          "rubro": {
+            "type": "string",
+            "example": "Alimentos y bebidas"
+          },
+          "total": {
+            "type": "integer",
+            "example": 15
+          }
+        },
+        "required": [
+          "rubro",
+          "total"
+        ]
+      },
+      "MapaCalorClics": {
+        "type": "object",
+        "properties": {
+          "granularidad": {
+            "type": "string",
+            "enum": [
+              "dia",
+              "semana",
+              "mes"
+            ],
+            "description": "Lo que representa cada columna, según los días del período: hasta 45 días, un día; hasta 180, una semana (lunes a domingo); más, un mes de calendario."
+          },
+          "columnas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnaMapaCalor"
+            }
+          },
+          "filas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilaMapaCalor"
+            }
+          }
+        },
+        "required": [
+          "granularidad",
+          "columnas",
+          "filas"
+        ]
+      },
+      "ColumnaMapaCalor": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "description": "Primer día de la columna (YYYY-MM-DD, día de La Paz).",
+            "example": "2026-09-28"
+          },
+          "fin": {
+            "type": "string",
+            "description": "Último día de la columna (YYYY-MM-DD, día de La Paz). Igual a `inicio` con granularidad `dia`.",
+            "example": "2026-10-04"
+          }
+        },
+        "required": [
+          "inicio",
+          "fin"
+        ]
+      },
+      "FilaMapaCalor": {
+        "type": "object",
+        "properties": {
+          "perfil_id": {
+            "type": "string"
+          },
+          "nombre_negocio": {
+            "type": "string",
+            "example": "Dulces de Ana"
+          },
+          "whatsapp": {
+            "type": "integer",
+            "description": "Suma de las celdas de la fila.",
+            "example": 20
+          },
+          "instagram": {
+            "type": "integer",
+            "description": "Suma de las celdas de la fila.",
+            "example": 8
+          },
+          "total": {
+            "type": "integer",
+            "description": "whatsapp + instagram.",
+            "example": 28
+          },
+          "total_anterior": {
+            "type": "integer",
+            "description": "Clics totales de la cuenta en el período inmediatamente anterior de igual duración (el que termina el día previo a `desde`); 0 si no tuvo. Sirve para calcular la tendencia.",
+            "example": 24
+          },
+          "celdas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CeldaMapaCalor"
+            },
+            "description": "Una celda por columna, en el mismo orden que `columnas`."
+          }
+        },
+        "required": [
+          "perfil_id",
+          "nombre_negocio",
+          "whatsapp",
+          "instagram",
+          "total",
+          "total_anterior",
+          "celdas"
+        ]
+      },
+      "CeldaMapaCalor": {
+        "type": "object",
+        "properties": {
+          "whatsapp": {
+            "type": "integer",
+            "example": 3
+          },
+          "instagram": {
+            "type": "integer",
+            "example": 1
+          }
+        },
+        "required": [
+          "whatsapp",
+          "instagram"
         ]
       }
     },
@@ -2125,6 +2332,21 @@
             "required": false,
             "name": "limite",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "programado",
+                "vigente",
+                "vencido"
+              ],
+              "description": "Solo los descuentos en ese estado: `programado` (aún no empieza), `vigente` o `vencido` (ya caducó). Se calcula al consultar, no es una columna. Sin este parámetro, todos."
+            },
+            "required": false,
+            "description": "Solo los descuentos en ese estado: `programado` (aún no empieza), `vigente` o `vencido` (ya caducó). Se calcula al consultar, no es una columna. Sin este parámetro, todos.",
+            "name": "estado",
+            "in": "query"
           }
         ],
         "responses": {
@@ -3102,6 +3324,7 @@
                   },
                   "nombre": {
                     "type": "string",
+                    "description": "3 a 150 caracteres, con al menos una letra.",
                     "example": "Torta de chocolate"
                   },
                   "descripcion": {
@@ -3236,8 +3459,9 @@
                 "properties": {
                   "nombre": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 150
+                    "minLength": 3,
+                    "maxLength": 150,
+                    "pattern": "\\p{L}/u"
                   },
                   "descripcion": {
                     "type": [
@@ -3535,6 +3759,21 @@
             },
             "required": false,
             "name": "limite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "programado",
+                "vigente",
+                "vencido"
+              ],
+              "description": "Solo los descuentos en ese estado: `programado` (aún no empieza), `vigente` o `vencido` (ya caducó). Se calcula al consultar, no es una columna. Sin este parámetro, todos."
+            },
+            "required": false,
+            "description": "Solo los descuentos en ese estado: `programado` (aún no empieza), `vigente` o `vencido` (ya caducó). Se calcula al consultar, no es una columna. Sin este parámetro, todos.",
+            "name": "estado",
             "in": "query"
           }
         ],
@@ -3987,6 +4226,538 @@
           },
           "404": {
             "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/perfiles/{id}/clics": {
+      "post": {
+        "tags": [
+          "Métricas"
+        ],
+        "summary": "Registrar un clic de contacto",
+        "description": "Público, sin autenticar (regla 19). Un evento anónimo por clic en el WhatsApp o el Instagram de un perfil: solo se guarda el perfil, el tipo y la fecha, nunca un dato del visitante. 404 si el perfil no existe o su cuenta está desactivada (regla 18).",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id del perfil."
+            },
+            "required": true,
+            "description": "Id del perfil.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": [
+                      "whatsapp",
+                      "instagram"
+                    ],
+                    "description": "A cuál de los dos contactos del perfil se hizo clic."
+                  }
+                },
+                "required": [
+                  "tipo"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Clic registrado."
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/metricas/resumen": {
+      "get": {
+        "tags": [
+          "Métricas"
+        ],
+        "summary": "Totales de clics",
+        "description": "Solo Admin. Suma de clics a WhatsApp y a Instagram, de cuentas activas (regla 18), en el rango indicado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "desde",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "hasta",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Totales.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenClics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/metricas/ranking": {
+      "get": {
+        "tags": [
+          "Métricas"
+        ],
+        "summary": "Cuentas más contactadas",
+        "description": "Solo Admin. Top de cuentas activas (regla 18) por clics totales en el rango indicado, descendente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "desde",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "hasta",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 10,
+              "description": "Cuántas cuentas trae el ranking (y el mapa de calor)."
+            },
+            "required": false,
+            "description": "Cuántas cuentas trae el ranking (y el mapa de calor).",
+            "name": "limite",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemRankingClic"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/metricas/serie": {
+      "get": {
+        "tags": [
+          "Métricas"
+        ],
+        "summary": "Serie diaria de clics",
+        "description": "Solo Admin. Un punto por día (día de La Paz) dentro del rango indicado, completo: los días sin clics vienen en 0. Alimenta el gráfico de interacción y las sparklines del Dashboard.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "desde",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "hasta",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemSerieClic"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/metricas/por-rubro": {
+      "get": {
+        "tags": [
+          "Métricas"
+        ],
+        "summary": "Clics por rubro",
+        "description": "Solo Admin. Suma de clics (WhatsApp + Instagram) de cuentas activas (regla 18) en el rango indicado, agrupada por rubro, descendente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "desde",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "hasta",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Distribución por rubro.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemRubroClic"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/metricas/mapa-calor": {
+      "get": {
+        "tags": [
+          "Métricas"
+        ],
+        "summary": "Mapa de calor de clics",
+        "description": "Solo Admin. Las cuentas activas (regla 18) con más clics en el rango indicado, hasta `limite`, según `orden` (totales por defecto, o los de WhatsApp o los de Instagram), con sus clics por canal, su evolución en el tiempo y los clics del período anterior de igual duración (`total_anterior`). La evolución es una celda por columna: el servidor elige la granularidad según los días del rango (hasta 45 días, un día por columna; hasta 180, una semana; más, un mes), todo en días de La Paz, con la primera y la última columna recortadas al rango, y trae 0 donde no hubo clics. Las filas salen en el orden pedido (en empate, por total y luego por nombre). Solo conteos agregados, nunca el evento individual.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Desde, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "desde",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+              "example": "2026-10-01"
+            },
+            "required": false,
+            "description": "Hasta, día de La Paz (YYYY-MM-DD). Sin ninguna de las dos, trae los últimos 30 días.",
+            "name": "hasta",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 10,
+              "description": "Cuántas cuentas trae el ranking (y el mapa de calor)."
+            },
+            "required": false,
+            "description": "Cuántas cuentas trae el ranking (y el mapa de calor).",
+            "name": "limite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "total",
+                "whatsapp",
+                "instagram"
+              ],
+              "default": "total",
+              "description": "Con qué se arma y se ordena el top: los clics totales (por defecto) o los de un solo canal. Con `whatsapp`, las `limite` cuentas con más clics de WhatsApp; no es un reordenamiento del top por total."
+            },
+            "required": false,
+            "description": "Con qué se arma y se ordena el top: los clics totales (por defecto) o los de un solo canal. Con `whatsapp`, las `limite` cuentas con más clics de WhatsApp; no es un reordenamiento del top por total.",
+            "name": "orden",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mapa de calor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapaCalorClics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
             "content": {
               "application/json": {
                 "schema": {

@@ -90,6 +90,19 @@ export async function enviarJson<T>(ruta: string, cuerpo: unknown): Promise<T> {
   return (await respuesta.json()) as T;
 }
 
+// POST público sin cuerpo de respuesta (ej. registrar un clic de contacto, 204). `enviarJson` no
+// sirve acá: `Response.json()` falla si no hay nada que parsear.
+export async function enviarJsonSinRespuesta(ruta: string, cuerpo: unknown): Promise<void> {
+  const respuesta = await fetch(`${urlBase()}${ruta}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo),
+    cache: "no-store",
+  });
+
+  if (!respuesta.ok) throw await errorDesdeRespuesta(respuesta);
+}
+
 // Cabecera Authorization: Bearer desde la cookie de sesión (regla 5: el navegador nunca ve el
 // JWT, pero el servidor del frontend sí, para reenviarlo). Llamar a esto sin sesión es un error
 // de programación (la ruta debería estar protegida por un layout guard, ej. app/admin/layout.tsx)

@@ -16,10 +16,10 @@ interface PropsMenuAccionesProducto {
 type ModalAbierto = "editar" | "estado" | null;
 
 const CLASES_ITEM =
-  "flex w-full items-center gap-2.5 px-3 py-2 text-left font-cuerpo text-sm text-texto transition-colors hover:bg-fondo focus-visible:bg-fondo focus-visible:outline-none";
+  "flex w-full items-center gap-2.5 px-3 py-3 text-left lg:py-2 font-cuerpo text-sm text-texto transition-colors hover:bg-fondo focus-visible:bg-fondo focus-visible:outline-none";
 
 const CLASES_ITEM_PELIGRO =
-  "flex w-full items-center gap-2.5 px-3 py-2 text-left font-cuerpo text-sm font-medium text-acento transition-colors hover:bg-acento-suave focus-visible:bg-acento-suave focus-visible:outline-none";
+  "flex w-full items-center gap-2.5 px-3 py-3 text-left lg:py-2 font-cuerpo text-sm font-medium text-acento transition-colors hover:bg-acento-suave focus-visible:bg-acento-suave focus-visible:outline-none";
 
 // Mismo patrón que MenuAccionesCuenta (menú de tres puntos + confirmación antes de mutar).
 export function MenuAccionesProducto({ producto, usuarioId }: PropsMenuAccionesProducto) {
@@ -56,7 +56,7 @@ export function MenuAccionesProducto({ producto, usuarioId }: PropsMenuAccionesP
         aria-haspopup="menu"
         aria-expanded={menuAbierto}
         aria-label="Acciones del producto"
-        className={`rounded-md p-2 transition-colors ${
+        className={`rounded-md p-3.5 transition-colors lg:p-2 ${
           menuAbierto ? "bg-fondo text-texto" : "text-texto-secundario hover:bg-fondo hover:text-texto"
         } ${CLASES_FOCO_ENLACE}`}
       >

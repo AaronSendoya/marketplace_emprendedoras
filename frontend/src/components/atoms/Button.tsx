@@ -1,9 +1,9 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-export type VarianteBoton = "primario" | "secundario" | "peligro";
+export type VarianteBoton = "primario" | "secundario" | "peligro" | "promocion";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium font-cuerpo transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acento focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-md px-4 py-[var(--control-py,0.5rem)] text-sm font-medium font-cuerpo transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acento focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
 // "primario" es naranja (CLAUDE.md sección 6, regla 2: el naranja es el color del CTA principal
 // en todo el sitio); "secundario" se queda en magenta, el color de navegación/enlaces por
@@ -14,6 +14,9 @@ const POR_VARIANTE: Record<VarianteBoton, string> = {
   primario: "bg-enfasis text-white hover:bg-enfasis-hover",
   secundario: "border border-borde bg-superficie text-texto hover:border-acento hover:text-acento",
   peligro: "bg-acento text-white hover:bg-acento-hover",
+  // Tonal púrpura: la acción de la zona de promociones del panel de la Emprendedora (sección 6,
+  // regla 11), un escalón por debajo del CTA naranja.
+  promocion: "border border-secundario/25 bg-secundario-suave text-secundario hover:bg-secundario/10",
 };
 
 // Expuesto aparte del componente para que un <a>/<Link> (ej. "Consultar precio" hacia wa.me, o

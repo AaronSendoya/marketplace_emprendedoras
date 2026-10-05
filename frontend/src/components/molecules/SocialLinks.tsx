@@ -1,8 +1,13 @@
+"use client";
+
 import { AtSign, Link2, MessageCircle } from "lucide-react";
+import { useTransition } from "react";
 import { IconLink } from "@/components/atoms/IconLink";
+import { registrarClicAction } from "@/lib/metricas/acciones";
 import { enlaceWhatsapp } from "@/lib/formato/whatsapp";
 
 export interface PropsSocialLinks {
+  perfilId: string;
   whatsapp: string;
   instagramUsername: string | null;
   otraRedSocial: string | null;
@@ -15,17 +20,38 @@ export interface PropsSocialLinks {
 // válido. No hay icono de marca para Instagram: lucide-react ya no incluye logos de terceros.
 // WhatsApp lleva `enfasis` (naranja, CLAUDE.md sección 6 regla 2): es el único de los tres
 // contactos con ese tratamiento.
-export function SocialLinks({ whatsapp, instagramUsername, otraRedSocial, className = "" }: PropsSocialLinks) {
+//
+// "use client" (regla 19): cada enlace registra un clic anónimo antes de abrirse. Siguen siendo
+// `target="_blank"` (IconLink, sin cambios), así que la pestaña actual nunca se recarga y el
+// registro — fire-and-forget, sin esperar su resultado — no retrasa ni puede romper la apertura.
+export function SocialLinks({ perfilId, whatsapp, instagramUsername, otraRedSocial, className = "" }: PropsSocialLinks) {
+  const [, iniciarTransicion] = useTransition();
+
+  function alHacerClic(tipo: "whatsapp" | "instagram") {
+    iniciarTransicion(() => {
+      registrarClicAction(perfilId, tipo);
+    });
+  }
+
   return (
     <ul className={`flex flex-wrap items-center gap-x-4 gap-y-2 ${className}`.trim()}>
       <li>
-        <IconLink href={enlaceWhatsapp(whatsapp)} icono={<MessageCircle size={16} strokeWidth={1.5} />} enfasis>
+        <IconLink
+          href={enlaceWhatsapp(whatsapp)}
+          icono={<MessageCircle size={16} strokeWidth={1.5} />}
+          enfasis
+          onClick={() => alHacerClic("whatsapp")}
+        >
           WhatsApp
         </IconLink>
       </li>
       {instagramUsername && (
         <li>
-          <IconLink href={`https://instagram.com/${instagramUsername}`} icono={<AtSign size={16} strokeWidth={1.5} />}>
+          <IconLink
+            href={`https://instagram.com/${instagramUsername}`}
+            icono={<AtSign size={16} strokeWidth={1.5} />}
+            onClick={() => alHacerClic("instagram")}
+          >
             @{instagramUsername}
           </IconLink>
         </li>

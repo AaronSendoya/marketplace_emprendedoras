@@ -16,7 +16,7 @@ interface PropsMenuAccionesDescuento {
 type ModalAbierto = "editar" | "asignar" | null;
 
 const CLASES_ITEM =
-  "flex w-full items-center gap-2.5 px-3 py-2 text-left font-cuerpo text-sm text-texto transition-colors hover:bg-fondo focus-visible:bg-fondo focus-visible:outline-none";
+  "flex w-full items-center gap-2.5 px-3 py-3 text-left lg:py-2 font-cuerpo text-sm text-texto transition-colors hover:bg-fondo focus-visible:bg-fondo focus-visible:outline-none";
 
 // Sin acción destructiva (regla 8: un descuento no se borra, se termina con fecha_fin desde el
 // propio formulario de edición), así que este menú no necesita el tratamiento de "peligro".
@@ -54,7 +54,7 @@ export function MenuAccionesDescuento({ descuento, productos, usuarioId }: Props
         aria-haspopup="menu"
         aria-expanded={menuAbierto}
         aria-label="Acciones del descuento"
-        className={`rounded-md p-2 transition-colors ${
+        className={`rounded-md p-3.5 transition-colors lg:p-2 ${
           menuAbierto ? "bg-fondo text-texto" : "text-texto-secundario hover:bg-fondo hover:text-texto"
         } ${CLASES_FOCO_ENLACE}`}
       >

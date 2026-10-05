@@ -11,7 +11,7 @@ import { EsquemaMisDescuentosQuery } from "@/api/openapi/rutas/descuentos";
 export const GET = withErrorHandling(
   requireAdmin(async (request, contexto: RouteContext<"/api/v1/admin/usuarios/[id]/descuentos">) => {
     const { id } = leerParametrosRuta(await contexto.params, EsquemaIdUsuario);
-    const { pagina, limite } = leerConsulta(request, EsquemaMisDescuentosQuery);
-    return listarMisDescuentos(crearListMisDescuentos(), id, { pagina, limite });
+    const { pagina, limite, estado } = leerConsulta(request, EsquemaMisDescuentosQuery);
+    return listarMisDescuentos(crearListMisDescuentos(), id, { pagina, limite }, estado);
   }),
 );

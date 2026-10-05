@@ -5,18 +5,39 @@ import { clasesBoton } from "@/components/atoms/Button";
 import { asignarDescuentoAction, quitarDescuentoAction } from "@/lib/admin/descuentos-acciones";
 import type { Descuento, ProductoPropio } from "@/lib/api/tipos";
 
+// Asignar y quitar un producto de un descuento. Por defecto son las acciones del Admin; el panel de
+// la Emprendedora pasa las suyas (otra ruta a revalidar) y sus propios textos.
+export interface AccionesAsignacion {
+  asignar: (descuentoId: string, productoId: string) => Promise<void>;
+  quitar: (descuentoId: string, productoId: string) => Promise<void>;
+}
+
 interface PropsAsignarProductosModal {
   descuento: Descuento;
   productos: ProductoPropio[];
-  usuarioId: string;
+  usuarioId?: string;
   abierto: boolean;
   onCerrar: () => void;
+  acciones?: AccionesAsignacion;
+  titulo?: string;
+  textoSinProductos?: string;
 }
 
 // Checklist contra producto_ids del descuento: el backend no tiene un "reemplazar todo", solo
 // asignar (regla 9: 403 si el producto es de otro perfil, por eso esta lista ya viene acotada al
 // mismo perfil del descuento) y quitar, uno por uno.
-export function AsignarProductosModal({ descuento, productos, usuarioId, abierto, onCerrar }: PropsAsignarProductosModal) {
+export function AsignarProductosModal({
+  descuento,
+  productos,
+  usuarioId = "",
+  abierto,
+  onCerrar,
+  acciones,
+  titulo = "Productos con este descuento",
+  textoSinProductos = "Todavía no hay productos en este perfil.",
+}: PropsAsignarProductosModal) {
+  const asignar = acciones?.asignar ?? ((descuentoId: string, productoId: string) => asignarDescuentoAction(descuentoId, productoId, usuarioId));
+  const quitar = acciones?.quitar ?? ((descuentoId: string, productoId: string) => quitarDescuentoAction(descuentoId, productoId, usuarioId));
   const [, iniciarTransicion] = useTransition();
   const cerrarRef = useRef<HTMLButtonElement>(null);
 
@@ -42,9 +63,9 @@ export function AsignarProductosModal({ descuento, productos, usuarioId, abierto
   function alCambiar(productoId: string, asignado: boolean) {
     iniciarTransicion(async () => {
       if (asignado) {
-        await quitarDescuentoAction(descuento.id, productoId, usuarioId);
+        await quitar(descuento.id, productoId);
       } else {
-        await asignarDescuentoAction(descuento.id, productoId, usuarioId);
+        await asignar(descuento.id, productoId);
       }
     });
   }
@@ -56,14 +77,14 @@ export function AsignarProductosModal({ descuento, productos, usuarioId, abierto
         aria-modal="true"
         aria-labelledby="asignar-productos-titulo"
         onClick={(evento) => evento.stopPropagation()}
-        className="max-h-[calc(100vh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
       >
         <h2 id="asignar-productos-titulo" className="font-titulo text-lg font-bold text-texto">
-          Productos con este descuento
+          {titulo}
         </h2>
 
         {productos.length === 0 ? (
-          <p className="font-cuerpo text-sm text-texto-secundario">Todavía no hay productos en este perfil.</p>
+          <p className="font-cuerpo text-sm text-texto-secundario">{textoSinProductos}</p>
         ) : (
           <ul className="space-y-1">
             {productos.map((producto) => {
@@ -81,7 +102,7 @@ export function AsignarProductosModal({ descuento, productos, usuarioId, abierto
         )}
 
         <div className="flex justify-end pt-2">
-          <button ref={cerrarRef} type="button" onClick={onCerrar} className={clasesBoton("secundario")}>
+          <button ref={cerrarRef} type="button" onClick={onCerrar} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
             Listo
           </button>
         </div>

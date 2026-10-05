@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import type { EjecutorSql } from "@/shared/infrastructure/MySqlClient";
 import type { CambiosDescuento, Descuento, NuevoDescuento } from "../domain/Descuento";
-import type { IDescuentoRepository } from "../domain/IDescuentoRepository";
+import type { FiltroEstadoDescuento, IDescuentoRepository } from "../domain/IDescuentoRepository";
 
 interface FilaDescuento {
   id: string;
@@ -19,6 +19,16 @@ const SELECT_DESCUENTO = `
   FROM descuentos d
   JOIN perfiles_emprendedores pe ON pe.id = d.perfil_id
 `;
+
+// Filtro opcional por estado (regla 8). Es la misma precedencia que `estadoDescuento`: programado si
+// ya tiene inicio y es futuro; si no, vencido si tiene fin y ya pasó; si no, vigente. Va como
+// parámetros (`NULL` = sin filtro): el estado nunca se interpola en el texto SQL. Placeholders, en
+// orden: estado, ahora (inicio), ahora (fin), estado.
+const FILTRO_ESTADO = `(? IS NULL OR CASE
+    WHEN d.fecha_inicio IS NOT NULL AND d.fecha_inicio > ? THEN 'programado'
+    WHEN d.fecha_fin IS NOT NULL AND d.fecha_fin < ? THEN 'vencido'
+    ELSE 'vigente'
+  END = ?)`;
 
 // Solo estas columnas se pueden actualizar: el SET se arma con esta lista, nunca con claves de la entrada.
 const COLUMNAS_EDITABLES: Record<keyof CambiosDescuento, string> = {
@@ -58,14 +68,17 @@ export class MySqlDescuentoRepository implements IDescuentoRepository {
     ]);
   }
 
-  async listarPorPerfil(perfilId: string, pagina: ParametrosPagina): Promise<Pagina<Descuento>> {
+  async listarPorPerfil(perfilId: string, pagina: ParametrosPagina, filtro?: FiltroEstadoDescuento): Promise<Pagina<Descuento>> {
+    const parametrosFiltro = [filtro?.estado ?? null, filtro?.ahora ?? null, filtro?.ahora ?? null, filtro?.estado ?? null];
     const [filas, totales] = await Promise.all([
-      this.db.consultar<FilaDescuento>(`${SELECT_DESCUENTO} WHERE d.perfil_id = ? ORDER BY d.creado_en DESC, d.id LIMIT ? OFFSET ?`, [
+      this.db.consultar<FilaDescuento>(
+        `${SELECT_DESCUENTO} WHERE d.perfil_id = ? AND ${FILTRO_ESTADO} ORDER BY d.creado_en DESC, d.id LIMIT ? OFFSET ?`,
+        [perfilId, ...parametrosFiltro, pagina.limite, desplazamiento(pagina)],
+      ),
+      this.db.consultar<{ total: number }>(`SELECT COUNT(*) AS total FROM descuentos d WHERE d.perfil_id = ? AND ${FILTRO_ESTADO}`, [
         perfilId,
-        pagina.limite,
-        desplazamiento(pagina),
+        ...parametrosFiltro,
       ]),
-      this.db.consultar<{ total: number }>("SELECT COUNT(*) AS total FROM descuentos WHERE perfil_id = ?", [perfilId]),
     ]);
     return { datos: await this.conProductos(filas), total: Number(totales[0]?.total ?? 0) };
   }

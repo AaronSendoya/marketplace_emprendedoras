@@ -14,7 +14,7 @@ import {
   type DescuentoConEstado,
 } from "../domain/Descuento";
 import type { IDescuentoRepository } from "../domain/IDescuentoRepository";
-import { crearVigencia, estadoDescuento, interpretarFecha, validarRango } from "../domain/VigenciaDescuento";
+import { crearVigencia, estadoDescuento, interpretarFecha, validarRango, type EstadoDescuento } from "../domain/VigenciaDescuento";
 
 const conEstado = (descuento: Descuento, ahora: Date): DescuentoConEstado => ({
   ...descuento,
@@ -98,7 +98,8 @@ export class UpdateDescuentoUseCase {
   }
 }
 
-// "Mis descuentos": los de su perfil con el estado calculado al consultar. Sin perfil, la lista está vacía.
+// "Mis descuentos": los de su perfil con el estado calculado al consultar, opcionalmente solo los de un
+// estado (regla 8). Sin perfil, la lista está vacía.
 export class ListMisDescuentosUseCase {
   constructor(
     private readonly descuentos: IDescuentoRepository,
@@ -106,11 +107,12 @@ export class ListMisDescuentosUseCase {
     private readonly clock: IClock,
   ) {}
 
-  async ejecutar(usuarioId: string, pagina: ParametrosPagina): Promise<Pagina<DescuentoConEstado>> {
+  async ejecutar(usuarioId: string, pagina: ParametrosPagina, estado?: EstadoDescuento): Promise<Pagina<DescuentoConEstado>> {
     const perfil = await this.perfiles.buscarPorUsuarioId(usuarioId);
     if (!perfil) return { datos: [], total: 0 };
-    const { datos, total } = await this.descuentos.listarPorPerfil(perfil.id, pagina);
+    // Un solo "ahora" para el filtro y para el estado de la respuesta: nunca discrepan entre sí.
     const ahora = this.clock.ahora();
+    const { datos, total } = await this.descuentos.listarPorPerfil(perfil.id, pagina, estado ? { estado, ahora } : undefined);
     return { datos: datos.map((descuento) => conEstado(descuento, ahora)), total };
   }
 }

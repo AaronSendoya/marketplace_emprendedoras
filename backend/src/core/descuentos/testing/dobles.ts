@@ -1,7 +1,8 @@
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import { ErrorValidacion } from "@/shared/domain/errors";
 import type { CambiosDescuento, Descuento, NuevoDescuento } from "../domain/Descuento";
-import type { IDescuentoRepository } from "../domain/IDescuentoRepository";
+import type { FiltroEstadoDescuento, IDescuentoRepository } from "../domain/IDescuentoRepository";
+import { estadoDescuento } from "../domain/VigenciaDescuento";
 
 export const descuentoDePrueba = (parches: Partial<Descuento> = {}): Descuento => ({
   id: "descuento-1",
@@ -46,8 +47,10 @@ export class DescuentoRepositoryEnMemoria implements IDescuentoRepository {
     }
   }
 
-  async listarPorPerfil(perfilId: string, pagina: ParametrosPagina): Promise<Pagina<Descuento>> {
-    const propios = this.descuentos.filter((d) => d.perfilId === perfilId);
+  async listarPorPerfil(perfilId: string, pagina: ParametrosPagina, filtro?: FiltroEstadoDescuento): Promise<Pagina<Descuento>> {
+    const propios = this.descuentos.filter(
+      (d) => d.perfilId === perfilId && (!filtro || estadoDescuento({ inicio: d.fechaInicio, fin: d.fechaFin }, filtro.ahora) === filtro.estado),
+    );
     return { datos: propios.slice(desplazamiento(pagina), desplazamiento(pagina) + pagina.limite), total: propios.length };
   }
 

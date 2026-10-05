@@ -6,6 +6,7 @@ import { registrarAuth } from "./rutas/auth";
 import { registrarCatalogos } from "./rutas/catalogos";
 import { registrarHealth } from "./rutas/health";
 import { registrarDescuentos } from "./rutas/descuentos";
+import { registrarMetricas } from "./rutas/metricas";
 import { registrarPerfiles } from "./rutas/perfiles";
 import { registrarProductos } from "./rutas/productos";
 
@@ -20,6 +21,7 @@ export function generarDocumento() {
   registrarPerfiles(registro);
   registrarProductos(registro);
   registrarDescuentos(registro);
+  registrarMetricas(registro);
 
   return new OpenApiGeneratorV31(registro.definitions).generateDocument({
     openapi: "3.1.0",
@@ -41,6 +43,7 @@ export function generarDocumento() {
       { name: "Marketplace", description: "Feed 2 público: productos con su descuento vigente (reglas 7 y 8)." },
       { name: "Productos", description: "Gestión de los productos propios (reglas 7 y 18)." },
       { name: "Descuentos", description: "Motor de promociones: descuentos por porcentaje con vigencia (reglas 8 y 9)." },
+      { name: "Métricas", description: "Clics de contacto del catálogo público, anónimos (regla 19)." },
     ],
   });
 }

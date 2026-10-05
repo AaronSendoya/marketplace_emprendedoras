@@ -49,9 +49,9 @@ export async function iniciarSesionAction(_estadoPrevio: EstadoLogin, formData: 
   }
 
   await crearCookieSesion(respuesta.token, respuesta.usuario.rol);
-  // El Admin tiene panel propio (fase 2, paso 2); la Emprendedora todavía no, así que sigue
-  // yendo al catálogo público.
-  redirect(respuesta.usuario.rol === "Admin" ? "/admin" : "/");
+  // Cada rol entra a su panel: el Admin a /admin y la Emprendedora a /mi-negocio. Solo cambia el
+  // destino; la autenticación y la cookie son las mismas.
+  redirect(respuesta.usuario.rol === "Admin" ? "/admin" : "/mi-negocio");
 }
 
 export async function cerrarSesionAction(): Promise<void> {
