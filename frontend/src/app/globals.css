@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 /*
- * Paleta y tipografía: CLAUDE.md sección 6 (Lineamientos de diseño) y
- * docs/PLAN_IMPLEMENTACION_FRONTEND.md sección 6. Tres colores de marca, cada uno con un rol fijo
- * (magenta: navegación/enlaces; púrpura: Hero/estado seleccionado; naranja: CTA/WhatsApp/
- * promociones — nunca intercambiables), neutros cálidos (stone) y dos familias tipográficas con
- * rol fijo (nunca se mezclan dentro de un mismo tipo de texto). Todo como token: cambiar un color
+ * Paleta y tipografía: CLAUDE.md sección 6 (Lineamientos de diseño, reglas 2 y 14). El sitio público
+ * usa neutros cálidos (stone) en tres niveles (fondo, fondo profundo y superficie blanca) y un solo
+ * color de acción, el naranja; el magenta queda para enlaces de texto y el púrpura ya no se usa fuera
+ * de /admin y /mi-negocio, que tienen su propio tema (más abajo). Dos familias tipográficas con rol
+ * fijo (nunca se mezclan dentro de un mismo tipo de texto). Todo como token: cambiar un color
  * después es un solo lugar.
  */
 :root {
-  --color-fondo: #fafaf9;
+  /* Tres niveles de superficie: el fondo gris de la página, el fondo profundo de las bandas alternas y la
+     superficie blanca de lo que contiene información (tarjetas, barra de filtros, modales). */
+  --color-fondo: #f5f5f4;
+  --color-fondo-profundo: #ecebe9;
   --color-superficie: #ffffff;
   --color-borde: #e7e5e4;
   --color-borde-fuerte: #d6d3d1;
@@ -24,9 +27,23 @@
   --color-secundario-hover: #6d28d9;
   --color-secundario-suave: #f5f3ff;
 
-  --color-enfasis: #ea580c;
-  --color-enfasis-hover: #c2410c;
+  /* Naranja: el único color de acción del sitio público. El botón usa #c2410c, que con texto blanco da 5,2:1
+     (el #ea580c de la marca solo daba 3,6:1); el naranja de marca queda para iconos y el anillo de foco. */
+  --color-enfasis: #c2410c;
+  --color-enfasis-hover: #9a3412;
   --color-enfasis-suave: #fff7ed;
+  --color-enfasis-borde: #ffedd5;
+  --color-marca: #ea580c;
+
+  /* Anillo de foco de los controles: naranja en el sitio público; el Admin y Mi negocio lo mantienen en
+     magenta (sus temas lo redefinen). */
+  --color-foco: var(--color-marca);
+
+  /* Pie de página: ciruela, un oscuro que nace del magenta y el púrpura del banner (no un negro puro). */
+  --color-pie: #34172b;
+  --color-pie-texto: #efe6ec;
+  --color-pie-tenue: #c4adbd;
+  --color-pie-acento: #fdba74;
 
   /* Color de cada canal de contacto en los gráficos y tablas del Admin (sección 6, regla 13): WhatsApp
      en el naranja de la marca (y su versión fuerte, con texto blanco encima) e Instagram en el púrpura
@@ -35,12 +52,30 @@
   --color-whatsapp: #ea580c;
   --color-whatsapp-fuerte: #c2410c;
 
+  /* Colores de cada servicio de contacto del catálogo público (sección 6, regla 14, punto g): solo para sus botones.
+     Son los de la marca de cada servicio y no sustituyen a los de PISTA8. El texto sobre el verde de WhatsApp es
+     oscuro (7,5:1; el blanco daba 2,0:1). Distintos de `--color-whatsapp`, que sigue siendo el canal en los gráficos del Admin. */
+  --color-wa: #25d366;
+  --color-wa-texto: #052e16;
+  --color-tiktok: #000000;
+  --color-facebook: #1877f2;
+  --fondo-instagram: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+
   /* Solo el panel de la Emprendedora (sección 6, regla 11): neutros cálidos y el tono del estado
      "Publicado". No se usan en el catálogo público ni en /admin. */
   --color-arena: #faf7f4;
   --color-riel: #f3eee8;
   --color-salvia: #3f6b4f;
   --color-salvia-suave: #edf4ef;
+
+  /* Solo la importación de Excel del Admin (sección 6, regla 13, punto i): tres estados de una fila. Siempre con
+     icono y texto; nunca solo color. Ninguna otra pantalla los usa. */
+  --color-aviso: #92400e;
+  --color-aviso-suave: #fffbeb;
+  --color-aviso-borde: #fde68a;
+  --color-error: #b42318;
+  --color-error-suave: #fef3f2;
+  --color-error-borde: #fecdca;
 }
 
 /* Ámbito del panel de la Emprendedora. Cambia el valor de tres tokens ya existentes para todo lo
@@ -50,6 +85,7 @@
   --color-fondo: var(--color-arena);
   --color-enfasis: #c2410c;
   --color-enfasis-hover: #9a3412;
+  --color-foco: var(--color-acento);
 }
 
 /* Ámbito del panel del Admin (sección 6, regla 13). Mismo mecanismo que `tema-negocio`: cambia el valor
@@ -61,6 +97,7 @@
   --color-fondo: #f5f5f4;
   --color-enfasis: #c2410c;
   --color-enfasis-hover: #9a3412;
+  --color-foco: var(--color-acento);
 
   --text-xs: 0.8125rem;
   --text-xs--line-height: calc(1.25 / 0.8125);
@@ -74,8 +111,15 @@
   --badge-py: 0.25rem;
 }
 
+/* Punto de corte desde el que el catálogo pasa de 2 a 3 columnas (sección 6, regla 14, punto f): 1180 px. Con nombre, y no
+   como `min-[1180px]`, porque Tailwind ordena las reglas de valor arbitrario antes que `md:` y entonces `md:grid-cols-2` gana. */
+@theme {
+  --breakpoint-rejilla: 73.75rem;
+}
+
 @theme inline {
   --color-fondo: var(--color-fondo);
+  --color-fondo-profundo: var(--color-fondo-profundo);
   --color-superficie: var(--color-superficie);
   --color-borde: var(--color-borde);
   --color-borde-fuerte: var(--color-borde-fuerte);
@@ -93,14 +137,34 @@
   --color-enfasis: var(--color-enfasis);
   --color-enfasis-hover: var(--color-enfasis-hover);
   --color-enfasis-suave: var(--color-enfasis-suave);
+  --color-enfasis-borde: var(--color-enfasis-borde);
+  --color-marca: var(--color-marca);
+  --color-foco: var(--color-foco);
+
+  --color-pie: var(--color-pie);
+  --color-pie-texto: var(--color-pie-texto);
+  --color-pie-tenue: var(--color-pie-tenue);
+  --color-pie-acento: var(--color-pie-acento);
 
   --color-whatsapp: var(--color-whatsapp);
   --color-whatsapp-fuerte: var(--color-whatsapp-fuerte);
+
+  --color-wa: var(--color-wa);
+  --color-wa-texto: var(--color-wa-texto);
+  --color-tiktok: var(--color-tiktok);
+  --color-facebook: var(--color-facebook);
 
   --color-arena: var(--color-arena);
   --color-riel: var(--color-riel);
   --color-salvia: var(--color-salvia);
   --color-salvia-suave: var(--color-salvia-suave);
+
+  --color-aviso: var(--color-aviso);
+  --color-aviso-suave: var(--color-aviso-suave);
+  --color-aviso-borde: var(--color-aviso-borde);
+  --color-error: var(--color-error);
+  --color-error-suave: var(--color-error-suave);
+  --color-error-borde: var(--color-error-borde);
 
   /* Plus Jakarta Sans: títulos, nombres de emprendimiento, cifras grandes.
      Inter: cuerpo, badges, botones, texto pequeño. */
@@ -115,9 +179,94 @@
   --text-seccion--line-height: 1.25;
   --text-kpi: 2.875rem;
   --text-kpi--line-height: 1;
+
+  /* Elevación del sitio público (regla 4): sombras suaves en tres escalas, nunca pesadas. El Admin no las
+     usa (regla 13) y Mi negocio tiene su propia sombra casi invisible (regla 11). */
+  --shadow-tarjeta: 0 1px 2px rgb(28 25 23 / 0.05), 0 1px 3px rgb(28 25 23 / 0.06);
+  --shadow-tarjeta-hover: 0 6px 16px rgb(28 25 23 / 0.09), 0 1px 3px rgb(28 25 23 / 0.06);
+  --shadow-modal: 0 24px 48px rgb(28 25 23 / 0.22), 0 4px 12px rgb(28 25 23 / 0.12);
+  --radius-superficie: 0.875rem;
+}
+
+/* Movimiento del sitio público (regla 6): solo opacity y transform. Las clases `animate-entrada`,
+   `animate-aparecer` y `animate-modal` salen de aquí. */
+@theme {
+  --animate-entrada: entrada 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  --animate-aparecer: aparecer 0.25s ease-out both;
+  --animate-modal: modal 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+
+  @keyframes entrada {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes modal {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 body {
   background: var(--color-fondo);
   color: var(--color-texto);
+}
+
+/* Las tarjetas de una rejilla entran una tras otra (hasta la sexta) al cargar la página y todo queda visible en
+   menos de un segundo. Es una animación por tiempo y no por desplazamiento a propósito: un revelado al
+   desplazarse deja el contenido que está bajo el pliegue en opacidad 0 hasta que se llega a él, y en una captura de
+   la página completa, una vista previa o una impresión eso se vería como huecos en blanco. */
+.entrada-escalonada > * {
+  animation: entrada 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.entrada-escalonada > :nth-child(2) { animation-delay: 60ms; }
+.entrada-escalonada > :nth-child(3) { animation-delay: 120ms; }
+.entrada-escalonada > :nth-child(4) { animation-delay: 180ms; }
+.entrada-escalonada > :nth-child(5) { animation-delay: 240ms; }
+.entrada-escalonada > :nth-child(n + 6) { animation-delay: 300ms; }
+
+/* El botón nativo de borrar del campo de búsqueda del sitio público (`Input` variante "catalogo") sale azul en Chrome
+   y Safari, un color que no es de la paleta: se dibuja con el gris de texto secundario. Con la búsqueda en vivo, borrar
+   el texto con él también vacía los resultados. */
+.campo-catalogo::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+  /* Chrome solo lo muestra al pasar el cursor o enfocar; en un teléfono eso es nunca. Con texto escrito, siempre visible. */
+  opacity: 1;
+  pointer-events: auto;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 1rem no-repeat;
+}
+
+/* Quien pide menos movimiento no recibe ninguna animación ni transición. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

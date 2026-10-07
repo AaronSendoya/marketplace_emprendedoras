@@ -3,6 +3,7 @@ import { AdminRestablecerPasswordUseCase } from "@/core/auth/application/AdminRe
 import { CambiarEmailUseCase } from "@/core/auth/application/CambiarEmailUseCase";
 import { CambiarEstadoUsuarioUseCase } from "@/core/auth/application/CambiarEstadoUsuarioUseCase";
 import { CreateUsuarioUseCase } from "@/core/auth/application/CreateUsuarioUseCase";
+import { EliminarCuentaUseCase } from "@/core/auth/application/EliminarCuentaUseCase";
 import { GetUsuarioUseCase } from "@/core/auth/application/GetUsuarioUseCase";
 import { ListUsuariosUseCase } from "@/core/auth/application/ListUsuariosUseCase";
 import { RequestOtpUseCase } from "@/core/auth/application/RequestOtpUseCase";
@@ -11,9 +12,11 @@ import { VerificadorOtp } from "@/core/auth/application/VerificadorOtp";
 import { BcryptPasswordHasher } from "@/core/auth/infrastructure/BcryptPasswordHasher";
 import { generarCodigoOtp } from "@/core/auth/infrastructure/generarCodigoOtp";
 import { generarPasswordTemporal } from "@/core/auth/infrastructure/generarPasswordTemporal";
+import { MySqlEliminacionCuentaRepository } from "@/core/auth/infrastructure/MySqlEliminacionCuentaRepository";
 import { MySqlOtpRepository } from "@/core/auth/infrastructure/MySqlOtpRepository";
 import { MySqlUsuarioRepository } from "@/core/auth/infrastructure/MySqlUsuarioRepository";
 import { crearEmailSender } from "@/shared/infrastructure/crearEmailSender";
+import { imageStoragePorDefecto } from "@/shared/infrastructure/crearImageStorage";
 import { logger } from "@/shared/infrastructure/logger";
 import { getMySqlClient } from "@/shared/infrastructure/MySqlClient";
 import { SystemClock } from "@/shared/infrastructure/SystemClock";
@@ -58,6 +61,11 @@ export function crearGetUsuario(): GetUsuarioUseCase {
 
 export function crearCambiarEstadoUsuario(): CambiarEstadoUsuarioUseCase {
   return new CambiarEstadoUsuarioUseCase(dependencias().usuarios, logger);
+}
+
+export function crearEliminarCuenta(): EliminarCuentaUseCase {
+  const db = getMySqlClient();
+  return new EliminarCuentaUseCase(dependencias().usuarios, new MySqlEliminacionCuentaRepository(db), imageStoragePorDefecto(), logger);
 }
 
 export function crearActualizarUsuario(): ActualizarUsuarioUseCase {

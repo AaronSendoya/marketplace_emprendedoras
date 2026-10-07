@@ -123,7 +123,7 @@ describe("carga concurrente sobre el pool (robustez)", () => {
     });
     const perfil = (await perfiles.buscarPorUsuarioId(ids.usuario))!;
     ids.perfil = perfil.id;
-    const descuento = await descuentos.crear({ perfilId: perfil.id, porcentaje: 10, fechaInicio: null, fechaFin: null, ahora: AHORA });
+    const descuento = await descuentos.crear({ perfilId: perfil.id, porcentaje: 10, fechaInicio: null, fechaFin: null, descripcion: null, ahora: AHORA });
     for (let i = 0; i < 40; i++) {
       const producto = await productos.crear({
         perfilId: perfil.id,

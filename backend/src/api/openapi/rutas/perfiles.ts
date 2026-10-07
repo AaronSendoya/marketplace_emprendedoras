@@ -1,7 +1,7 @@
 import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { esquemaPaginacion } from "@/api/http/paginacion";
-import { AUTENTICADO, esquemaPagina, PUBLICO, respuestasDeError } from "../componentes";
+import { AUTENTICADO, EsquemaPaginacion, PUBLICO, respuestasDeError } from "../componentes";
 
 const texto = (maximo: number) => z.string().trim().min(1).max(maximo);
 const instagram = z
@@ -59,7 +59,16 @@ export const EsquemaIdPerfil = z.object({ id: z.uuid().meta({ description: "Id d
 export const EsquemaListarPerfilesQuery = esquemaPaginacion.extend({
   ciudad_id: z.uuid().optional(),
   rubro_id: z.uuid().optional(),
-  q: z.string().trim().min(1).max(100).optional().meta({ description: "Texto a buscar en el nombre del negocio y la descripción." }),
+  q: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional()
+    .meta({
+      description:
+        "Texto a buscar (regla 20). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del negocio, la descripción, el nombre de la emprendedora o el nombre y la descripción de sus productos activos; no hace falta que sea en el mismo campo ni en ese orden. Sin distinguir mayúsculas ni acentos. Se combina con ciudad_id y rubro_id con AND. Si no hay ninguna coincidencia exacta, se devuelven los perfiles parecidos, que toleran errores de tipeo (`dulses` encuentra `Dulces`), y la respuesta lo indica con `similares: true`.",
+    }),
 });
 
 const referencia = (ejemplo: string) => z.object({ id: z.string(), nombre: z.string().meta({ example: ejemplo }) });
@@ -81,6 +90,18 @@ export const EsquemaPerfil = z
     actualizado_en: z.iso.datetime(),
   })
   .meta({ id: "Perfil" });
+
+// `GET /perfiles`: la página de siempre más `similares` (regla 20).
+const EsquemaPerfilesPagina = z
+  .object({
+    datos: z.array(EsquemaPerfil),
+    paginacion: EsquemaPaginacion,
+    similares: z.boolean().meta({
+      description:
+        "`true` cuando `q` no tuvo ninguna coincidencia exacta y `datos` son perfiles parecidos (regla 20); `false` en cualquier otro caso. Los parecidos nunca se mezclan con las coincidencias exactas.",
+    }),
+  })
+  .meta({ id: "PerfilesPagina" });
 
 // Solo documentación: describe las partes del formulario, incluidos los archivos.
 const archivo = (descripcion: string) => z.string().meta({ type: "string", format: "binary", description: descripcion });
@@ -116,7 +137,7 @@ export function registrarPerfiles(registro: OpenAPIRegistry): void {
     security: PUBLICO,
     request: { query: EsquemaListarPerfilesQuery },
     responses: {
-      200: { description: "Página de perfiles.", content: { "application/json": { schema: esquemaPagina(EsquemaPerfil, "PerfilesPagina") } } },
+      200: { description: "Página de perfiles.", content: { "application/json": { schema: EsquemaPerfilesPagina } } },
       ...respuestasDeError("VALIDACION"),
     },
   });

@@ -46,6 +46,10 @@
     {
       "name": "Métricas",
       "description": "Clics de contacto del catálogo público, anónimos (regla 19)."
+    },
+    {
+      "name": "Importaciones",
+      "description": "Carga de emprendedoras desde el Excel de Google Forms, sin imágenes. Solo Admin (regla 22)."
     }
   ],
   "components": {
@@ -324,6 +328,41 @@
           "paginacion"
         ]
       },
+      "CuentaEliminada": {
+        "type": "object",
+        "properties": {
+          "perfiles": {
+            "type": "integer",
+            "description": "Perfiles eliminados (0 o 1).",
+            "example": 1
+          },
+          "productos": {
+            "type": "integer",
+            "example": 6
+          },
+          "descuentos": {
+            "type": "integer",
+            "example": 2
+          },
+          "clics": {
+            "type": "integer",
+            "description": "Clics de contacto eliminados.",
+            "example": 120
+          },
+          "imagenes": {
+            "type": "integer",
+            "description": "Imágenes borradas de R2 (nunca las predeterminadas).",
+            "example": 8
+          }
+        },
+        "required": [
+          "perfiles",
+          "productos",
+          "descuentos",
+          "clics",
+          "imagenes"
+        ]
+      },
       "Perfil": {
         "type": "object",
         "properties": {
@@ -564,6 +603,14 @@
             ],
             "format": "date-time"
           },
+          "descripcion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Detalle opcional de la promoción, de hasta 280 caracteres; `null` si no tiene.",
+            "example": "Día de la Madre, en toda la línea de tortas"
+          },
           "estado": {
             "type": "string",
             "enum": [
@@ -591,6 +638,7 @@
           "porcentaje",
           "fecha_inicio",
           "fecha_fin",
+          "descripcion",
           "estado",
           "producto_ids",
           "creado_en"
@@ -607,11 +655,16 @@
           },
           "paginacion": {
             "$ref": "#/components/schemas/Paginacion"
+          },
+          "similares": {
+            "type": "boolean",
+            "description": "`true` cuando `q` no tuvo ninguna coincidencia exacta y `datos` son perfiles parecidos (regla 20); `false` en cualquier otro caso. Los parecidos nunca se mezclan con las coincidencias exactas."
           }
         },
         "required": [
           "datos",
-          "paginacion"
+          "paginacion",
+          "similares"
         ]
       },
       "ProductosPagina": {
@@ -625,11 +678,16 @@
           },
           "paginacion": {
             "$ref": "#/components/schemas/Paginacion"
+          },
+          "similares": {
+            "type": "boolean",
+            "description": "`true` cuando `q` no tuvo ninguna coincidencia exacta y `datos` son productos parecidos (regla 21); `false` en cualquier otro caso. Los parecidos nunca se mezclan con las coincidencias exactas."
           }
         },
         "required": [
           "datos",
-          "paginacion"
+          "paginacion",
+          "similares"
         ]
       },
       "ProductoPublico": {
@@ -959,6 +1017,369 @@
         "required": [
           "whatsapp",
           "instagram"
+        ]
+      },
+      "AnalisisImportacion": {
+        "type": "object",
+        "properties": {
+          "hoja": {
+            "type": "string",
+            "description": "La hoja que se leyó."
+          },
+          "hojas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "columnas": {
+            "type": "object",
+            "properties": {
+              "reconocidas": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ignoradas": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Encabezados que se ignoran a propósito (fotos, logo, marca temporal y el beneficio, que no se registra)."
+              },
+              "opcionales_ausentes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "reconocidas",
+              "ignoradas",
+              "opcionales_ausentes"
+            ]
+          },
+          "filas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilaAnalizadaImportacion"
+            }
+          },
+          "resumen": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "listas": {
+                "type": "integer"
+              },
+              "revisar": {
+                "type": "integer"
+              },
+              "con_error": {
+                "type": "integer"
+              },
+              "ya_existen": {
+                "type": "integer"
+              },
+              "repetidas": {
+                "type": "integer"
+              },
+              "ocultas": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "listas",
+              "revisar",
+              "con_error",
+              "ya_existen",
+              "repetidas",
+              "ocultas"
+            ]
+          }
+        },
+        "required": [
+          "hoja",
+          "hojas",
+          "columnas",
+          "filas",
+          "resumen"
+        ]
+      },
+      "FilaAnalizadaImportacion": {
+        "type": "object",
+        "properties": {
+          "fila": {
+            "type": "integer",
+            "description": "Número de fila en el Excel."
+          },
+          "oculta": {
+            "type": "boolean",
+            "description": "La fila estaba oculta por un filtro de Excel."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "lista",
+              "revisar",
+              "error",
+              "ya_existe",
+              "repetida"
+            ],
+            "description": "`repetida` y `ya_existe` nunca se importan."
+          },
+          "datos": {
+            "$ref": "#/components/schemas/DatosFilaImportacion"
+          },
+          "avisos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AvisoImportacion"
+            }
+          },
+          "ya_existe": {
+            "type": "boolean"
+          },
+          "repetida_de": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Fila donde aparece primero el mismo correo."
+          },
+          "textos": {
+            "type": "object",
+            "properties": {
+              "instagram": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "instagram"
+            ],
+            "description": "Lo que decía el Excel, para el reporte «por revisar»."
+          }
+        },
+        "required": [
+          "fila",
+          "oculta",
+          "estado",
+          "datos",
+          "avisos",
+          "ya_existe",
+          "repetida_de",
+          "textos"
+        ]
+      },
+      "DatosFilaImportacion": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string"
+          },
+          "nombres": {
+            "type": "string"
+          },
+          "apellido_paterno": {
+            "type": "string"
+          },
+          "apellido_materno": {
+            "type": "string"
+          },
+          "whatsapp": {
+            "type": "string",
+            "description": "Ya normalizado y con `+` (por ejemplo `+59171234567`) cuando es válido."
+          },
+          "ciudad_id": {
+            "type": "string"
+          },
+          "ciudad_texto": {
+            "type": "string"
+          },
+          "rubro_id": {
+            "type": "string"
+          },
+          "rubro_texto": {
+            "type": "string"
+          },
+          "nombre_negocio": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "instagram": {
+            "type": "string"
+          },
+          "otra_red_social": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "correo",
+          "nombres",
+          "apellido_paterno",
+          "apellido_materno",
+          "whatsapp",
+          "ciudad_id",
+          "ciudad_texto",
+          "rubro_id",
+          "rubro_texto",
+          "nombre_negocio",
+          "descripcion",
+          "instagram",
+          "otra_red_social"
+        ]
+      },
+      "AvisoImportacion": {
+        "type": "object",
+        "properties": {
+          "campo": {
+            "type": "string",
+            "example": "whatsapp"
+          },
+          "codigo": {
+            "type": "string",
+            "example": "whatsapp_invalido"
+          },
+          "severidad": {
+            "type": "string",
+            "enum": [
+              "error",
+              "revisar",
+              "info"
+            ],
+            "description": "`error` impide importar la fila; `revisar` es una suposición que conviene mirar; `info` solo informa."
+          },
+          "mensaje": {
+            "type": "string",
+            "example": "El WhatsApp «hola» no es válido. En Bolivia son 8 dígitos y empiezan con 6 o 7; con otro país, escribe el código con +."
+          },
+          "reporte": {
+            "type": "boolean",
+            "description": "También va al reporte «por revisar» que se descarga al terminar."
+          }
+        },
+        "required": [
+          "campo",
+          "codigo",
+          "severidad",
+          "mensaje",
+          "reporte"
+        ]
+      },
+      "ValidacionImportacion": {
+        "type": "object",
+        "properties": {
+          "filas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fila": {
+                  "type": "integer"
+                },
+                "estado": {
+                  "type": "string",
+                  "enum": [
+                    "lista",
+                    "revisar",
+                    "error",
+                    "ya_existe",
+                    "repetida"
+                  ]
+                },
+                "avisos": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvisoImportacion"
+                  }
+                },
+                "ya_existe": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "fila",
+                "estado",
+                "avisos",
+                "ya_existe"
+              ]
+            }
+          }
+        },
+        "required": [
+          "filas"
+        ]
+      },
+      "ResultadoImportacion": {
+        "type": "object",
+        "properties": {
+          "resultados": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fila": {
+                  "type": "integer"
+                },
+                "correo": {
+                  "type": "string"
+                },
+                "estado": {
+                  "type": "string",
+                  "enum": [
+                    "creada",
+                    "omitida",
+                    "error"
+                  ]
+                },
+                "cuenta_creada": {
+                  "type": "boolean"
+                },
+                "perfil_creado": {
+                  "type": "boolean"
+                },
+                "password_temporal": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Solo si se creó la cuenta, y solo en esta respuesta: no se guarda en claro ni se vuelve a mostrar (regla 5)."
+                },
+                "avisos": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvisoImportacion"
+                  }
+                },
+                "mensaje": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "fila",
+                "correo",
+                "estado",
+                "cuenta_creada",
+                "perfil_creado",
+                "password_temporal",
+                "avisos",
+                "mensaje"
+              ]
+            }
+          }
+        },
+        "required": [
+          "resultados"
         ]
       }
     },
@@ -1807,6 +2228,116 @@
       }
     },
     "/admin/usuarios/{id}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Eliminar una cuenta por completo",
+        "description": "Irreversible (regla 5). Distinta de desactivar y no la sustituye. Solo se elimina una cuenta de Emprendedor **activa**: una suspendida da 409 (se activa primero), una de Admin da 403 y la propia cuenta del Admin da 409. El cuerpo lleva `confirmacion_email`, el correo de la cuenta; si no coincide, 400 y no se borra nada. Borra, en una sola transacción, su perfil, sus productos, sus descuentos y las asignaciones entre ambos, todos sus clics de contacto (también dejan de contar en las métricas, regla 19), los códigos OTP y los intentos de acceso de su correo, y la cuenta; después borra de R2 sus imágenes (nunca las predeterminadas). La persona pierde el acceso en su siguiente petición y su correo queda libre.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la cuenta.",
+              "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+            },
+            "required": true,
+            "description": "Id de la cuenta.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmacion_email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150,
+                    "description": "El correo de la cuenta, escrito por el Admin.",
+                    "example": "emprendedora@gmail.com"
+                  }
+                },
+                "required": [
+                  "confirmacion_email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lo que se eliminó junto con la cuenta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaEliminada"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "Admin"
@@ -2447,10 +2978,10 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 100,
-              "description": "Texto a buscar en el nombre del negocio y la descripción."
+              "description": "Texto a buscar (regla 20). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del negocio, la descripción, el nombre de la emprendedora o el nombre y la descripción de sus productos activos; no hace falta que sea en el mismo campo ni en ese orden. Sin distinguir mayúsculas ni acentos. Se combina con ciudad_id y rubro_id con AND. Si no hay ninguna coincidencia exacta, se devuelven los perfiles parecidos, que toleran errores de tipeo (`dulses` encuentra `Dulces`), y la respuesta lo indica con `similares: true`."
             },
             "required": false,
-            "description": "Texto a buscar en el nombre del negocio y la descripción.",
+            "description": "Texto a buscar (regla 20). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del negocio, la descripción, el nombre de la emprendedora o el nombre y la descripción de sus productos activos; no hace falta que sea en el mismo campo ni en ese orden. Sin distinguir mayúsculas ni acentos. Se combina con ciudad_id y rubro_id con AND. Si no hay ninguna coincidencia exacta, se devuelven los perfiles parecidos, que toleran errores de tipeo (`dulses` encuentra `Dulces`), y la respuesta lo indica con `similares: true`.",
             "name": "q",
             "in": "query"
           }
@@ -3143,10 +3674,10 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 100,
-              "description": "Texto a buscar en el nombre y la descripción."
+              "description": "Texto a buscar (regla 21). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del producto, su descripción o el nombre de su negocio; no hace falta que sea en el mismo campo ni en ese orden. Sin distinguir mayúsculas ni acentos. Se combina con ciudad_id, rubro_id y perfil_id con AND. Si no hay ninguna coincidencia exacta, se devuelven los productos parecidos, que toleran errores de tipeo (`dulses` encuentra `Dulces`), y la respuesta lo indica con `similares: true`."
             },
             "required": false,
-            "description": "Texto a buscar en el nombre y la descripción.",
+            "description": "Texto a buscar (regla 21). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del producto, su descripción o el nombre de su negocio; no hace falta que sea en el mismo campo ni en ese orden. Sin distinguir mayúsculas ni acentos. Se combina con ciudad_id, rubro_id y perfil_id con AND. Si no hay ninguna coincidencia exacta, se devuelven los productos parecidos, que toleran errores de tipeo (`dulses` encuentra `Dulces`), y la respuesta lo indica con `similares: true`.",
             "name": "q",
             "in": "query"
           }
@@ -3859,6 +4390,15 @@
                     "maxLength": 40,
                     "description": "Sin fecha es permanente.",
                     "example": "2026-12-31"
+                  },
+                  "descripcion": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 280,
+                    "description": "Detalle opcional que explica la promoción, de hasta 280 caracteres (regla 8).",
+                    "example": "Día de la Madre, en toda la línea de tortas"
                   }
                 },
                 "required": [
@@ -3989,6 +4529,15 @@
                     "maxLength": 40,
                     "description": "`null` la quita (permanente). Un descuento no se borra: se termina con la fecha de fin.",
                     "example": "2026-12-01"
+                  },
+                  "descripcion": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 280,
+                    "description": "`null` o texto vacío quita el detalle; omitirla no cambia nada.",
+                    "example": "Día de la Madre, en toda la línea de tortas"
                   }
                 },
                 "additionalProperties": false
@@ -4742,6 +5291,474 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/importaciones/emprendedoras/analizar": {
+      "post": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Analizar el Excel de emprendedoras (no escribe nada)",
+        "description": "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, 500 filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden. Las columnas de fotos, logo y beneficio se ignoran. No crea nada. El archivo no se guarda.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Un archivo Excel `.xlsx` (sin macros) de hasta 2 MB."
+                  }
+                },
+                "required": [
+                  "archivo"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Filas leídas del Excel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalisisImportacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamaño permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/importaciones/emprendedoras/validar": {
+      "post": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Revisar filas corregidas (no escribe nada)",
+        "description": "Solo Admin (regla 22). Hasta 10 filas. Vuelve a aplicar las reglas a datos que el Admin corrigió en la vista previa y dice si el correo ya tiene cuenta. Solo ve errores: las suposiciones («para revisar») salen del análisis del archivo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filas": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "fila": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1048576,
+                          "description": "Número de fila en el Excel, para relacionar la respuesta con la vista previa."
+                        },
+                        "datos": {
+                          "type": "object",
+                          "properties": {
+                            "correo": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "nombres": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "apellido_paterno": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "apellido_materno": {
+                              "type": "string",
+                              "maxLength": 300,
+                              "description": "Vacío si la persona no tiene apellido materno (regla 10)."
+                            },
+                            "whatsapp": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "ciudad_id": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "ciudad_texto": {
+                              "type": "string",
+                              "maxLength": 200,
+                              "default": "",
+                              "description": "Lo que decía el Excel; solo sirve para armar los mensajes, no se guarda."
+                            },
+                            "rubro_id": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "rubro_texto": {
+                              "type": "string",
+                              "maxLength": 200,
+                              "default": ""
+                            },
+                            "nombre_negocio": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "descripcion": {
+                              "type": "string",
+                              "maxLength": 4000
+                            },
+                            "instagram": {
+                              "type": "string",
+                              "maxLength": 300,
+                              "description": "Usuario sin arroba; vacío si no tiene."
+                            },
+                            "otra_red_social": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "correo",
+                            "nombres",
+                            "apellido_paterno",
+                            "apellido_materno",
+                            "whatsapp",
+                            "ciudad_id",
+                            "rubro_id",
+                            "nombre_negocio",
+                            "descripcion",
+                            "instagram",
+                            "otra_red_social"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "fila",
+                        "datos"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 10
+                  }
+                },
+                "required": [
+                  "filas"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estado de cada fila.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidacionImportacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/importaciones/emprendedoras": {
+      "post": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Importar emprendedoras",
+        "description": "Solo Admin (regla 22). Hasta 10 filas por petición. Por cada fila crea la cuenta (rol Emprendedor, correo sin verificar, contraseña temporal aleatoria), el perfil con las imágenes predeterminadas (regla 11); no crea descuentos. Vuelve a validar todo: la vista previa no se da por buena. Una cuenta cuyo correo ya existe se omite. Una fila que falla no detiene a las demás. La contraseña temporal solo sale en esta respuesta.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filas": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "fila": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1048576,
+                          "description": "Número de fila en el Excel, para relacionar la respuesta con la vista previa."
+                        },
+                        "datos": {
+                          "type": "object",
+                          "properties": {
+                            "correo": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "nombres": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "apellido_paterno": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "apellido_materno": {
+                              "type": "string",
+                              "maxLength": 300,
+                              "description": "Vacío si la persona no tiene apellido materno (regla 10)."
+                            },
+                            "whatsapp": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "ciudad_id": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "ciudad_texto": {
+                              "type": "string",
+                              "maxLength": 200,
+                              "default": "",
+                              "description": "Lo que decía el Excel; solo sirve para armar los mensajes, no se guarda."
+                            },
+                            "rubro_id": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "rubro_texto": {
+                              "type": "string",
+                              "maxLength": 200,
+                              "default": ""
+                            },
+                            "nombre_negocio": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "descripcion": {
+                              "type": "string",
+                              "maxLength": 4000
+                            },
+                            "instagram": {
+                              "type": "string",
+                              "maxLength": 300,
+                              "description": "Usuario sin arroba; vacío si no tiene."
+                            },
+                            "otra_red_social": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "correo",
+                            "nombres",
+                            "apellido_paterno",
+                            "apellido_materno",
+                            "whatsapp",
+                            "ciudad_id",
+                            "rubro_id",
+                            "nombre_negocio",
+                            "descripcion",
+                            "instagram",
+                            "otra_red_social"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "fila",
+                        "datos"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 10
+                  }
+                },
+                "required": [
+                  "filas"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado de cada fila.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoImportacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/importaciones/emprendedoras/plantilla": {
+      "get": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Descargar la plantilla de ejemplo",
+        "description": "Solo Admin (regla 22). Un `.xlsx` con los encabezados del formulario de Google Forms y dos filas inventadas que muestran el formato esperado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archivo Excel de ejemplo.",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }

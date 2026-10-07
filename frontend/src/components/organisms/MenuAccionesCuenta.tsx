@@ -1,9 +1,10 @@
 "use client";
 
-import { Ban, Eye, KeyRound, MoreVertical, Pencil, UserCheck } from "lucide-react";
+import { Ban, Eye, KeyRound, MoreVertical, Pencil, Trash2, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmModal } from "@/components/molecules/ConfirmModal";
 import { EditarCuentaModal } from "@/components/organisms/EditarCuentaModal";
+import { EliminarCuentaModal } from "@/components/organisms/EliminarCuentaModal";
 import { RestablecerPasswordModal } from "@/components/organisms/RestablecerPasswordModal";
 import { VerDetallesModal } from "@/components/organisms/VerDetallesModal";
 import { cambiarEstadoAction } from "@/lib/admin/acciones";
@@ -15,7 +16,7 @@ interface PropsMenuAccionesCuenta {
   volverA: string;
 }
 
-type ModalAbierto = "detalles" | "editar" | "password" | "estado" | null;
+type ModalAbierto = "detalles" | "editar" | "password" | "estado" | "eliminar" | null;
 
 const CLASES_ITEM =
   "flex w-full items-center gap-2.5 px-3 py-3 text-left lg:py-2 font-cuerpo text-sm text-texto transition-colors hover:bg-fondo focus-visible:bg-fondo focus-visible:outline-none";
@@ -27,9 +28,10 @@ const CLASES_ITEM_PELIGRO =
 
 // Reemplaza el enlace de texto suelto en la fila (un clic accidental cambiaba el estado de la
 // cuenta sin avisar): el menú de tres puntos agrupa las acciones administrativas (ver detalles,
-// editar, restablecer contraseña, suspender/activar) y cada mutación exige confirmar en un modal
-// antes de tocar la base. No hay "Eliminar": la cascada del esquema (perfil → productos →
-// descuentos, regla 6) lo haría irreversible, así que el proyecto solo hace soft delete.
+// editar, restablecer contraseña, suspender/activar y eliminar) y cada mutación exige confirmar en un
+// modal antes de tocar la base. «Eliminar cuenta» (regla 5, 2026-10-07) es una operación distinta de suspender: borra todo
+// para siempre, así que solo aparece en una cuenta de Emprendedor activa (una suspendida se activa primero, a propósito) y
+// su modal pide escribir el correo.
 export function MenuAccionesCuenta({ usuario, volverA }: PropsMenuAccionesCuenta) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [modalAbierto, setModalAbierto] = useState<ModalAbierto>(null);
@@ -50,6 +52,9 @@ export function MenuAccionesCuenta({ usuario, volverA }: PropsMenuAccionesCuenta
       window.removeEventListener("keydown", alPresionarTecla);
     };
   }, [menuAbierto]);
+
+  // Una cuenta de Admin nunca se elimina desde el panel; una suspendida tampoco (primero se activa).
+  const puedeEliminar = usuario.rol === "Emprendedor" && usuario.activo;
 
   function abrir(modal: ModalAbierto) {
     setMenuAbierto(false);
@@ -101,6 +106,16 @@ export function MenuAccionesCuenta({ usuario, volverA }: PropsMenuAccionesCuenta
             )}
             {usuario.activo ? "Suspender cuenta" : "Activar cuenta"}
           </button>
+
+          {puedeEliminar && (
+            <>
+              <div role="separator" aria-hidden="true" className="my-1 h-px bg-borde" />
+              <button role="menuitem" type="button" onClick={() => abrir("eliminar")} className={CLASES_ITEM_PELIGRO}>
+                <Trash2 size={16} strokeWidth={1.5} aria-hidden="true" />
+                Eliminar cuenta
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -109,6 +124,8 @@ export function MenuAccionesCuenta({ usuario, volverA }: PropsMenuAccionesCuenta
       <EditarCuentaModal usuario={usuario} abierto={modalAbierto === "editar"} onCerrar={() => setModalAbierto(null)} />
 
       <RestablecerPasswordModal usuarioId={usuario.id} abierto={modalAbierto === "password"} onCerrar={() => setModalAbierto(null)} />
+
+      <EliminarCuentaModal usuario={usuario} abierto={modalAbierto === "eliminar"} onCerrar={() => setModalAbierto(null)} volverA={volverA} />
 
       <ConfirmModal
         abierto={modalAbierto === "estado"}

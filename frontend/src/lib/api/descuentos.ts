@@ -21,6 +21,7 @@ export interface DatosNuevoDescuento {
   porcentaje: number;
   fecha_inicio?: string | null;
   fecha_fin?: string | null;
+  descripcion?: string | null;
 }
 
 // POST /descuentos: el Admin siempre indica `perfil_id` (regla 18, backend).
@@ -30,6 +31,8 @@ export interface DatosEditarDescuento {
   porcentaje?: number;
   fecha_inicio?: string | null;
   fecha_fin?: string | null;
+  // `null` quita el detalle; omitirlo no lo cambia.
+  descripcion?: string | null;
 }
 
 // PATCH /descuentos/{id}. No hay borrar: un descuento se termina editando `fecha_fin` (regla 8).

@@ -23,7 +23,7 @@ export default function PaginaIniciarSesion() {
               es la navegación explícita. */}
           <Image src="/logo/pista8-logo.png" alt="Pista 8" width={584} height={185} className="mx-auto h-10 w-auto" priority />
 
-          <div className="space-y-6 rounded-xl border border-borde bg-superficie p-8 shadow-sm">
+          <div className="animate-entrada space-y-6 rounded-superficie border border-borde bg-superficie p-8 shadow-tarjeta">
             <div className="space-y-1 text-center">
               <h1 className="font-titulo text-xl font-bold text-texto">Iniciar sesión</h1>
               <p className="font-cuerpo text-sm text-texto-secundario">Acceso para emprendedoras y administradoras.</p>
@@ -34,7 +34,7 @@ export default function PaginaIniciarSesion() {
 
           <Link
             href="/"
-            className={`flex items-center justify-center gap-2 font-cuerpo text-sm text-texto-secundario transition-colors hover:text-acento ${CLASES_FOCO_ENLACE}`}
+            className={`flex items-center justify-center gap-2 font-cuerpo text-sm font-medium text-acento transition-colors hover:underline hover:underline-offset-4 ${CLASES_FOCO_ENLACE}`}
           >
             <ArrowLeft size={16} strokeWidth={1.5} aria-hidden="true" />
             Volver al catálogo
@@ -42,7 +42,7 @@ export default function PaginaIniciarSesion() {
         </div>
       </div>
 
-      <div className="hidden flex-1 flex-col items-center justify-center gap-6 bg-acento-suave p-12 lg:flex">
+      <div className="hidden flex-1 flex-col items-center justify-center gap-6 bg-fondo-profundo p-12 lg:flex">
         <Image src="/Portada 1.png" alt="" width={2732} height={590} className="w-full max-w-xl rounded-xl" />
         <p className="max-w-md text-center font-cuerpo text-sm text-texto-secundario">
           Una comunidad de emprendedoras que impulsa sus negocios en todo el país.

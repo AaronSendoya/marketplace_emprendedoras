@@ -19,6 +19,7 @@ const nuevo = (parches: Partial<Parameters<typeof repositorio.crear>[0]> = {}) =
   porcentaje: 15,
   fechaInicio: null,
   fechaFin: null,
+  descripcion: null,
   ahora: T0,
   ...parches,
 });
@@ -72,6 +73,63 @@ describe("MySqlDescuentoRepository", () => {
   it("las fechas son opcionales e independientes: se guardan como NULL", async () => {
     expect(await repositorio.crear(nuevo())).toMatchObject({ fechaInicio: null, fechaFin: null });
     expect(await repositorio.crear(nuevo({ fechaFin: enMin(5) }))).toMatchObject({ fechaInicio: null, fechaFin: enMin(5) });
+  });
+
+  describe("detalle del descuento (regla 8, 280 caracteres)", () => {
+    it("sin detalle se guarda NULL, y el detalle se guarda y se lee tal cual, con tildes, ñ y saltos de línea", async () => {
+      expect(await repositorio.crear(nuevo())).toMatchObject({ descripcion: null });
+
+      const texto = "Día de la Madre:\nla línea de tortas, con piña y ñandú";
+      const creado = await repositorio.crear(nuevo({ descripcion: texto }));
+
+      expect(creado.descripcion).toBe(texto);
+      expect((await repositorio.buscarPorId(creado.id))?.descripcion).toBe(texto);
+    });
+
+    it("la base acepta exactamente 280 caracteres, también emojis: VARCHAR(280) cuenta caracteres y no bytes", async () => {
+      const dosOchenta = "ñ".repeat(280);
+      const emojis = "😀".repeat(280);
+
+      expect((await repositorio.crear(nuevo({ descripcion: dosOchenta }))).descripcion).toBe(dosOchenta);
+      expect((await repositorio.crear(nuevo({ descripcion: emojis }))).descripcion).toBe(emojis);
+    });
+
+    it("la base rechaza 281 caracteres en vez de cortarlos en silencio (modo estricto)", async () => {
+      await expect(repositorio.crear(nuevo({ descripcion: "a".repeat(281) }))).rejects.toThrow(/demasiado largo/i);
+      await expect(repositorio.crear(nuevo({ descripcion: "😀".repeat(281) }))).rejects.toThrow(/demasiado largo/i);
+    });
+
+    it("la columna es VARCHAR(280) y admite NULL", async () => {
+      const filas = await cliente.consultar<{ tipo: string; largo: number | string; nulos: string }>(
+        `SELECT DATA_TYPE AS tipo, CHARACTER_MAXIMUM_LENGTH AS largo, IS_NULLABLE AS nulos
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'descuentos' AND COLUMN_NAME = 'descripcion'`,
+      );
+
+      expect(filas).toHaveLength(1);
+      expect({ tipo: filas[0].tipo, largo: Number(filas[0].largo), nulos: filas[0].nulos }).toEqual({ tipo: "varchar", largo: 280, nulos: "YES" });
+    });
+
+    it("actualizar cambia el detalle, null lo quita y omitirlo no lo toca", async () => {
+      const creado = await repositorio.crear(nuevo({ descripcion: "Primero" }));
+
+      await repositorio.actualizar(creado.id, { descripcion: "Segundo" });
+      expect((await repositorio.buscarPorId(creado.id))?.descripcion).toBe("Segundo");
+
+      await repositorio.actualizar(creado.id, { porcentaje: 30 });
+      expect((await repositorio.buscarPorId(creado.id))?.descripcion).toBe("Segundo");
+
+      await repositorio.actualizar(creado.id, { descripcion: null });
+      expect((await repositorio.buscarPorId(creado.id))?.descripcion).toBeNull();
+    });
+
+    it("los listados traen el detalle de cada descuento", async () => {
+      const creado = await repositorio.crear(nuevo({ descripcion: "Detalle del listado" }));
+
+      const { datos } = await repositorio.listarPorPerfil(ids.perfil, { pagina: 1, limite: 100 });
+
+      expect(datos.find((d) => d.id === creado.id)?.descripcion).toBe("Detalle del listado");
+    });
   });
 
   it("la base rechaza un porcentaje fuera de rango y un rango de fechas invertido (CHECK)", async () => {

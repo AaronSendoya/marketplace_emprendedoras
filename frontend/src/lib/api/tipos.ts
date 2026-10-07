@@ -151,6 +151,8 @@ export interface Descuento {
   porcentaje: number;
   fecha_inicio: string | null;
   fecha_fin: string | null;
+  // Detalle opcional que explica la promoción: hasta 280 caracteres (regla 8); `null` si no tiene.
+  descripcion: string | null;
   estado: EstadoDescuento;
   producto_ids: string[];
   creado_en: string;
@@ -165,6 +167,17 @@ export interface Paginacion {
 export interface Pagina<T> {
   datos: T[];
   paginacion: Paginacion;
+}
+
+// `GET /perfiles`: `similares` es `true` cuando el texto buscado no tuvo ninguna coincidencia exacta y `datos` son
+// perfiles parecidos (regla 20 del contrato compartido).
+export interface PaginaPerfiles extends Pagina<Perfil> {
+  similares: boolean;
+}
+
+// `GET /marketplace/productos`: lo mismo para los productos (regla 21).
+export interface PaginaProductos extends Pagina<ProductoPublico> {
+  similares: boolean;
 }
 
 // Códigos de error del backend (MATRIZ_PERMISOS.md, sección Convenciones). Cada uno tiene su
@@ -245,6 +258,15 @@ export interface UsuarioCreado {
   password_temporal: string | null;
 }
 
+// DELETE /admin/usuarios/{id}: lo que se eliminó junto con la cuenta (regla 5, backend).
+export interface CuentaEliminada {
+  perfiles: number;
+  productos: number;
+  descuentos: number;
+  clics: number;
+  imagenes: number;
+}
+
 // Respuesta genérica de confirmación (ej. POST /admin/usuarios/verificacion-correo).
 export interface Mensaje {
   mensaje: string;
@@ -253,4 +275,78 @@ export interface Mensaje {
 export interface LoginRespuesta {
   token: string;
   usuario: Usuario;
+}
+
+// Importación de emprendedoras desde Excel (regla 22, backend; `docs/openapi.json`, tag "Importaciones"). Los mensajes de cada
+// aviso los arma el backend: el frontend los muestra tal cual.
+export type EstadoFilaImportacion = "lista" | "revisar" | "error" | "ya_existe" | "repetida";
+
+export interface AvisoImportacion {
+  campo: string;
+  codigo: string;
+  severidad: "error" | "revisar" | "info";
+  mensaje: string;
+  // También va al reporte "por revisar" que se descarga al terminar.
+  reporte: boolean;
+}
+
+// Lo que la vista previa muestra y el Admin corrige de cada fila, y lo que `validar` e `importar` reciben de vuelta.
+export interface DatosFilaImportacion {
+  correo: string;
+  nombres: string;
+  apellido_paterno: string;
+  apellido_materno: string;
+  whatsapp: string;
+  ciudad_id: string;
+  ciudad_texto: string;
+  rubro_id: string;
+  rubro_texto: string;
+  nombre_negocio: string;
+  descripcion: string;
+  instagram: string;
+  otra_red_social: string;
+}
+
+export interface FilaAnalizadaImportacion {
+  fila: number;
+  oculta: boolean;
+  estado: EstadoFilaImportacion;
+  datos: DatosFilaImportacion;
+  avisos: AvisoImportacion[];
+  ya_existe: boolean;
+  repetida_de: number | null;
+  // Lo que decía el Excel en lo que no se guarda tal cual, para el reporte "por revisar".
+  textos: { instagram: string };
+}
+
+export interface AnalisisImportacion {
+  hoja: string;
+  hojas: string[];
+  columnas: { reconocidas: string[]; ignoradas: string[]; opcionales_ausentes: string[] };
+  filas: FilaAnalizadaImportacion[];
+  resumen: { total: number; listas: number; revisar: number; con_error: number; ya_existen: number; repetidas: number; ocultas: number };
+}
+
+export interface FilaAValidarImportacion {
+  fila: number;
+  datos: DatosFilaImportacion;
+}
+
+export interface ValidacionFilaImportacion {
+  fila: number;
+  estado: EstadoFilaImportacion;
+  avisos: AvisoImportacion[];
+  ya_existe: boolean;
+}
+
+export interface ResultadoFilaImportacion {
+  fila: number;
+  correo: string;
+  estado: "creada" | "omitida" | "error";
+  cuenta_creada: boolean;
+  perfil_creado: boolean;
+  // Solo si se creó la cuenta, y solo en esta respuesta: nunca se guarda en el servidor (regla 5).
+  password_temporal: string | null;
+  avisos: AvisoImportacion[];
+  mensaje: string | null;
 }

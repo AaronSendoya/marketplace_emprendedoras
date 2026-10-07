@@ -75,7 +75,9 @@ describe("consultas SQL (regla 17, caja blanca)", () => {
 
   it("los valores del usuario en un LIKE se escapan y viajan como parámetro", () => {
     for (const fuente of conSql.filter((f) => f.texto.includes("escaparLike"))) {
-      expect(fuente.texto, fuente.ruta).toMatch(/const patron = `%\$\{escaparLike\(filtros\.q\)\}%`/);
+      // El valor escapado es el texto entero (usuarios, productos) o, desde la regla 20, cada palabra del texto
+      // de una búsqueda de perfiles: en los dos casos pasa por `escaparLike` y nunca se interpola en el SQL.
+      expect(fuente.texto, fuente.ruta).toMatch(/const patron = `%\$\{escaparLike\((?:filtros\.q|termino)\)\}%`/);
       expect(fuente.texto, fuente.ruta).toMatch(/valores\.push\(patron(?:, patron)+\)/);
     }
   });

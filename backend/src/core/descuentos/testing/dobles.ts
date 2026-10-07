@@ -11,6 +11,7 @@ export const descuentoDePrueba = (parches: Partial<Descuento> = {}): Descuento =
   porcentaje: 15,
   fechaInicio: null,
   fechaFin: null,
+  descripcion: null,
   creadoEn: new Date("2026-09-01T00:00:00Z"),
   productoIds: [],
   ...parches,
@@ -28,6 +29,7 @@ export class DescuentoRepositoryEnMemoria implements IDescuentoRepository {
       porcentaje: datos.porcentaje,
       fechaInicio: datos.fechaInicio,
       fechaFin: datos.fechaFin,
+      descripcion: datos.descripcion,
       creadoEn: datos.ahora,
     });
     this.descuentos.push(descuento);

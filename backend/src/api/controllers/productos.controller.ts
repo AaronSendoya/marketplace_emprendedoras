@@ -67,7 +67,9 @@ export async function listarMarketplace(
   urlImagen: UrlImagen,
 ): Promise<Response> {
   const resultado = await usecase.ejecutar(filtros, pagina);
-  return paginado({ ...resultado, datos: resultado.datos.map((producto) => serializarProductoPublico(producto, urlImagen)) }, pagina);
+  return paginado({ ...resultado, datos: resultado.datos.map((producto) => serializarProductoPublico(producto, urlImagen)) }, pagina, {
+    similares: resultado.similares,
+  });
 }
 
 export async function obtenerProductoMarketplace(usecase: GetProductoMarketplaceUseCase, id: string, urlImagen: UrlImagen): Promise<Response> {

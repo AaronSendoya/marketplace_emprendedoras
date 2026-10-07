@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ErrorArchivoMuyGrande, ErrorValidacion } from "@/shared/domain/errors";
-import { leerFormulario, LIMITE_CUERPO_DOS_IMAGENES, LIMITE_CUERPO_UNA_IMAGEN, separarFormulario } from "./multipart";
+import { leerArchivoUnico, leerFormulario, LIMITE_CUERPO_DOS_IMAGENES, LIMITE_CUERPO_EXCEL, LIMITE_CUERPO_UNA_IMAGEN, separarFormulario } from "./multipart";
 
 const peticion = (form: FormData) => new Request("http://localhost/x", { method: "POST", body: form });
 const archivo = (contenido: string, nombre = "a.png") => new File([contenido], nombre, { type: "image/png" });
@@ -97,5 +97,52 @@ describe("separarFormulario", () => {
     form.append("a", "2");
 
     await expect(separarFormulario(form, [])).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe("leerArchivoUnico (regla 22)", () => {
+  const excel = (contenido = "datos", nombre = "emprendedoras.xlsx") => new File([contenido], nombre);
+
+  it("lee el archivo del campo pedido, con su nombre y su contenido", async () => {
+    const form = new FormData();
+    form.set("archivo", excel("hola mundo"));
+
+    const leido = await leerArchivoUnico(peticion(form), "archivo", LIMITE_CUERPO_EXCEL);
+
+    expect(leido.nombre).toBe("emprendedoras.xlsx");
+    expect(leido.contenido.toString()).toBe("hola mundo");
+  });
+
+  it("sin archivo, dice qué hacer", async () => {
+    await expect(leerArchivoUnico(peticion(new FormData()), "archivo", LIMITE_CUERPO_EXCEL)).rejects.toMatchObject({
+      message: "Falta el archivo. Arrastra o elige un archivo Excel (.xlsx).",
+    });
+  });
+
+  it("rechaza un campo con otro nombre, un campo de más y un texto en lugar del archivo", async () => {
+    const otroNombre = new FormData();
+    otroNombre.set("documento", excel());
+    const deMas = new FormData();
+    deMas.set("archivo", excel());
+    deMas.set("rol", "Admin");
+    const texto = new FormData();
+    texto.set("archivo", "no soy un archivo");
+
+    await expect(leerArchivoUnico(peticion(otroNombre), "archivo", LIMITE_CUERPO_EXCEL)).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(leerArchivoUnico(peticion(deMas), "archivo", LIMITE_CUERPO_EXCEL)).rejects.toMatchObject({ detalles: [{ campo: "rol" }] });
+    await expect(leerArchivoUnico(peticion(texto), "archivo", LIMITE_CUERPO_EXCEL)).rejects.toMatchObject({ message: "El campo debe ser un archivo." });
+  });
+
+  it("rechaza un cuerpo que no es multipart y uno que pasa del límite (sin leerlo entero)", async () => {
+    const json = new Request("http://localhost/x", { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
+    const grande = new FormData();
+    grande.set("archivo", excel("x".repeat(4 * 1024 * 1024)));
+
+    await expect(leerArchivoUnico(json, "archivo", LIMITE_CUERPO_EXCEL)).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(leerArchivoUnico(peticion(grande), "archivo", LIMITE_CUERPO_EXCEL)).rejects.toBeInstanceOf(ErrorArchivoMuyGrande);
+  });
+
+  it("el límite del cuerpo es de 3 MB: 2 MB de archivo más el margen de los campos", () => {
+    expect(LIMITE_CUERPO_EXCEL).toBe(3 * 1024 * 1024);
   });
 });

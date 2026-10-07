@@ -117,6 +117,9 @@ export function DescuentosPerfilGrid({
                   </p>
                 )}
 
+                {/* Detalle (regla 8): completo, con sus saltos de línea; son 280 caracteres como máximo. */}
+                {descuento.descripcion && <p className="mt-2 font-cuerpo text-sm break-words whitespace-pre-line text-texto">{descuento.descripcion}</p>}
+
                 <div className="mt-3 border-t border-borde pt-3">
                   {productosAsignados.length === 0 ? (
                     <p className="font-cuerpo text-xs text-texto-secundario">Sin productos asignados.</p>

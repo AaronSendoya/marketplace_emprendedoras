@@ -17,6 +17,15 @@ export interface EstadoFormularioDescuento {
   guardado?: boolean;
 }
 
+// El detalle del descuento tal como lo cuenta la API (regla 8): sin espacios en los extremos y con los saltos de línea
+// como `\n`. Un formulario HTML entrega los de un `textarea` como `\r\n` (dos caracteres), y con ellos un texto con
+// saltos de línea que en pantalla cabe en 280 caracteres se pasaría del límite sin que quien escribe lo vea.
+function detalleDelFormulario(formData: FormData): string {
+  return String(formData.get("descripcion") ?? "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+}
+
 export async function crearDescuentoAction(
   perfilId: string,
   usuarioId: string,
@@ -26,6 +35,7 @@ export async function crearDescuentoAction(
   const porcentajeTexto = String(formData.get("porcentaje") ?? "").trim();
   const fechaInicio = String(formData.get("fecha_inicio") ?? "").trim();
   const fechaFin = String(formData.get("fecha_fin") ?? "").trim();
+  const descripcion = detalleDelFormulario(formData);
   const porcentaje = Number(porcentajeTexto);
 
   if (!porcentajeTexto || Number.isNaN(porcentaje)) return { error: "Indica un porcentaje válido." };
@@ -36,6 +46,7 @@ export async function crearDescuentoAction(
       porcentaje,
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
+      descripcion: descripcion || null,
     });
   } catch (error) {
     if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
@@ -62,6 +73,8 @@ export async function editarDescuentoAction(
     porcentaje: porcentajeTexto ? Number(porcentajeTexto) : undefined,
     fecha_inicio: fechaInicio || null,
     fecha_fin: fechaFin || null,
+    // El formulario siempre manda el campo: vacío quita el detalle.
+    descripcion: detalleDelFormulario(formData) || null,
   };
 
   try {

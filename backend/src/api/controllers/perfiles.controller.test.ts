@@ -32,12 +32,21 @@ describe("serializarPerfil", () => {
 
 describe("controlador de perfiles", () => {
   it("listarPerfiles responde la página con la paginación", async () => {
-    const usecase = { ejecutar: async () => ({ datos: [perfilDePrueba()], total: 9 }) } as unknown as GetPerfilesUseCase;
+    const usecase = { ejecutar: async () => ({ datos: [perfilDePrueba()], total: 9, similares: false }) } as unknown as GetPerfilesUseCase;
 
     const cuerpo = await listarPerfiles(usecase, {}, { pagina: 2, limite: 1 }, url).then((r) => r.json());
 
     expect(cuerpo.paginacion).toEqual({ pagina: 2, limite: 1, total: 9 });
     expect(cuerpo.datos[0].nombre_negocio).toBe("Dulces de Ana");
+    expect(cuerpo.similares).toBe(false);
+  });
+
+  it("listarPerfiles dice cuándo los perfiles son parecidos y no coincidencias exactas (regla 20)", async () => {
+    const usecase = { ejecutar: async () => ({ datos: [perfilDePrueba()], total: 1, similares: true }) } as unknown as GetPerfilesUseCase;
+
+    const cuerpo = await listarPerfiles(usecase, { q: "dulses" }, { pagina: 1, limite: 20 }, url).then((r) => r.json());
+
+    expect(cuerpo.similares).toBe(true);
   });
 
   it("crearPerfil responde 201 con el perfil serializado", async () => {

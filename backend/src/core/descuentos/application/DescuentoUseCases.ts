@@ -7,6 +7,7 @@ import type { IClock } from "@/shared/domain/IClock";
 import type { ILogger } from "@/shared/domain/ILogger";
 import type { Pagina, ParametrosPagina } from "@/shared/domain/Paginacion";
 import {
+  normalizarDescripcion,
   puedeGestionarDescuento,
   validarPorcentaje,
   type CambiosDescuento,
@@ -35,6 +36,8 @@ export interface DatosNuevoDescuento {
   // Texto tal como lo escribió la persona (ver VigenciaDescuento).
   fechaInicio?: string | null;
   fechaFin?: string | null;
+  // Detalle opcional de hasta 280 caracteres (regla 8); vacío o ausente = sin detalle.
+  descripcion?: string | null;
 }
 
 export class CreateDescuentoUseCase {
@@ -49,6 +52,7 @@ export class CreateDescuentoUseCase {
     const perfil = await resolverPerfilDeGestion(this.perfiles, actor, datos.perfilId);
     validarPorcentaje(datos.porcentaje);
     const vigencia = crearVigencia(datos);
+    const descripcion = normalizarDescripcion(datos.descripcion);
 
     const ahora = this.clock.ahora();
     const descuento = await this.descuentos.crear({
@@ -56,6 +60,7 @@ export class CreateDescuentoUseCase {
       porcentaje: datos.porcentaje,
       fechaInicio: vigencia.inicio,
       fechaFin: vigencia.fin,
+      descripcion,
       ahora,
     });
     this.logger.info("descuento_creado", { descuentoId: descuento.id, perfilId: perfil.id, actorId: actor.id });
@@ -68,6 +73,8 @@ export interface DatosEdicionDescuento {
   // `undefined` = sin cambio; `null` = quitar la fecha (regla 8).
   fechaInicio?: string | null;
   fechaFin?: string | null;
+  // `undefined` = sin cambio; `null` o texto vacío = quitar el detalle.
+  descripcion?: string | null;
 }
 
 // Regla 8: un descuento no se borra; se termina editando `fecha_fin`.
@@ -91,6 +98,7 @@ export class UpdateDescuentoUseCase {
       porcentaje: datos.porcentaje,
       fechaInicio: datos.fechaInicio === undefined ? undefined : inicio,
       fechaFin: datos.fechaFin === undefined ? undefined : fin,
+      descripcion: datos.descripcion === undefined ? undefined : normalizarDescripcion(datos.descripcion),
     };
     await this.descuentos.actualizar(id, cambios);
     this.logger.info("descuento_actualizado", { descuentoId: id, actorId: actor.id });

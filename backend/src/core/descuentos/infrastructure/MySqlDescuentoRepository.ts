@@ -11,11 +11,12 @@ interface FilaDescuento {
   porcentaje: string;
   fecha_inicio: Date | string | null;
   fecha_fin: Date | string | null;
+  descripcion: string | null;
   creado_en: Date | string;
 }
 
 const SELECT_DESCUENTO = `
-  SELECT d.id, d.perfil_id, pe.usuario_id, d.porcentaje, d.fecha_inicio, d.fecha_fin, d.creado_en
+  SELECT d.id, d.perfil_id, pe.usuario_id, d.porcentaje, d.fecha_inicio, d.fecha_fin, d.descripcion, d.creado_en
   FROM descuentos d
   JOIN perfiles_emprendedores pe ON pe.id = d.perfil_id
 `;
@@ -35,6 +36,7 @@ const COLUMNAS_EDITABLES: Record<keyof CambiosDescuento, string> = {
   porcentaje: "porcentaje",
   fechaInicio: "fecha_inicio",
   fechaFin: "fecha_fin",
+  descripcion: "descripcion",
 };
 
 const aFecha = (valor: Date | string | null) => (valor === null ? null : new Date(valor));
@@ -45,8 +47,8 @@ export class MySqlDescuentoRepository implements IDescuentoRepository {
   async crear(datos: NuevoDescuento): Promise<Descuento> {
     const id = randomUUID();
     await this.db.ejecutar(
-      "INSERT INTO descuentos (id, perfil_id, porcentaje, fecha_inicio, fecha_fin, creado_en) VALUES (?, ?, ?, ?, ?, ?)",
-      [id, datos.perfilId, datos.porcentaje, datos.fechaInicio, datos.fechaFin, datos.ahora],
+      "INSERT INTO descuentos (id, perfil_id, porcentaje, fecha_inicio, fecha_fin, descripcion, creado_en) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [id, datos.perfilId, datos.porcentaje, datos.fechaInicio, datos.fechaFin, datos.descripcion, datos.ahora],
     );
     const descuento = await this.buscarPorId(id);
     if (!descuento) throw new Error("El descuento recién creado no se encontró.");
@@ -112,6 +114,7 @@ export class MySqlDescuentoRepository implements IDescuentoRepository {
       porcentaje: Number(fila.porcentaje),
       fechaInicio: aFecha(fila.fecha_inicio),
       fechaFin: aFecha(fila.fecha_fin),
+      descripcion: fila.descripcion,
       creadoEn: new Date(fila.creado_en),
       productoIds: asignaciones.filter((a) => a.descuento_id === fila.id).map((a) => a.producto_id),
     }));

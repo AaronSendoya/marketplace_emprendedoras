@@ -1,11 +1,13 @@
 import { actualizarJsonAutenticado, enviarFormDataAutenticado, obtenerJson, obtenerJsonAutenticado, reemplazarFormDataAutenticado } from "./cliente";
-import type { FiltrosProductos, Pagina, ParametrosPagina, ProductoPropio, ProductoPublico } from "./tipos";
+import type { FiltrosProductos, Pagina, PaginaProductos, ParametrosPagina, ProductoPropio, ProductoPublico } from "./tipos";
 
 // GET /marketplace/productos: Feed 2 (promociones), público. Regla 8 (backend): la vigencia del
 // descuento se evalúa al consultar, así que no conviene cachear por más tiempo del que se
-// tolere de retraso (valor por defecto del cliente: 30 s, ver cliente.ts).
+// tolere de retraso (valor por defecto del cliente: 30 s, ver cliente.ts). Con texto de búsqueda
+// (`q`) no se cachea: la búsqueda en vivo pide una consulta distinta por cada pausa al escribir y
+// guardarlas todas llenaría la caché de Next con textos que casi nadie repite.
 export const listarProductos = (filtros: FiltrosProductos = {}) =>
-  obtenerJson<Pagina<ProductoPublico>>("/marketplace/productos", { parametros: { ...filtros } });
+  obtenerJson<PaginaProductos>("/marketplace/productos", { parametros: { ...filtros }, revalidarSegundos: filtros.q ? 0 : undefined });
 
 export const obtenerProducto = (id: string) => obtenerJson<ProductoPublico>(`/marketplace/productos/${id}`);
 

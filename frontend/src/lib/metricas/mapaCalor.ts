@@ -1,10 +1,13 @@
-import type { CeldaMapaCalor, OrdenMapaCalor } from "@/lib/api/tipos";
+import type { CeldaMapaCalor, GranularidadMapaCalor, OrdenMapaCalor } from "@/lib/api/tipos";
 
 // Con qué se arma y se ordena el top de la tabla de calor (regla 19). Viven aquí, en un módulo sin
 // "use client", para que la página (Server Component) los reciba como lo que son: un export de un
 // módulo de cliente llegaría como una referencia, no como su valor.
 export const ORDENES_MAPA_CALOR: OrdenMapaCalor[] = ["total", "whatsapp", "instagram"];
 export const ORDEN_MAPA_CALOR_POR_DEFECTO: OrdenMapaCalor = "total";
+
+// La unidad de tiempo de cada columna del mapa de calor, para los textos accesibles de las miniaturas.
+export const UNIDAD_POR_GRANULARIDAD: Record<GranularidadMapaCalor, string> = { dia: "día", semana: "semana", mes: "mes" };
 
 export const ETIQUETA_ORDEN: Record<OrdenMapaCalor, string> = {
   total: "clics totales",

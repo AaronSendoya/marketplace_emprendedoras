@@ -53,7 +53,7 @@ Diferencias del motor que ya se resolvieron en el esquema, el seed y el cliente 
 | 3 Núcleo compartido | Hecho (`MySqlClient` desde el 2026-09-21) | Errores, `MySqlClient` (pool `mysql2`), traductor de errores por número de MySQL, validación, paginación, `IClock` y registro de eventos que tapa los valores de los errores del motor. |
 | 4 Swagger y OpenAPI | Hecho; falta la prueba manual en `/docs` con tu base | `GET /api/v1/health`, `GET /api/v1/openapi.json`, `GET /docs` y `pnpm openapi:export`. Con MySQL: 191 pruebas unitarias, `typecheck`, `lint` y `build` en verde; el servidor real responde `/health` 200 con la base encendida y 500 estándar (sin filtrar la clave) con la base caída, y `/docs` 200. |
 | 5 Seguridad transversal | Hecho | `src/proxy.ts` con CORS estricto y cabeceras de seguridad. Ver desviaciones. |
-| 6 Catálogos | Hecho | `GET /catalogos/ciudades` y `/rubros`, públicos, sin paginar (10 y 10 en el seed). 215 pruebas unitarias y 76 de integración en verde. |
+| 6 Catálogos | Hecho | `GET /catalogos/ciudades` y `/rubros`, públicos, sin paginar (10 ciudades y 8 rubros en el seed). 215 pruebas unitarias y 76 de integración en verde. |
 | 7 Autenticación con JWT | Hecho | `POST /auth/login`, `GET /auth/me`, `requireAuth`/`requireAdmin`, freno de login (regla 17). 248 pruebas unitarias y 82 de integración en verde; probado en un servidor real contra tu MySQL: login de Admin y Emprendedor, `/auth/me`, mismo error para correo inexistente/contraseña incorrecta/cuenta inactiva, `rol` rechazado en el cuerpo (400), y 429 con `Retry-After: 900` al sexto intento fallido (sin registrar uno nuevo). |
 | 8a OTP y correo (sin proveedor) | Hecho | Cuatro endpoints de `/auth/password/*` y `/auth/email/*`. 312 pruebas unitarias y 97 de integración en verde; probado en un servidor real (ver desviaciones). |
 | 8b Correo real | Bloqueado | Falta elegir proveedor y cuenta remitente. |
@@ -63,7 +63,7 @@ Diferencias del motor que ya se resolvieron en el esquema, el seed y el cliente 
 | 11 Perfiles (Feed 1) | Hecho | Seis rutas más `GET /mis/perfil`. 496 pruebas unitarias y 117 de integración en verde; probado en un servidor real (ver desviaciones). |
 | 12 Productos y marketplace (Feed 2) | Hecho | Siete rutas más `GET /mis/productos`. Consulta de la regla 8 probada contra MySQL real. |
 | 13 Descuentos | Hecho | Cinco rutas y `VigenciaDescuento`. 667 pruebas unitarias y 155 de integración en verde; probado en un servidor real (ver desviaciones). |
-| 14 Migración desde el Excel | Bloqueado | Falta el archivo Excel y el acceso a los archivos de Drive. |
+| 14 Migración desde el Excel | Texto: en curso (2026-10-06); imágenes: bloqueado | Ya se tiene el archivo: se carga desde una pantalla del Admin (regla 22), sin imágenes. La descarga desde Drive sigue bloqueada: falta acceso a los archivos y configurar R2. |
 | 15 Endurecimiento y calidad | Hecho | Swagger solo en desarrollo, límites de tamaño, auditoría de login y pruebas de caja blanca (`tests/seguridad/`). `pnpm audit` sin vulnerabilidades. Revisión en [SEGURIDAD.md](SEGURIDAD.md). |
 | 16 Despliegue en Hostinger | Pendiente | No se hace hasta que se indique. |
 | 17 Cierre | Hecho | `CLAUDE.md` (sección 4 con la estructura real), `README.md`, [MATRIZ_PERMISOS.md](MATRIZ_PERMISOS.md) y `openapi.json`. 1273 pruebas unitarias y de caja blanca y 171 de integración en verde. |
@@ -321,7 +321,7 @@ Primer corte vertical completo: valida la arquitectura de punta a punta.
 
 *   `Ciudad`, `Rubro`, `ICatalogoRepository`, `GetCatalogosUseCase`, `MySqlCatalogoRepository`, controlador, rutas y Swagger.
 
-**Verificación:** en Swagger, `GET /catalogos/ciudades` y `/catalogos/rubros` devuelven las 10 ciudades y los 10 rubros del seed.
+**Verificación:** en Swagger, `GET /catalogos/ciudades` y `/catalogos/rubros` devuelven las 10 ciudades y los 8 rubros oficiales del seed.
 
 ### Paso 7 - Autenticación con JWT (regla 5)
 
@@ -421,7 +421,9 @@ Primer corte vertical completo: valida la arquitectura de punta a punta.
 
 ### Paso 14 - Migración desde el Excel (reglas 4, 10, 11 y 12)
 
-Bloqueado hasta contar con el archivo Excel y con acceso a los archivos de Drive.
+**Rediseño (2026-10-06):** la carga de los datos de texto ya no es un script local sino una pantalla del Admin (regla 22): `src/core/importaciones/` con las operaciones `analizar`, `validar` e `importar` (`/admin/importaciones/emprendedoras`), sin descargar imágenes (todo perfil usa las predeterminadas), sin guardar el archivo y sin importar el beneficio ni crear descuentos (el cliente no los registra). Lo de abajo describe el script original; sigue vigente para la descarga de imágenes desde Drive, que queda pendiente hasta tener acceso a los archivos y R2.
+
+Original: bloqueado hasta contar con el archivo Excel y con acceso a los archivos de Drive.
 
 *   `src/scripts/migrarDesdeExcel.ts` con `--dry-run` (por defecto) y `--ejecutar`, leyendo con `exceljs`.
 *   Definir el mapeo de columnas con el Excel real: nombre, correo, WhatsApp, ciudad, rubro, Instagram, descripción, "Sube tu foto", "Sube el logo" y beneficio.

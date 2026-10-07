@@ -40,7 +40,9 @@ export async function listarPerfiles(
   urlImagen: UrlImagen,
 ): Promise<Response> {
   const resultado = await usecase.ejecutar(filtros, pagina);
-  return paginado({ ...resultado, datos: resultado.datos.map((perfil) => serializarPerfil(perfil, urlImagen)) }, pagina);
+  return paginado({ ...resultado, datos: resultado.datos.map((perfil) => serializarPerfil(perfil, urlImagen)) }, pagina, {
+    similares: resultado.similares,
+  });
 }
 
 export async function obtenerPerfil(usecase: GetPerfilUseCase, id: string, urlImagen: UrlImagen): Promise<Response> {

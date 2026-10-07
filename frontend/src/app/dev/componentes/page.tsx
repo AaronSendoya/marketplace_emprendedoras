@@ -1,14 +1,22 @@
+import { MapPin } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { EmprendedoraCard } from "@/components/molecules/EmprendedoraCard";
-import { PriceTag } from "@/components/molecules/PriceTag";
+import { BotonConsultarPrecio } from "@/components/molecules/BotonConsultarPrecio";
+import { PrecioProducto } from "@/components/molecules/PrecioProducto";
 import { ProductoCard } from "@/components/molecules/ProductoCard";
 import { SocialLinks } from "@/components/molecules/SocialLinks";
 import { TarjetaEsqueleto } from "@/components/molecules/TarjetaEsqueleto";
 import type { Perfil, ProductoPublico } from "@/lib/api/tipos";
+
+// Con R2 conectado (NEXT_PUBLIC_IMAGENES_HOST) se usan las imágenes predeterminadas del bucket, que sí abren; si no, el
+// marcador de siempre.
+const HOST_IMAGENES = process.env.NEXT_PUBLIC_IMAGENES_HOST;
+const FOTO_EJEMPLO = HOST_IMAGENES ? `https://${HOST_IMAGENES}/defaults/foto-perfil-anonima.webp` : "memoria://desarrollo-sin-r2";
+const LOGO_EJEMPLO = HOST_IMAGENES ? `https://${HOST_IMAGENES}/defaults/logo-vacio.webp` : "memoria://desarrollo-sin-r2";
 
 const PERFIL_EJEMPLO: Perfil = {
   id: "00000000-0000-0000-0000-000000000000",
@@ -17,12 +25,12 @@ const PERFIL_EJEMPLO: Perfil = {
     "Repostería artesanal boliviana: tortas, alfajores y bocaditos para eventos, hechos con ingredientes locales y sin conservantes.",
   whatsapp: "59171234567",
   instagram_username: "dulcesdeana",
-  otra_red_social: "TikTok: @dulcesdeana",
+  otra_red_social: "https://www.tiktok.com/@dulcesdeana",
   ciudad: { id: "1", nombre: "La Paz" },
   rubro: { id: "1", nombre: "Alimentos y bebidas" },
   emprendedora: "Ana Quispe",
-  foto_perfil_url: "memoria://desarrollo-sin-r2",
-  logo_url: "memoria://desarrollo-sin-r2",
+  foto_perfil_url: FOTO_EJEMPLO,
+  logo_url: LOGO_EJEMPLO,
   creado_en: "2026-01-01T00:00:00.000Z",
   actualizado_en: "2026-01-01T00:00:00.000Z",
 };
@@ -40,7 +48,7 @@ const PRODUCTO_NORMAL: ProductoPublico = {
   id: "10000000-0000-0000-0000-000000000000",
   nombre: "Torta de chocolate (18 cm)",
   descripcion: "Bizcocho húmedo de chocolate con ganache, para 12 porciones.",
-  imagen_url: "memoria://desarrollo-sin-r2",
+  imagen_url: FOTO_EJEMPLO,
   precio: 120,
   porcentaje: null,
   precio_con_descuento: null,
@@ -85,6 +93,13 @@ export default function PaginaComponentes() {
       <Seccion titulo="Button">
         <Button variante="primario">Primario</Button>
         <Button variante="secundario">Secundario</Button>
+        <Button variante="contorno">Contorno</Button>
+        <Button variante="primario" tamano="compacto">
+          Compacto
+        </Button>
+        <Button variante="primario" tamano="grande">
+          Grande
+        </Button>
         <Button variante="primario" disabled>
           Deshabilitado
         </Button>
@@ -94,11 +109,16 @@ export default function PaginaComponentes() {
         <Badge variante="neutro">La Paz</Badge>
         <Badge variante="neutro">Alimentos y bebidas</Badge>
         <Badge variante="acento">-20%</Badge>
+        <Badge variante="ciudad" icono={<MapPin size={13} strokeWidth={1.75} />}>
+          La Paz
+        </Badge>
+        <Badge variante="rubro">Alimentos y bebidas</Badge>
       </Seccion>
 
       <Seccion titulo="Input">
         <Input aria-label="Buscar" placeholder="Buscar emprendedoras..." className="max-w-xs" />
         <Input aria-label="Campo deshabilitado" placeholder="Deshabilitado" disabled className="max-w-xs" />
+        <Input aria-label="Campo del catálogo" variante="catalogo" placeholder="Variante del catálogo" className="max-w-xs" />
       </Seccion>
 
       <Seccion titulo="Select">
@@ -109,56 +129,97 @@ export default function PaginaComponentes() {
           <option value="la-paz">La Paz</option>
           <option value="cochabamba">Cochabamba</option>
         </Select>
+        <Select aria-label="Ciudad (catálogo)" variante="catalogo" className="max-w-xs" defaultValue="">
+          <option value="">Variante del catálogo</option>
+          <option value="la-paz">La Paz</option>
+        </Select>
       </Seccion>
 
-      <Seccion titulo="SocialLinks — completo">
-        <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername="dulcesdeana" otraRedSocial="TikTok: @dulcesdeana" />
+      <Seccion titulo="SocialLinks — encabezado de un perfil">
+        <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername="dulcesdeana" otraRedSocial={null} variante="encabezado" />
       </Seccion>
 
-      <Seccion titulo="SocialLinks — solo WhatsApp">
-        <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername={null} otraRedSocial={null} />
+      <Seccion titulo="SocialLinks — panel de contacto (con otra red)">
+        <div className="w-full max-w-xs">
+          <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername="dulcesdeana" otraRedSocial="TikTok: @dulcesdeana" variante="contacto" />
+        </div>
       </Seccion>
 
-      <Seccion titulo="PriceTag — precio normal">
-        <PriceTag perfilId="dev-perfil" precio={120} porcentaje={null} precioConDescuento={null} consultarPrecio={false} whatsapp="59171234567" />
+      <Seccion titulo="SocialLinks — solo WhatsApp (contacto)">
+        <div className="w-full max-w-xs">
+          <SocialLinks perfilId="dev-perfil" whatsapp="59171234567" instagramUsername={null} otraRedSocial={null} variante="contacto" />
+        </div>
       </Seccion>
 
-      <Seccion titulo="PriceTag — con descuento vigente">
-        <PriceTag perfilId="dev-perfil" precio={120} porcentaje={20} precioConDescuento={96} consultarPrecio={false} whatsapp="59171234567" />
+      <Seccion titulo="PrecioProducto — precio normal, con descuento y detalle">
+        <PrecioProducto precio={120} porcentaje={null} precioConDescuento={null} />
+        <PrecioProducto precio={120} porcentaje={20} precioConDescuento={96} />
+        <PrecioProducto precio={120} porcentaje={20} precioConDescuento={96} tamano="detalle" />
       </Seccion>
 
-      <Seccion titulo="PriceTag — consultar precio">
-        <PriceTag
-          perfilId="dev-perfil"
-          precio={null}
-          porcentaje={null}
-          precioConDescuento={null}
-          consultarPrecio
-          whatsapp="59171234567"
-        />
+      <Seccion titulo="BotonConsultarPrecio">
+        <BotonConsultarPrecio perfilId="dev-perfil" whatsapp="59171234567" />
+        <BotonConsultarPrecio perfilId="dev-perfil" whatsapp="59171234567" etiqueta="Consultar por WhatsApp" tamano="grande" />
       </Seccion>
 
-      <Seccion titulo="EmprendedoraCard">
-        <div className="max-w-sm">
+      <Seccion titulo="EmprendedoraCard — WhatsApp + Instagram + TikTok, solo Instagram y sin ningún contacto">
+        <div className="w-full max-w-[26rem]">
           <EmprendedoraCard perfil={PERFIL_EJEMPLO} />
         </div>
+        <div className="w-full max-w-[26rem]">
+          <EmprendedoraCard
+            perfil={{ ...PERFIL_EJEMPLO, id: "00000000-0000-0000-0000-000000000001", nombre_negocio: "Telar Andino de las Tres Culturas", whatsapp: "", otra_red_social: null, rubro: { id: "2", nombre: "Artesanías o productos hechos a mano" } }}
+          />
+        </div>
+        <div className="w-full max-w-[26rem]">
+          <EmprendedoraCard
+            perfil={{ ...PERFIL_EJEMPLO, id: "00000000-0000-0000-0000-000000000002", nombre_negocio: "Estudio Vida Sana", whatsapp: "", instagram_username: null, otra_red_social: "@sinenlace" }}
+          />
+        </div>
       </Seccion>
 
-      <Seccion titulo="ProductoCard — los tres estados de precio">
-        <div className="max-w-sm">
+      <Seccion titulo="SocialLinks tarjeta — todas las combinaciones">
+        {[
+          { etiqueta: "WhatsApp + Instagram + TikTok", w: "59171234567", i: "ana", o: "https://tiktok.com/@ana" },
+          { etiqueta: "WhatsApp + Facebook", w: "59171234567", i: null, o: "https://www.facebook.com/ana" },
+          { etiqueta: "Instagram + sitio web", w: "", i: "ana", o: "Tapados.com.bo" },
+          { etiqueta: "Solo TikTok", w: "", i: null, o: "tiktok.com/@ana" },
+          { etiqueta: "Solo WhatsApp", w: "59171234567", i: null, o: null },
+          { etiqueta: "Ninguno (no devuelve nada)", w: "", i: null, o: "@sinenlace" },
+        ].map((caso) => (
+          <div key={caso.etiqueta} className="w-72 space-y-2 rounded-lg border border-borde bg-superficie p-3">
+            <p className="font-cuerpo text-xs text-texto-secundario">{caso.etiqueta}</p>
+            <div className="flex min-h-11 items-center">
+              <SocialLinks perfilId="dev-perfil" whatsapp={caso.w} instagramUsername={caso.i} otraRedSocial={caso.o} nombreNegocio="Dulces de Ana" variante="tarjeta" />
+            </div>
+          </div>
+        ))}
+      </Seccion>
+
+      <Seccion titulo="ProductoCard — precio normal, con descuento, precio a consultar y sin WhatsApp">
+        <div className="w-full max-w-[26rem]">
           <ProductoCard producto={PRODUCTO_NORMAL} />
         </div>
-        <div className="max-w-sm">
+        <div className="w-full max-w-[26rem]">
           <ProductoCard producto={PRODUCTO_CON_DESCUENTO} />
         </div>
-        <div className="max-w-sm">
+        <div className="w-full max-w-[26rem]">
           <ProductoCard producto={PRODUCTO_CONSULTAR_PRECIO} />
+        </div>
+        <div className="w-full max-w-[26rem]">
+          <ProductoCard producto={{ ...PRODUCTO_CON_DESCUENTO, id: "10000000-0000-0000-0000-000000000003", perfil: { ...PERFIL_RESUMEN_EJEMPLO, whatsapp: "" } }} />
+        </div>
+        <div className="w-full max-w-[26rem]">
+          <ProductoCard producto={{ ...PRODUCTO_CONSULTAR_PRECIO, id: "10000000-0000-0000-0000-000000000004", perfil: { ...PERFIL_RESUMEN_EJEMPLO, whatsapp: "" } }} />
         </div>
       </Seccion>
 
       <Seccion titulo="TarjetaEsqueleto (paso 9, estado de carga)">
         <div className="max-w-sm">
           <TarjetaEsqueleto />
+        </div>
+        <div className="max-w-sm">
+          <TarjetaEsqueleto variante="producto" />
         </div>
       </Seccion>
     </main>

@@ -5,6 +5,7 @@ import { registrarAdminUsuarios } from "./rutas/admin-usuarios";
 import { registrarAuth } from "./rutas/auth";
 import { registrarCatalogos } from "./rutas/catalogos";
 import { registrarHealth } from "./rutas/health";
+import { registrarImportaciones } from "./rutas/importaciones";
 import { registrarDescuentos } from "./rutas/descuentos";
 import { registrarMetricas } from "./rutas/metricas";
 import { registrarPerfiles } from "./rutas/perfiles";
@@ -22,6 +23,7 @@ export function generarDocumento() {
   registrarProductos(registro);
   registrarDescuentos(registro);
   registrarMetricas(registro);
+  registrarImportaciones(registro);
 
   return new OpenApiGeneratorV31(registro.definitions).generateDocument({
     openapi: "3.1.0",
@@ -44,6 +46,7 @@ export function generarDocumento() {
       { name: "Productos", description: "Gestión de los productos propios (reglas 7 y 18)." },
       { name: "Descuentos", description: "Motor de promociones: descuentos por porcentaje con vigencia (reglas 8 y 9)." },
       { name: "Métricas", description: "Clics de contacto del catálogo público, anónimos (regla 19)." },
+      { name: "Importaciones", description: "Carga de emprendedoras desde el Excel de Google Forms, sin imágenes. Solo Admin (regla 22)." },
     ],
   });
 }

@@ -1,6 +1,7 @@
 import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { esquemaPaginacion } from "@/api/http/paginacion";
+import { LARGO_MAXIMO_DESCRIPCION_DESCUENTO, MENSAJE_DESCRIPCION_DESCUENTO } from "@/core/descuentos/domain/Descuento";
 import { AUTENTICADO, esquemaPagina, respuestasDeError } from "../componentes";
 
 const MENSAJE_PORCENTAJE = "El porcentaje debe ser mayor que 0 y hasta 100, con hasta 2 decimales.";
@@ -25,12 +26,24 @@ const fecha = z
     example: "2026-12-01",
   });
 
+// Regla 8: el mismo límite de `descuentos.descripcion` (`VARCHAR(280)`). Un texto vacío se acepta y equivale a no tener
+// detalle: el dominio lo guarda como `null`.
+const descripcion = z
+  .string()
+  .trim()
+  .max(LARGO_MAXIMO_DESCRIPCION_DESCUENTO, MENSAJE_DESCRIPCION_DESCUENTO)
+  .meta({
+    description: `Detalle opcional que explica la promoción, de hasta ${LARGO_MAXIMO_DESCRIPCION_DESCUENTO} caracteres (regla 8).`,
+    example: "Día de la Madre, en toda la línea de tortas",
+  });
+
 export const EsquemaCrearDescuentoBody = z
   .object({
     perfil_id: z.uuid().optional().meta({ description: "Solo Admin: perfil al que pertenece. Una emprendedora usa el suyo." }),
     porcentaje,
     fecha_inicio: fecha.nullable().optional().meta({ description: "Sin fecha rige desde que se crea." }),
     fecha_fin: fecha.nullable().optional().meta({ description: "Sin fecha es permanente.", example: "2026-12-31" }),
+    descripcion: descripcion.nullable().optional(),
   })
   .strict();
 
@@ -39,6 +52,7 @@ export const EsquemaEditarDescuentoBody = z
     porcentaje: porcentaje.optional(),
     fecha_inicio: fecha.nullable().optional().meta({ description: "`null` quita la fecha." }),
     fecha_fin: fecha.nullable().optional().meta({ description: "`null` la quita (permanente). Un descuento no se borra: se termina con la fecha de fin." }),
+    descripcion: descripcion.nullable().optional().meta({ description: "`null` o texto vacío quita el detalle; omitirla no cambia nada." }),
   })
   .strict()
   .refine((datos) => Object.values(datos).some((valor) => valor !== undefined), "Indica al menos un campo para cambiar.");
@@ -69,6 +83,7 @@ export const EsquemaDescuento = z
     porcentaje: z.number().meta({ example: 15 }),
     fecha_inicio: z.iso.datetime().nullable(),
     fecha_fin: z.iso.datetime().nullable(),
+    descripcion: z.string().nullable().meta({ description: `Detalle opcional de la promoción, de hasta ${LARGO_MAXIMO_DESCRIPCION_DESCUENTO} caracteres; \`null\` si no tiene.`, example: "Día de la Madre, en toda la línea de tortas" }),
     estado: z.enum(["programado", "vigente", "vencido"]).meta({ description: "Calculado al consultar (regla 8): `programado` aún no empieza; `vencido` ya caducó." }),
     producto_ids: z.array(z.string()).meta({ description: "Productos a los que está asignado." }),
     creado_en: z.iso.datetime(),

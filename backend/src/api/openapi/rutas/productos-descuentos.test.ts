@@ -82,6 +82,25 @@ describe("EsquemaCrearDescuentoBody y EsquemaEditarDescuentoBody", () => {
     expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje }).success).toBe(false);
   });
 
+  it("el detalle admite hasta 280 caracteres, vacío o null, y recorta los espacios", () => {
+    expect(EsquemaCrearDescuentoBody.parse({ porcentaje: 10, descripcion: "  Día de la Madre  " }).descripcion).toBe("Día de la Madre");
+    expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, descripcion: "a".repeat(280) }).success).toBe(true);
+    expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, descripcion: "" }).success).toBe(true);
+    expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, descripcion: null }).success).toBe(true);
+    expect(EsquemaEditarDescuentoBody.safeParse({ descripcion: null }).success).toBe(true);
+    expect(EsquemaEditarDescuentoBody.safeParse({ descripcion: "Solo el detalle" }).success).toBe(true);
+  });
+
+  it("rechaza un detalle de más de 280 caracteres, con un mensaje claro, o que no sea texto", () => {
+    const largo = EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, descripcion: "a".repeat(281) });
+
+    expect(largo.success).toBe(false);
+    expect(JSON.stringify(largo.error?.issues)).toContain("El detalle no puede superar los 280 caracteres.");
+    expect(EsquemaEditarDescuentoBody.safeParse({ descripcion: "a".repeat(281) }).success).toBe(false);
+    expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, descripcion: "a".repeat(10_000) }).success).toBe(false);
+    expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, descripcion: 123 }).success).toBe(false);
+  });
+
   it("rechaza campos ajenos, fechas vacías y cuerpos de edición vacíos", () => {
     expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, tipo: "monto" }).success).toBe(false);
     expect(EsquemaCrearDescuentoBody.safeParse({ porcentaje: 10, fecha_inicio: "" }).success).toBe(false);

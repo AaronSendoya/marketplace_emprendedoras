@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { MAXIMO_DE_CARACTERES_DE_DESCRIPCION } from "@/shared/domain/BusquedaSimilar";
+import { terminosDeBusqueda } from "@/shared/domain/BusquedaTexto";
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import type { EjecutorSql } from "@/shared/infrastructure/MySqlClient";
+import { MAXIMO_DE_PRODUCTOS_BUSCADOS, type ProductoBuscable } from "../domain/BusquedaSimilar";
 import type { IProductoRepository } from "../domain/IProductoRepository";
 import type { CambiosProducto, FiltrosMarketplace, NuevoProducto, Producto } from "../domain/Producto";
 
@@ -52,6 +55,13 @@ const SELECT_PRODUCTO = `
     GROUP BY pd.producto_id
   ) dv ON dv.producto_id = p.id
 `;
+
+interface FilaBuscable {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  nombre_negocio: string;
+}
 
 const DESDE_CONTEO = `
   FROM productos p
@@ -144,12 +154,50 @@ export class MySqlProductoRepository implements IProductoRepository {
       condiciones.push("pe.rubro_id = ?");
       valores.push(filtros.rubroId);
     }
-    if (filtros.q) {
-      const patron = `%${escaparLike(filtros.q)}%`;
-      condiciones.push("(p.nombre LIKE ? OR p.descripcion LIKE ?)");
-      valores.push(patron, patron);
+    // Regla 21: cada palabra del texto debe aparecer en el nombre del producto, en su descripción o en el nombre de su
+    // negocio (AND entre palabras, OR entre campos). No distingue mayúsculas ni acentos: lo resuelve la colación
+    // utf8mb4_unicode_ci. Tres parámetros por palabra, el mismo patrón en cada uno: la condición es texto fijo y va
+    // como literal (tests/seguridad/sql.test.ts lo exige).
+    for (const termino of terminosDeBusqueda(filtros.q ?? "")) {
+      const patron = `%${escaparLike(termino)}%`;
+      condiciones.push("(p.nombre LIKE ? OR p.descripcion LIKE ? OR pe.nombre_negocio LIKE ?)");
+      valores.push(patron, patron, patron);
     }
     return this.listar(ahora, `WHERE ${condiciones.join(" AND ")}`, valores, pagina);
+  }
+
+  async textosBuscables(filtros: Pick<FiltrosMarketplace, "perfilId" | "ciudadId" | "rubroId">): Promise<ProductoBuscable[]> {
+    const condiciones = ["p.activo = 1", "u.activo = 1"];
+    const valores: unknown[] = [];
+    if (filtros.perfilId) {
+      condiciones.push("p.perfil_id = ?");
+      valores.push(filtros.perfilId);
+    }
+    if (filtros.ciudadId) {
+      condiciones.push("pe.ciudad_id = ?");
+      valores.push(filtros.ciudadId);
+    }
+    if (filtros.rubroId) {
+      condiciones.push("pe.rubro_id = ?");
+      valores.push(filtros.rubroId);
+    }
+    const donde = `WHERE ${condiciones.join(" AND ")}`;
+
+    // De cada descripción solo su comienzo: el resto no cambia el parecido.
+    const filas = await this.db.consultar<FilaBuscable>(
+      `SELECT p.id, p.nombre, LEFT(p.descripcion, ?) AS descripcion, pe.nombre_negocio
+       ${DESDE_CONTEO} ${donde} ORDER BY p.creado_en DESC, p.id LIMIT ?`,
+      [MAXIMO_DE_CARACTERES_DE_DESCRIPCION, ...valores, MAXIMO_DE_PRODUCTOS_BUSCADOS],
+    );
+    return filas.map((fila) => ({ productoId: fila.id, nombre: fila.nombre, descripcion: fila.descripcion, nombreNegocio: fila.nombre_negocio }));
+  }
+
+  async listarMarketplacePorIds(ahora: Date, ids: string[]): Promise<Producto[]> {
+    // `IN ()` vacío no es SQL válido.
+    if (ids.length === 0) return [];
+    const filas = await this.db.consultar<FilaProducto>(`${SELECT_PRODUCTO} WHERE p.activo = 1 AND u.activo = 1 AND p.id IN (?)`, [ahora, ahora, ids]);
+    const porId = new Map(filas.map((fila) => [fila.id, mapear(fila)]));
+    return ids.flatMap((id) => porId.get(id) ?? []);
   }
 
   listarPorPerfil(perfilId: string, ahora: Date, pagina: ParametrosPagina): Promise<Pagina<Producto>> {

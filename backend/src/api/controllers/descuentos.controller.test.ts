@@ -20,11 +20,17 @@ describe("serializarDescuento", () => {
       porcentaje: 15,
       fecha_inicio: "2026-12-01T04:00:00.000Z",
       fecha_fin: "2027-01-01T03:59:59.000Z",
+      descripcion: null,
       estado: "programado",
       producto_ids: ["producto-1"],
       creado_en: "2026-09-01T00:00:00.000Z",
     });
     expect(JSON.stringify(cuerpo)).not.toContain("usuario-1");
+  });
+
+  it("devuelve el detalle tal cual, y null cuando no tiene", () => {
+    expect(serializarDescuento({ ...descuentoDePrueba({ descripcion: "Día de la Madre" }), estado: "vigente" })).toMatchObject({ descripcion: "Día de la Madre" });
+    expect(serializarDescuento({ ...descuentoDePrueba(), estado: "vigente" })).toMatchObject({ descripcion: null });
   });
 
   it("sin fechas devuelve null", () => {

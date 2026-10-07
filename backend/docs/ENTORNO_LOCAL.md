@@ -70,7 +70,7 @@ pnpm db:migrate
 pnpm db:seed:dev
 ```
 
-La primera debe mostrar `aplicada: 0001_esquema_inicial.sql`, `aplicada: 0002_indices.sql` y `2 migración(es) aplicada(s).`. La segunda, `Totales: { roles: 2, ciudades: 10, rubros: 10, usuarios: 11 }`. Ambas se pueden repetir sin duplicar nada.
+La primera debe mostrar `aplicada: 0001_esquema_inicial.sql`, `aplicada: 0002_indices.sql` y `2 migración(es) aplicada(s).`. La segunda, `Totales: { roles: 2, ciudades: 10, rubros: 8, usuarios: 11 }`. Ambas se pueden repetir sin duplicar nada.
 
 Para verlo en DBeaver: en la conexión `catalogo_dev`, pulsa `F5` sobre `Tablas`. Deben aparecer 10 tablas (`_migraciones`, `ciudades`, `descuentos`, `otp_codigos`, `perfiles_emprendedores`, `producto_descuentos`, `productos`, `roles`, `rubros`, `usuarios`). Prueba la consulta:
 

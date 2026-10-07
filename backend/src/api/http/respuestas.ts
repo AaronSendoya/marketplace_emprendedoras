@@ -34,8 +34,9 @@ export const creado = <T>(cuerpo: T) => Response.json(cuerpo, { status: 201 });
 
 export const sinContenido = () => new Response(null, { status: 204 });
 
-export const paginado = <T>({ datos, total }: Pagina<T>, { pagina, limite }: ParametrosPagina) =>
-  Response.json({ datos, paginacion: { pagina, limite, total } });
+// `extra`: campos propios de un listado que van junto a `datos` y `paginacion` (ej. `similares` de `GET /perfiles`).
+export const paginado = <T>({ datos, total }: Pagina<T>, { pagina, limite }: ParametrosPagina, extra: Record<string, unknown> = {}) =>
+  Response.json({ datos, paginacion: { pagina, limite, total }, ...extra });
 
 // Nunca devuelve detalles internos: un error desconocido se registra y responde 500 genérico.
 export function respuestaDeError(error: unknown, logger: ILogger): Response {

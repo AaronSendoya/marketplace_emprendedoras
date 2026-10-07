@@ -2,6 +2,8 @@ import { ErrorConflicto, ErrorValidacion } from "@/shared/domain/errors";
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import type { IImageProcessor } from "@/shared/domain/IImageProcessor";
 import type { TipoImagen } from "@/shared/domain/imagenes";
+import { normalizarTexto } from "@/shared/domain/BusquedaSimilar";
+import type { PerfilBuscable } from "../domain/BusquedaSimilar";
 import type { IPerfilRepository } from "../domain/IPerfilRepository";
 import type { CambiosPerfil, FiltrosPerfiles, NuevoPerfil, Perfil } from "../domain/Perfil";
 
@@ -33,6 +35,8 @@ export class PerfilRepositoryEnMemoria implements IPerfilRepository {
   ) {}
 
   falloAlActualizar = false;
+  // Productos activos por id de perfil, para la búsqueda de texto.
+  productos: Record<string, { nombre: string; descripcion: string | null }[]> = {};
 
   async crear(datos: NuevoPerfil): Promise<Perfil> {
     if (this.perfiles.some((p) => p.usuarioId === datos.usuarioId)) throw new ErrorConflicto("Este usuario ya tiene un perfil.");
@@ -79,11 +83,39 @@ export class PerfilRepositoryEnMemoria implements IPerfilRepository {
   }
 
   async listar(filtros: FiltrosPerfiles, pagina: ParametrosPagina): Promise<Pagina<Perfil>> {
+    const palabras = normalizarTexto(filtros.q ?? "").split(/\s+/).filter(Boolean);
     const coinciden = this.perfiles
       .filter((p) => p.usuarioActivo)
       .filter((p) => !filtros.ciudadId || p.ciudad.id === filtros.ciudadId)
-      .filter((p) => !filtros.rubroId || p.rubro.id === filtros.rubroId);
+      .filter((p) => !filtros.rubroId || p.rubro.id === filtros.rubroId)
+      .filter((p) => {
+        const textos = this.textosDe(p).map(normalizarTexto);
+        return palabras.every((palabra) => textos.some((texto) => texto.includes(palabra)));
+      });
     return { datos: coinciden.slice(desplazamiento(pagina), desplazamiento(pagina) + pagina.limite), total: coinciden.length };
+  }
+
+  async textosBuscables(filtros: Pick<FiltrosPerfiles, "ciudadId" | "rubroId">): Promise<PerfilBuscable[]> {
+    return this.perfiles
+      .filter((p) => p.usuarioActivo)
+      .filter((p) => !filtros.ciudadId || p.ciudad.id === filtros.ciudadId)
+      .filter((p) => !filtros.rubroId || p.rubro.id === filtros.rubroId)
+      .map((p) => ({
+        perfilId: p.id,
+        nombreNegocio: p.nombreNegocio,
+        nombreEmprendedora: p.nombreEmprendedora,
+        descripcion: p.descripcion,
+        productos: this.productos[p.id] ?? [],
+      }));
+  }
+
+  async listarPorIds(ids: string[]): Promise<Perfil[]> {
+    return ids.flatMap((id) => this.perfiles.filter((p) => p.id === id && p.usuarioActivo));
+  }
+
+  private textosDe(perfil: Perfil): string[] {
+    const productos = this.productos[perfil.id] ?? [];
+    return [perfil.nombreNegocio, perfil.descripcion, perfil.nombreEmprendedora, ...productos.flatMap((p) => [p.nombre, p.descripcion ?? ""])];
   }
 }
 

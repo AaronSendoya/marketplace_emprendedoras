@@ -6,13 +6,15 @@ import {
   obtenerJsonAutenticado,
   reemplazarFormDataAutenticado,
 } from "./cliente";
-import type { FiltrosPerfiles, Pagina, Perfil } from "./tipos";
+import type { FiltrosPerfiles, PaginaPerfiles, Perfil } from "./tipos";
 
 // GET /perfiles: Feed 1 (emprendedoras), público. Regla 8 (backend): no cachear más tiempo del
 // retraso tolerable; 30 s por defecto (mismo criterio que el marketplace, aunque los perfiles no
-// tengan vigencia de descuentos, para mantener un solo valor fácil de ajustar).
+// tengan vigencia de descuentos, para mantener un solo valor fácil de ajustar). Con texto de búsqueda
+// (`q`) no se cachea: la búsqueda en vivo pide una consulta distinta por cada pausa al escribir y
+// guardarlas todas llenaría la caché de Next con textos que casi nadie repite.
 export const listarPerfiles = (filtros: FiltrosPerfiles = {}) =>
-  obtenerJson<Pagina<Perfil>>("/perfiles", { parametros: { ...filtros } });
+  obtenerJson<PaginaPerfiles>("/perfiles", { parametros: { ...filtros }, revalidarSegundos: filtros.q ? 0 : undefined });
 
 export const obtenerPerfil = (id: string) => obtenerJson<Perfil>(`/perfiles/${id}`);
 

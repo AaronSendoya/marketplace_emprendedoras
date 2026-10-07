@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MySqlDescuentoRepository } from "@/core/descuentos/infrastructure/MySqlDescuentoRepository";
+import { GetMarketplaceUseCase } from "@/core/productos/application/ConsultasProducto";
+import { MAXIMO_DE_CARACTERES_DE_DESCRIPCION } from "@/shared/domain/BusquedaSimilar";
 import { ErrorValidacion } from "@/shared/domain/errors";
+import { FakeClock } from "@/shared/testing/FakeClock";
 import { MySqlClient } from "@/shared/infrastructure/MySqlClient";
 import { urlDePruebas } from "../../../../tests/integration/support/conexion";
 import type { NuevoProducto } from "../domain/Producto";
@@ -41,7 +44,7 @@ const nuevo = (parches: Partial<NuevoProducto> = {}): NuevoProducto => ({
 
 // Crea un descuento del perfil A y lo asigna a los productos indicados.
 async function descuento(porcentaje: number, fechaInicio: Date | null, fechaFin: Date | null, productoIds: string[], perfilId = ids.perfilA) {
-  const creado = await descuentos.crear({ perfilId, porcentaje, fechaInicio, fechaFin, ahora: T0 });
+  const creado = await descuentos.crear({ perfilId, porcentaje, fechaInicio, fechaFin, descripcion: null, ahora: T0 });
   await descuentos.asignar(creado.id, productoIds);
   return creado;
 }
@@ -324,5 +327,94 @@ describe("MySqlProductoRepository: listados", () => {
     const { datos: despues } = await feed({ perfilId: ids.perfilA });
 
     expect(despues[0]).toMatchObject({ porcentajeVigente: 20, precioConDescuento: 80 });
+  });
+});
+
+describe("MySqlProductoRepository: búsqueda de productos (regla 21)", () => {
+  const usecase = new GetMarketplaceUseCase(repositorio, new FakeClock(T0));
+  const ids2: Record<string, string> = {};
+
+  beforeAll(async () => {
+    ids2.zumo = (await nuevoProducto("Zumo de maracuyá", { ahora: enMin(200), descripcion: "Jugo natural prensado en frío" })).id;
+    ids2.mermelada = (await nuevoProducto("Mermelada de frutilla", { ahora: enMin(201), perfilId: ids.perfilB, descripcion: "x".repeat(MAXIMO_DE_CARACTERES_DE_DESCRIPCION + 100) })).id;
+    // El negocio B se renombra con una palabra que solo él tiene: "Negocio B" no sirve para distinguirlo, porque una
+    // letra suelta también está en el prefijo aleatorio de la prueba.
+    await cliente.ejecutar("UPDATE perfiles_emprendedores SET nombre_negocio = ? WHERE id = ?", [`${prefijo} Frutería Chacaltaya`, ids.perfilB]);
+    const escondido = await nuevoProducto("Zumo escondido", { ahora: enMin(202) });
+    await repositorio.actualizar(escondido.id, { activo: false }, enMin(203));
+    await nuevoProducto("Zumo de cuenta desactivada", { ahora: enMin(204), perfilId: ids.perfilInactivo });
+  });
+
+  const buscar = async (q: string, filtros: { ciudadId?: string; rubroId?: string; perfilId?: string } = {}) => {
+    const resultado = await usecase.ejecutar({ ...filtros, q }, { pagina: 1, limite: 50 });
+    return { nombres: resultado.datos.map((p) => p.nombre.replace(`${prefijo} `, "")), similares: resultado.similares, total: resultado.total };
+  };
+
+  it("busca también en el nombre del negocio al que pertenece el producto", async () => {
+    expect(await buscar(`${prefijo} chacaltaya mermelada`)).toEqual({ nombres: ["Mermelada de frutilla"], similares: false, total: 1 });
+    expect(await buscar(`${prefijo} chacaltaya zumo`)).toEqual({ nombres: [], similares: false, total: 0 });
+  });
+
+  it("no busca en el nombre de la emprendedora", async () => {
+    expect(await buscar(`${prefijo} flores`)).toEqual({ nombres: [], similares: false, total: 0 });
+  });
+
+  it("con una coincidencia exacta no muestra parecidos, y no distingue acentos", async () => {
+    expect(await buscar(`${prefijo} maracuya`)).toEqual({ nombres: ["Zumo de maracuyá"], similares: false, total: 1 });
+  });
+
+  it("sin coincidencia exacta devuelve el producto parecido y lo marca", async () => {
+    expect(await buscar(`${prefijo} maracuia`)).toEqual({ nombres: ["Zumo de maracuyá"], similares: true, total: 1 });
+    expect(await buscar(`${prefijo} chacaltaya frutila`)).toEqual({ nombres: ["Mermelada de frutilla"], similares: true, total: 1 });
+    expect(await buscar(`${prefijo} chacalaya mermelada`)).toEqual({ nombres: ["Mermelada de frutilla"], similares: true, total: 1 });
+  });
+
+  it("un producto oculto o de una cuenta desactivada no aparece, ni como parecido", async () => {
+    expect((await buscar(`${prefijo} escondidoo`)).nombres).toEqual([]);
+    expect((await buscar(`${prefijo} desactivda`)).nombres).toEqual([]);
+  });
+
+  it("los parecidos también se combinan con la ciudad, el rubro y el perfil con AND", async () => {
+    expect((await buscar(`${prefijo} maracuia`, { ciudadId: ids.ciudadA })).similares).toBe(true);
+    expect(await buscar(`${prefijo} maracuia`, { ciudadId: ids.ciudadB })).toEqual({ nombres: [], similares: false, total: 0 });
+    expect((await buscar(`${prefijo} maracuia`, { rubroId: ids.rubroB })).nombres).toEqual([]);
+    expect((await buscar(`${prefijo} maracuia`, { perfilId: ids.perfilB })).nombres).toEqual([]);
+  });
+
+  it("los parecidos llevan el descuento vigente y el precio con descuento", async () => {
+    await descuento(20, null, null, [ids2.zumo]);
+
+    const { datos, similares } = await usecase.ejecutar({ q: `${prefijo} maracuia` }, { pagina: 1, limite: 50 });
+
+    expect(similares).toBe(true);
+    expect(datos[0]).toMatchObject({ porcentajeVigente: 20, precioConDescuento: 80 });
+  });
+
+  it("textosBuscables entrega los productos activos de cuentas activas con el nombre de su negocio y solo el comienzo de la descripción", async () => {
+    const textos = (await repositorio.textosBuscables({})).filter((t) => t.nombre.startsWith(prefijo));
+
+    expect(textos.find((t) => t.productoId === ids2.zumo)).toMatchObject({ nombreNegocio: `${prefijo} Negocio A`, descripcion: "Jugo natural prensado en frío" });
+    expect(textos.find((t) => t.productoId === ids2.mermelada)?.descripcion).toHaveLength(MAXIMO_DE_CARACTERES_DE_DESCRIPCION);
+    expect(textos.some((t) => t.nombre.endsWith("Zumo escondido") || t.nombre.endsWith("cuenta desactivada"))).toBe(false);
+  });
+
+  it("textosBuscables respeta el perfil, la ciudad y el rubro", async () => {
+    const mios = async (filtros: Parameters<typeof repositorio.textosBuscables>[0]) =>
+      (await repositorio.textosBuscables(filtros)).filter((t) => t.nombre.startsWith(prefijo)).map((t) => t.productoId);
+
+    expect(await mios({ perfilId: ids.perfilB })).toContain(ids2.mermelada);
+    expect(await mios({ perfilId: ids.perfilB })).not.toContain(ids2.zumo);
+    expect(await mios({ ciudadId: ids.ciudadB })).not.toContain(ids2.zumo);
+    expect(await mios({ rubroId: ids.rubroA })).toContain(ids2.zumo);
+    expect(await mios({ ciudadId: ids.ciudadB, rubroId: ids.rubroA })).toEqual([]);
+  });
+
+  it("listarMarketplacePorIds respeta el orden dado y omite los inactivos, las cuentas desactivadas y los ids que no existen", async () => {
+    const oculto = (await repositorio.listarPorPerfil(ids.perfilA, T0, { pagina: 1, limite: 100 })).datos.find((p) => p.nombre.endsWith("Zumo escondido"))!;
+
+    const lista = await repositorio.listarMarketplacePorIds(T0, [ids2.mermelada, oculto.id, randomUUID(), ids2.zumo]);
+
+    expect(lista.map((p) => p.id)).toEqual([ids2.mermelada, ids2.zumo]);
+    expect(await repositorio.listarMarketplacePorIds(T0, [])).toEqual([]);
   });
 });

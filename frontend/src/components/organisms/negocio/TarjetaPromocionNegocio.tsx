@@ -53,6 +53,9 @@ export function TarjetaPromocionNegocio({ descuento, perfilId, productos }: Prop
         </Badge>
       </div>
 
+      {/* Detalle (regla 8): completo, con sus saltos de línea; son 280 caracteres como máximo. */}
+      {descuento.descripcion && <p className="font-cuerpo text-sm break-words whitespace-pre-line text-texto">{descuento.descripcion}</p>}
+
       <div className="flex-1 border-t border-borde pt-4">
         {asignados.length === 0 ? (
           <p className="font-cuerpo text-sm text-texto-secundario">Todavía no tiene productos: no le descuenta nada a nadie.</p>

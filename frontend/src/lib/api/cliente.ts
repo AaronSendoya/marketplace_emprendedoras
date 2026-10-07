@@ -188,6 +188,21 @@ export async function reemplazarFormDataAutenticado<T>(ruta: string, formData: F
 
 // DELETE autenticado (ej. quitar la asignación de un descuento a un producto). El backend responde
 // 204 sin cuerpo, así que no hay nada que parsear como JSON.
+// DELETE autenticado con cuerpo JSON y respuesta JSON: eliminar una cuenta por completo, cuyo cuerpo lleva el correo escrito por
+// el Admin como confirmación (regla 5, backend).
+export async function eliminarJsonAutenticado<T>(ruta: string, cuerpo: unknown): Promise<T> {
+  const respuesta = await fetch(`${urlBase()}${ruta}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...(await cabeceraAutenticacion()) },
+    body: JSON.stringify(cuerpo),
+    cache: "no-store",
+  });
+
+  if (!respuesta.ok) throw await errorDesdeRespuesta(respuesta);
+
+  return (await respuesta.json()) as T;
+}
+
 export async function eliminarAutenticado(ruta: string): Promise<void> {
   const respuesta = await fetch(`${urlBase()}${ruta}`, {
     method: "DELETE",
@@ -196,4 +211,16 @@ export async function eliminarAutenticado(ruta: string): Promise<void> {
   });
 
   if (!respuesta.ok) throw await errorDesdeRespuesta(respuesta);
+}
+
+// GET autenticado de un archivo (ej. la plantilla de ejemplo del Excel de importación): devuelve los bytes tal cual.
+export async function obtenerBinarioAutenticado(ruta: string): Promise<ArrayBuffer> {
+  const respuesta = await fetch(`${urlBase()}${ruta}`, {
+    headers: await cabeceraAutenticacion(),
+    cache: "no-store",
+  });
+
+  if (!respuesta.ok) throw await errorDesdeRespuesta(respuesta);
+
+  return respuesta.arrayBuffer();
 }

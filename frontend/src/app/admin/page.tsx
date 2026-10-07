@@ -1,4 +1,4 @@
-import { CircleAlert, Users as UsersIcon } from "lucide-react";
+import { CircleAlert, CircleCheck, Users as UsersIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -29,6 +29,27 @@ function primerValor(valor: string | string[] | undefined): string {
   return (Array.isArray(valor) ? valor[0] : valor) ?? "";
 }
 
+// El aviso de «cuenta eliminada» llega en la URL (`?eliminada=1&p=…`, lo arma `eliminarCuentaAction`). Es texto de la barra de
+// direcciones: solo se aceptan enteros pequeños, nunca se muestra nada más.
+function entero(valor: string | string[] | undefined): number {
+  const n = Number(primerValor(valor));
+  return Number.isInteger(n) && n >= 0 && n <= 1_000_000 ? n : 0;
+}
+
+const plural = (n: number, singular: string, varios: string) => `${n} ${n === 1 ? singular : varios}`;
+
+function describirEliminacion(p: { perfiles: number; productos: number; descuentos: number; clics: number; imagenes: number }): string {
+  const partes = [
+    p.perfiles > 0 ? plural(p.perfiles, "perfil", "perfiles") : null,
+    p.productos > 0 ? plural(p.productos, "producto", "productos") : null,
+    p.descuentos > 0 ? plural(p.descuentos, "descuento", "descuentos") : null,
+    p.clics > 0 ? plural(p.clics, "clic de contacto", "clics de contacto") : null,
+    p.imagenes > 0 ? plural(p.imagenes, "imagen", "imágenes") : null,
+  ].filter((parte): parte is string => parte !== null);
+  if (partes.length === 0) return "La cuenta no tenía perfil ni productos.";
+  return `También se borraron ${partes.length > 1 ? partes.slice(0, -1).join(", ") + " y " + partes[partes.length - 1] : partes[0]}.`;
+}
+
 export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/admin">) {
   // Mismo guard que app/admin/layout.tsx (regla 5): Next arranca el render de layout y página en
   // paralelo para adelantar la carga de datos, así que sin esto la página llega a pedir datos
@@ -43,6 +64,14 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
   const limiteParametro = Number(primerValor(parametros.limite));
   const limite = LIMITES_VALIDOS.includes(limiteParametro) ? limiteParametro : LIMITE_POR_DEFECTO;
   const conError = primerValor(parametros.error) === "estado";
+  const eliminada = primerValor(parametros.eliminada) === "1";
+  const resumenEliminada = describirEliminacion({
+    perfiles: entero(parametros.p),
+    productos: entero(parametros.pr),
+    descuentos: entero(parametros.d),
+    clics: entero(parametros.c),
+    imagenes: entero(parametros.i),
+  });
 
   let yo: Awaited<ReturnType<typeof obtenerMe>>;
   let resultado: Awaited<ReturnType<typeof listarUsuarios>>;
@@ -88,6 +117,15 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
           </Link>
         }
       />
+
+      {eliminada && (
+        <p role="status" className="flex items-start gap-2 font-cuerpo text-sm text-texto">
+          <CircleCheck size={16} strokeWidth={1.5} aria-hidden="true" className="mt-0.5 shrink-0 text-salvia" />
+          <span>
+            <strong className="font-semibold">Cuenta eliminada.</strong> {resumenEliminada}
+          </span>
+        </p>
+      )}
 
       {conError && (
         <p role="alert" className="flex items-center gap-2 font-cuerpo text-sm text-texto">

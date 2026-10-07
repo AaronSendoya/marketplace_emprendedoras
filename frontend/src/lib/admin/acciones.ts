@@ -7,6 +7,7 @@ import {
   crearUsuario,
   type DatosNuevaCuenta,
   editarUsuario,
+  eliminarUsuario,
   restablecerPasswordAdmin,
 } from "@/lib/api/admin";
 import { ErrorApi } from "@/lib/api/cliente";
@@ -76,6 +77,39 @@ export async function cambiarEstadoAction(id: string, activo: boolean, volverA: 
     redirect(`${volverA}${separador}error=estado`);
   }
   revalidatePath("/admin");
+}
+
+export interface EstadoEliminarCuenta {
+  error?: string;
+}
+
+// Eliminar una cuenta por completo (regla 5, backend): irreversible, solo una de Emprendedor activa y con el correo escrito. Si
+// sale bien, redirige a la lista con lo que se eliminó en la URL (`?eliminada=1&p=…`), que la página lee y valida para mostrar el
+// aviso (la fila y su modal ya no existen al volver a pedir la lista, así que no puede avisar el propio modal). Si no, devuelve el
+// motivo para mostrarlo en el modal. El `redirect` va fuera del `try`: lanza una excepción propia de Next.
+export async function eliminarCuentaAction(usuarioId: string, confirmacionEmail: string, volverA: string): Promise<EstadoEliminarCuenta> {
+  let eliminado;
+  try {
+    eliminado = await eliminarUsuario(usuarioId, confirmacionEmail);
+  } catch (error) {
+    if (error instanceof ErrorApi) {
+      if (error.status === 401) redirect("/iniciar-sesion");
+      if (error.status === 400) return { error: "El correo escrito no coincide con el de la cuenta." };
+      if (error.status === 404) {
+        revalidatePath("/admin");
+        return { error: "Esa cuenta ya no existe." };
+      }
+      // 403 y 409 traen su motivo en español (cuenta suspendida, de Admin, la propia, o que cambió mientras se eliminaba).
+      if (error.status === 403 || error.status === 409) return { error: error.message };
+    }
+    return { error: "No pudimos eliminar la cuenta. Intenta de nuevo." };
+  }
+
+  revalidatePath("/admin");
+  const separador = volverA.includes("?") ? "&" : "?";
+  redirect(
+    `${volverA}${separador}eliminada=1&p=${eliminado.perfiles}&pr=${eliminado.productos}&d=${eliminado.descuentos}&c=${eliminado.clics}&i=${eliminado.imagenes}`,
+  );
 }
 
 export interface EstadoEditarCuenta {

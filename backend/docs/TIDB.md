@@ -57,18 +57,18 @@ pnpm db:migrate
 Remove-Item Env:DATABASE_URL
 ```
 
-Debe aplicar las migraciones `0001` a `0004`. Si falla a la mitad, no la repitas a ciegas: el DDL no se revierte; revisa qué tablas quedaron (`SHOW TABLES`) y avísame.
+Debe aplicar todas las migraciones de `db/migrations/` (hoy `0001` a `0008`; si la base ya tenía algunas, solo las que falten). Si falla a la mitad, no la repitas a ciegas: el DDL no se revierte; revisa qué tablas quedaron (`SHOW TABLES`) y avísame.
 
 Luego verifica en el SQL Editor:
 
 ```sql
-SHOW TABLES;              -- 11 tablas: roles, ciudades, rubros, usuarios, perfiles_emprendedores, productos, descuentos, producto_descuentos, otp_codigos, intentos_login, _migraciones
+SHOW TABLES;              -- 12 tablas: roles, ciudades, rubros, usuarios, perfiles_emprendedores, productos, descuentos, producto_descuentos, otp_codigos, intentos_login, clics_contacto, _migraciones
 SELECT nombre FROM _migraciones ORDER BY nombre;
 ```
 
 ## 5. Datos iniciales de producción
 
-No uses `seed.dev.sql` (es solo desarrollo). Faltan los roles `Admin` y `Emprendedor`, las ciudades y rubros, y el primer Admin (regla 14, plantilla en `schema.reference.sql`, directriz 10). Inserta con UUID v4 generados localmente.
+No uses `seed.dev.sql` (es solo desarrollo). Faltan los roles `Admin` y `Emprendedor`, las ciudades, los rubros y el primer Admin (regla 14, plantilla en `schema.reference.sql`, directriz 10). Los rubros son los 8 oficiales del cliente: los carga `rubros-oficiales.sql` (esta misma carpeta), que es idempotente y también actualiza una base que ya tenía los rubros del seed anterior (ejecútalo en `catalogo_prod`, con Alt+X en DBeaver). Inserta con UUID v4 generados localmente.
 
 ## 6. Conectar la app
 

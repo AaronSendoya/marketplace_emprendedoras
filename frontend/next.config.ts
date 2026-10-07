@@ -7,6 +7,9 @@ import type { NextConfig } from "next";
 const hostImagenes = process.env.NEXT_PUBLIC_IMAGENES_HOST;
 
 const nextConfig: NextConfig = {
+  // Regla 22 (backend): la importación de emprendedoras envía el `.xlsx` (hasta 2 MB) en una Server Function, y el límite por
+  // defecto es 1 MB. 3 MB deja margen sobre el máximo del backend, que es quien lo impone de verdad (2 MB).
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   images: {
     remotePatterns: hostImagenes ? [{ protocol: "https", hostname: hostImagenes }] : [],
   },

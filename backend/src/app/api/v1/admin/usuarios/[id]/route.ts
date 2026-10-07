@@ -1,9 +1,9 @@
-import { actualizarUsuario, obtenerUsuario } from "@/api/controllers/admin-usuarios.controller";
-import { crearActualizarUsuario, crearGetUsuario } from "@/api/composicion/auth";
+import { actualizarUsuario, eliminarUsuario, obtenerUsuario } from "@/api/controllers/admin-usuarios.controller";
+import { crearActualizarUsuario, crearEliminarCuenta, crearGetUsuario } from "@/api/composicion/auth";
 import { leerCuerpo, leerParametrosRuta } from "@/api/http/validacion";
 import { requireAdmin } from "@/api/middlewares/requireAdmin";
 import { withErrorHandling } from "@/api/middlewares/withErrorHandling";
-import { EsquemaEditarUsuarioBody, EsquemaIdUsuario } from "@/api/openapi/rutas/admin-usuarios";
+import { EsquemaEditarUsuarioBody, EsquemaEliminarCuentaBody, EsquemaIdUsuario } from "@/api/openapi/rutas/admin-usuarios";
 import type { CambiosUsuario } from "@/core/auth/domain/Usuario";
 
 export const GET = withErrorHandling(
@@ -25,5 +25,14 @@ export const PATCH = withErrorHandling(
       ...(cuerpo.apellido_materno !== undefined && { apellidoMaterno: cuerpo.apellido_materno }),
     };
     return actualizarUsuario(crearActualizarUsuario(), admin.id, id, cambios);
+  }),
+);
+
+// Regla 5: eliminar la cuenta por completo (irreversible). Solo una cuenta de Emprendedor activa y con el correo escrito.
+export const DELETE = withErrorHandling(
+  requireAdmin(async (request, contexto: RouteContext<"/api/v1/admin/usuarios/[id]">, admin) => {
+    const { id } = leerParametrosRuta(await contexto.params, EsquemaIdUsuario);
+    const { confirmacion_email } = await leerCuerpo(request, EsquemaEliminarCuentaBody);
+    return eliminarUsuario(crearEliminarCuenta(), admin.id, id, confirmacion_email);
   }),
 );

@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronsUpDown, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronsUpDown } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import type { FilaMapaCalor, GranularidadMapaCalor, MapaCalorClics, OrdenMapaCalor } from "@/lib/api/tipos";
+import { Avatar } from "@/components/atoms/Avatar";
+import type { MapaCalorClics, OrdenMapaCalor } from "@/lib/api/tipos";
 import { CLASES_FOCO_ENLACE } from "@/lib/estilos";
 import { formatearPorcentaje } from "@/lib/formato/precio";
 import {
@@ -16,16 +17,22 @@ import {
   UMBRAL_ALTO,
   UMBRAL_MEDIO,
   UMBRAL_MUY_ALTO,
+  UNIDAD_POR_GRANULARIDAD,
   type NivelCalor,
 } from "@/lib/metricas/mapaCalor";
-import { calcularTendencia } from "@/lib/metricas/tendencia";
+import type { IdentidadPerfil } from "@/lib/metricas/identidad";
 import { EvolucionMini } from "./EvolucionMini";
+import { EnlaceNegocio, RubroCiudad } from "./IdentidadEmprendimiento";
+import { TendenciaClics } from "./TendenciaClics";
 
 interface PropsTablaCalorPerfiles {
   mapa: MapaCalorClics;
   orden: OrdenMapaCalor;
   // Clics de todas las cuentas en el período (WhatsApp + Instagram): la base del "% del total".
   totalPeriodo: number;
+  // Quién es cada emprendimiento (emprendedora, rubro y ciudad), por `perfil_id`. Vacío si la lista pública
+  // de perfiles no respondió: la fila se muestra igual, solo con el nombre del negocio.
+  identidades: Record<string, IdentidadPerfil>;
 }
 
 type Columna = "whatsapp" | "instagram" | "total";
@@ -70,7 +77,6 @@ const UMBRAL_DE_LEYENDA: Record<NivelCalor, string> = {
   1: `< ${UMBRAL_MEDIO * 100} %`,
   0: "",
 };
-const UNIDAD_POR_GRANULARIDAD: Record<GranularidadMapaCalor, string> = { dia: "día", semana: "semana", mes: "mes" };
 
 function Celda({ valor, nivel, columna }: { valor: number; nivel: NivelCalor; columna: Columna }) {
   return (
@@ -80,26 +86,6 @@ function Celda({ valor, nivel, columna }: { valor: number; nivel: NivelCalor; co
     >
       {formatearEntero(valor)}
     </div>
-  );
-}
-
-function Tendencia({ fila }: { fila: FilaMapaCalor }) {
-  const tendencia = calcularTendencia(fila.total, fila.total_anterior);
-  if (tendencia === null) {
-    return (
-      <span className="font-cuerpo text-sm text-texto-secundario" title="Sin clics en el período anterior con los que comparar">
-        <span aria-hidden="true">—</span>
-        <span className="sr-only">Sin clics en el período anterior con los que comparar</span>
-      </span>
-    );
-  }
-  const Icono = tendencia > 0 ? TrendingUp : tendencia < 0 ? TrendingDown : Minus;
-  return (
-    <span className="inline-flex items-center gap-1 font-cuerpo text-sm font-semibold text-texto" title="Frente al período anterior de igual duración">
-      <Icono size={13} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
-      {tendencia > 0 ? "+" : ""}
-      {tendencia}%<span className="sr-only"> frente al período anterior</span>
-    </span>
   );
 }
 
@@ -148,7 +134,7 @@ const ENCABEZADO_FIJO = "sticky top-0 z-10 bg-superficie px-1 py-2 font-cuerpo t
 // tendencia contra el período anterior. El color de cada celda dice cuánto representa frente al
 // líder de su columna, con niveles con nombre que la leyenda explica; el número siempre está a la
 // vista, así que nada depende solo del color. Los encabezados de canal ordenan (y eligen el top).
-export function TablaCalorPerfiles({ mapa, orden, totalPeriodo }: PropsTablaCalorPerfiles) {
+export function TablaCalorPerfiles({ mapa, orden, totalPeriodo, identidades }: PropsTablaCalorPerfiles) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -192,7 +178,7 @@ export function TablaCalorPerfiles({ mapa, orden, totalPeriodo }: PropsTablaCalo
         </ul>
       </div>
 
-      <div className={`overflow-auto transition-opacity md:max-h-[34rem] ${pendiente ? "opacity-60" : ""}`} aria-busy={pendiente}>
+      <div className={`overflow-auto transition-opacity md:max-h-[44rem] ${pendiente ? "opacity-60" : ""}`} aria-busy={pendiente}>
         <table className="w-full border-separate [border-spacing:0_6px]">
           <caption className="sr-only">Clics de WhatsApp, de Instagram y totales de cada emprendimiento en el período, con su evolución y su tendencia.</caption>
           <thead>
@@ -209,10 +195,10 @@ export function TablaCalorPerfiles({ mapa, orden, totalPeriodo }: PropsTablaCalo
               <th scope="col" className={`${ENCABEZADO_FIJO} hidden text-center md:table-cell`}>
                 % del total
               </th>
-              <th scope="col" className={`${ENCABEZADO_FIJO} hidden text-center md:table-cell`}>
+              <th scope="col" className={`${ENCABEZADO_FIJO} hidden text-center xl:table-cell`}>
                 Evolución
               </th>
-              <th scope="col" className={`${ENCABEZADO_FIJO} hidden text-center md:table-cell`}>
+              <th scope="col" className={`${ENCABEZADO_FIJO} hidden text-center xl:table-cell`}>
                 Tendencia
               </th>
             </tr>
@@ -226,16 +212,30 @@ export function TablaCalorPerfiles({ mapa, orden, totalPeriodo }: PropsTablaCalo
                 <tr key={fila.perfil_id}>
                   <td className="px-1 text-center font-cuerpo text-sm font-medium text-texto-secundario tabular-nums">{indice + 1}</td>
                   <th scope="row" className="w-full max-w-0 px-1.5 text-left font-normal">
-                    {/* Hasta dos líneas en pantallas angostas (el nombre es la identidad de la fila y a 360 px solo
-                        sobran ~100 px); una sola, con puntos suspensivos, desde `md`. */}
-                    <span className="line-clamp-2 font-titulo text-base font-bold break-words text-texto sm:text-[1.0625rem] md:line-clamp-1" title={fila.nombre_negocio}>
-                      {fila.nombre_negocio}
-                    </span>
-                    {/* Debajo de `md` no caben las columnas de evolución y tendencia: se resumen aquí. */}
-                    <span className="mt-0.5 flex items-center gap-1.5 md:hidden">
-                      <EvolucionMini serie={serie} etiqueta={etiquetaEvolucion} className="h-4 w-12 shrink-0" />
-                      <Tendencia fila={fila} />
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {/* Sin avatar debajo de `sm`: a 360 px el nombre necesita todo el ancho. Se oculta el contenedor y no
+                          el avatar, porque el átomo ya trae su propio `inline-flex` y chocaría con `hidden`. */}
+                      <span className="hidden sm:inline-flex">
+                        <Avatar nombreCompleto={fila.nombre_negocio} tamano="md" />
+                      </span>
+                      <div className="min-w-0">
+                        {/* Hasta dos líneas en pantallas angostas (el nombre es la identidad de la fila y a 360 px solo
+                            sobran ~100 px); una sola, con puntos suspensivos, desde `md`. */}
+                        <span className="line-clamp-2 block font-titulo text-base font-bold text-texto sm:text-[1.0625rem] md:line-clamp-1">
+                          <EnlaceNegocio perfilId={fila.perfil_id} nombre={fila.nombre_negocio} />
+                        </span>
+                        {identidades[fila.perfil_id] && (
+                          <span className="line-clamp-2 block font-cuerpo text-sm text-texto-secundario md:line-clamp-1">
+                            <RubroCiudad identidad={identidades[fila.perfil_id]} />
+                          </span>
+                        )}
+                        {/* Debajo de `xl` no caben las columnas de evolución y tendencia junto al avatar y al rubro: se resumen aquí. */}
+                        <span className="mt-0.5 flex items-center gap-1.5 xl:hidden">
+                          <EvolucionMini serie={serie} etiqueta={etiquetaEvolucion} className="h-4 w-12 shrink-0" />
+                          <TendenciaClics fila={fila} />
+                        </span>
+                      </div>
+                    </div>
                   </th>
                   <td className="px-0.5">
                     <Celda valor={fila.whatsapp} nivel={nivelCalor(fila.whatsapp, lideres.whatsapp)} columna="whatsapp" />
@@ -249,11 +249,11 @@ export function TablaCalorPerfiles({ mapa, orden, totalPeriodo }: PropsTablaCalo
                   <td className="hidden px-1.5 text-center font-cuerpo text-base font-semibold text-texto tabular-nums md:table-cell">
                     {cuota === null ? <span className="text-texto-secundario">—</span> : formatearPorcentaje(Math.round(cuota * 10) / 10)}
                   </td>
-                  <td className="hidden px-1.5 md:table-cell">
+                  <td className="hidden px-1.5 xl:table-cell">
                     <EvolucionMini serie={serie} etiqueta={etiquetaEvolucion} className="mx-auto h-7 w-20" />
                   </td>
-                  <td className="hidden px-1.5 text-center md:table-cell">
-                    <Tendencia fila={fila} />
+                  <td className="hidden px-1.5 text-center xl:table-cell">
+                    <TendenciaClics fila={fila} />
                   </td>
                 </tr>
               );

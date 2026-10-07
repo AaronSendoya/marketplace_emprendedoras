@@ -4,6 +4,10 @@
 // rechazo real sigue siendo el Zod del backend.
 export const LIMITES_PRODUCTO = { nombreMin: 3, nombreMax: 150, descripcionMax: 2000 };
 
+// Detalle opcional de un descuento (regla 8): el mismo límite de `descuentos.descripcion` (VARCHAR(280)). Se cuenta
+// con `.length`, igual que `maxLength` del campo y que la API: un emoji cuenta 2.
+export const LIMITES_DESCUENTO = { descripcionMax: 280 };
+
 const CONTIENE_LETRA = /\p{L}/u;
 
 export function errorNombreProducto(valor: string): string | null {

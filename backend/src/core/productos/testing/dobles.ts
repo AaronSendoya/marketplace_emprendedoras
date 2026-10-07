@@ -1,5 +1,7 @@
+import { normalizarTexto } from "@/shared/domain/BusquedaSimilar";
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import { ErrorValidacion } from "@/shared/domain/errors";
+import type { ProductoBuscable } from "../domain/BusquedaSimilar";
 import type { IProductoRepository } from "../domain/IProductoRepository";
 import type { CambiosProducto, FiltrosMarketplace, NuevoProducto, Producto } from "../domain/Producto";
 
@@ -71,11 +73,30 @@ export class ProductoRepositoryEnMemoria implements IProductoRepository {
     producto.actualizadoEn = ahora;
   }
 
-  async listarMarketplace(_ahora: Date, filtros: FiltrosMarketplace, pagina: ParametrosPagina): Promise<Pagina<Producto>> {
-    const coinciden = this.productos
+  private delFeed(filtros: Pick<FiltrosMarketplace, "perfilId" | "ciudadId" | "rubroId">): Producto[] {
+    return this.productos
       .filter((p) => p.activo && p.perfil.usuarioActivo)
-      .filter((p) => !filtros.perfilId || p.perfilId === filtros.perfilId);
+      .filter((p) => !filtros.perfilId || p.perfilId === filtros.perfilId)
+      .filter((p) => !filtros.ciudadId || p.perfil.ciudad.id === filtros.ciudadId)
+      .filter((p) => !filtros.rubroId || p.perfil.rubro.id === filtros.rubroId);
+  }
+
+  async listarMarketplace(_ahora: Date, filtros: FiltrosMarketplace, pagina: ParametrosPagina): Promise<Pagina<Producto>> {
+    const palabras = normalizarTexto(filtros.q ?? "").split(/\s+/).filter(Boolean);
+    const coinciden = this.delFeed(filtros).filter((p) => {
+      const textos = [p.nombre, p.descripcion ?? "", p.perfil.nombreNegocio].map(normalizarTexto);
+      return palabras.every((palabra) => textos.some((texto) => texto.includes(palabra)));
+    });
     return { datos: coinciden.slice(desplazamiento(pagina), desplazamiento(pagina) + pagina.limite), total: coinciden.length };
+  }
+
+  async textosBuscables(filtros: Pick<FiltrosMarketplace, "perfilId" | "ciudadId" | "rubroId">): Promise<ProductoBuscable[]> {
+    return this.delFeed(filtros).map((p) => ({ productoId: p.id, nombre: p.nombre, descripcion: p.descripcion, nombreNegocio: p.perfil.nombreNegocio }));
+  }
+
+  async listarMarketplacePorIds(_ahora: Date, ids: string[]): Promise<Producto[]> {
+    const delFeed = this.delFeed({});
+    return ids.flatMap((id) => delFeed.filter((p) => p.id === id));
   }
 
   async listarPorPerfil(perfilId: string, _ahora: Date, pagina: ParametrosPagina): Promise<Pagina<Producto>> {

@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ErrorConflicto, ErrorValidacion } from "@/shared/domain/errors";
 import { MySqlClient } from "@/shared/infrastructure/MySqlClient";
 import { urlDePruebas } from "../../../../tests/integration/support/conexion";
+import { GetPerfilesUseCase } from "../application/ConsultasPerfil";
+import { MAXIMO_DE_CARACTERES_DE_DESCRIPCION } from "@/shared/domain/BusquedaSimilar";
 import type { NuevoPerfil } from "../domain/Perfil";
 import { MySqlPerfilRepository } from "./MySqlPerfilRepository";
 
@@ -167,6 +169,161 @@ describe("MySqlPerfilRepository", () => {
       expect((await repositorio.listar({ q: `${prefijo} 100%` }, { pagina: 1, limite: 50 })).datos).toHaveLength(1);
       expect((await repositorio.listar({ q: `${prefijo} 1_0%` }, { pagina: 1, limite: 50 })).datos).toEqual([]);
       expect((await repositorio.listar({ q: "%" }, { pagina: 1, limite: 50 })).datos.every((p) => (p.nombreNegocio + p.descripcion).includes("%"))).toBe(true);
+    });
+
+    describe("búsqueda por palabras y por varios campos (regla 20)", () => {
+      const ids = async (q: string, filtros: Parameters<typeof repositorio.listar>[0] = {}) =>
+        (await repositorio.listar({ ...filtros, q }, { pagina: 1, limite: 50 })).datos.map((p) => p.usuarioId).sort();
+      const ordenados = (...lista: string[]) => [...lista].sort();
+
+      const insertarProducto = async (usuarioId: string, nombre: string, descripcion: string | null, activo: boolean) => {
+        const perfil = (await repositorio.buscarPorUsuarioId(usuarioId))!;
+        await cliente.ejecutar(
+          "INSERT INTO productos (id, perfil_id, nombre, descripcion, imagen_key, activo) VALUES (?, ?, ?, ?, 'productos/p.webp', ?)",
+          [randomUUID(), perfil.id, nombre, descripcion, activo ? 1 : 0],
+        );
+      };
+
+      beforeAll(async () => {
+        await insertarProducto(usuarios.dos, "Café especial", "Grano tostado en La Paz", true);
+        await insertarProducto(usuarios.tres, "CAFETERÍA Andina", null, true);
+        await insertarProducto(usuarios.uno, "Zzz oculto", "Producto que su dueña ocultó", false);
+        await insertarProducto(usuarios.inactivo, "Cafetería de una cuenta desactivada", null, true);
+      });
+
+      it("busca por el nombre de la emprendedora: nombres y apellidos de su cuenta", async () => {
+        expect(await ids(`${prefijo} choque`)).toEqual([usuarios.uno]);
+        expect(await ids(`${prefijo} flores maría`)).toEqual(ordenados(usuarios.uno, usuarios.dos, usuarios.tres));
+      });
+
+      it("no distingue acentos ni mayúsculas, en cualquier campo", async () => {
+        expect(await ids(`${prefijo} MARIA`)).toEqual(await ids(`${prefijo} maría`));
+        expect(await ids(`${prefijo} jabones`)).toEqual([usuarios.tres]);
+        expect(await ids(`${prefijo} JABÓNES`)).toEqual([usuarios.tres]);
+      });
+
+      it("busca en el nombre y en la descripción de los productos activos", async () => {
+        expect(await ids(`${prefijo} cafe`)).toEqual(ordenados(usuarios.dos, usuarios.tres));
+        expect(await ids(`${prefijo} CAFÉ ESPECIAL`)).toEqual([usuarios.dos]);
+        expect(await ids(`${prefijo} tostado`)).toEqual([usuarios.dos]);
+        expect(await ids(`${prefijo} cafeteria`)).toEqual([usuarios.tres]);
+      });
+
+      it("encuentra una palabra como parte de otra", async () => {
+        expect(await ids(`${prefijo} tost`)).toEqual([usuarios.dos]);
+        expect(await ids(`${prefijo} ndina`)).toEqual([usuarios.tres]);
+      });
+
+      it("un producto oculto no hace aparecer a su dueña", async () => {
+        expect(await ids(`${prefijo} zzz`)).toEqual([]);
+        expect(await ids(`${prefijo} ocultó`)).toEqual([]);
+      });
+
+      it("el producto de una cuenta desactivada no la hace aparecer (regla 18)", async () => {
+        expect(await ids(`${prefijo} desactivada`)).toEqual([]);
+        expect(await ids(`${prefijo} cafe`)).not.toContain(usuarios.inactivo);
+      });
+
+      it("cada palabra puede estar en un campo distinto y en cualquier orden", async () => {
+        expect(await ids(`${prefijo} tostado maría`)).toEqual([usuarios.dos]);
+        expect(await ids(`maría tostado ${prefijo}`)).toEqual([usuarios.dos]);
+        expect(await ids(`${prefijo}   tostado   maría `)).toEqual([usuarios.dos]);
+      });
+
+      it("todas las palabras deben aparecer: si una no está en ningún campo, no hay resultado", async () => {
+        expect(await ids(`${prefijo} tostado jabones`)).toEqual([]);
+        expect(await ids(`${prefijo} maría inexistentepalabra`)).toEqual([]);
+      });
+
+      it("se combina con la ciudad y el rubro con AND: ningún filtro anula a otro", async () => {
+        expect(await ids(`${prefijo} cafe`, { ciudadId: ciudadB })).toEqual([usuarios.dos]);
+        expect(await ids(`${prefijo} cafe`, { rubroId: rubroA })).toEqual([usuarios.tres]);
+        expect(await ids(`${prefijo} cafe`, { ciudadId: ciudadB, rubroId: rubroA })).toEqual([]);
+        expect(await ids(`${prefijo} cafe`, { ciudadId: ciudadB, rubroId: rubroB })).toEqual([usuarios.dos]);
+      });
+
+      it("el total cuenta los mismos perfiles que se listan", async () => {
+        const { datos, total } = await repositorio.listar({ q: `${prefijo} cafe` }, { pagina: 1, limite: 1 });
+
+        expect(total).toBe(2);
+        expect(datos).toHaveLength(1);
+      });
+
+      it("un % o _ escrito en una palabra sigue buscándose tal cual", async () => {
+        expect(await ids(`${prefijo} maría 100%`)).toEqual([usuarios.tres]);
+        expect(await ids(`${prefijo} maría 1_0%`)).toEqual([]);
+      });
+
+      describe("resultados similares (regla 20)", () => {
+        const perfilDe = async (usuarioId: string) => (await repositorio.buscarPorUsuarioId(usuarioId))!.id;
+        const usecase = new GetPerfilesUseCase(repositorio);
+        const parecidos = async (q: string, filtros: { ciudadId?: string; rubroId?: string } = {}) => {
+          const resultado = await usecase.ejecutar({ ...filtros, q }, { pagina: 1, limite: 50 });
+          return { usuarios: resultado.datos.map((p) => p.usuarioId).sort(), similares: resultado.similares, total: resultado.total };
+        };
+
+        beforeAll(async () => {
+          await insertarProducto(usuarios.uno, "Mermelada de frutilla", "x".repeat(MAXIMO_DE_CARACTERES_DE_DESCRIPCION + 100), true);
+        });
+
+        it("textosBuscables entrega los textos de los perfiles activos y solo sus productos activos", async () => {
+          const textos = await repositorio.textosBuscables({});
+          const [idUno, idDos, idInactivo] = await Promise.all([usuarios.uno, usuarios.dos, usuarios.inactivo].map(perfilDe));
+          const dos = textos.find((t) => t.perfilId === idDos);
+          const uno = textos.find((t) => t.perfilId === idUno);
+
+          expect(dos).toMatchObject({
+            nombreNegocio: `${prefijo} Tienda`,
+            nombreEmprendedora: "María Flores",
+            productos: [{ nombre: "Café especial", descripcion: "Grano tostado en La Paz" }],
+          });
+          expect(uno?.productos.map((p) => p.nombre)).toEqual(["Mermelada de frutilla"]);
+          expect(textos.some((t) => t.perfilId === idInactivo)).toBe(false);
+        });
+
+        it("de cada descripción de producto entrega solo el comienzo", async () => {
+          const textos = await repositorio.textosBuscables({});
+          const idUno = await perfilDe(usuarios.uno);
+          const uno = textos.find((t) => t.perfilId === idUno)!;
+
+          expect(uno.productos[0].descripcion).toHaveLength(MAXIMO_DE_CARACTERES_DE_DESCRIPCION);
+        });
+
+        it("textosBuscables respeta la ciudad y el rubro", async () => {
+          const idDos = await perfilDe(usuarios.dos);
+
+          expect((await repositorio.textosBuscables({ ciudadId: ciudadB })).filter((t) => t.nombreNegocio.startsWith(prefijo)).map((t) => t.perfilId)).toEqual([idDos]);
+          expect((await repositorio.textosBuscables({ rubroId: rubroB })).filter((t) => t.nombreNegocio.startsWith(prefijo)).map((t) => t.perfilId)).toEqual([idDos]);
+          expect((await repositorio.textosBuscables({ ciudadId: ciudadB, rubroId: rubroA })).filter((t) => t.nombreNegocio.startsWith(prefijo))).toEqual([]);
+        });
+
+        it("listarPorIds respeta el orden dado y omite las cuentas desactivadas y los ids que no existen", async () => {
+          const [uno, dos, tres, inactivo] = await Promise.all([usuarios.uno, usuarios.dos, usuarios.tres, usuarios.inactivo].map(perfilDe));
+
+          expect((await repositorio.listarPorIds([tres, inactivo, randomUUID(), uno, dos])).map((p) => p.id)).toEqual([tres, uno, dos]);
+          expect(await repositorio.listarPorIds([])).toEqual([]);
+        });
+
+        it("sin coincidencia exacta devuelve el perfil parecido y lo marca", async () => {
+          expect(await parecidos(`${prefijo} jabonez`)).toEqual({ usuarios: [usuarios.tres], similares: true, total: 1 });
+          expect(await parecidos(`${prefijo} maria floress tostdo`)).toMatchObject({ usuarios: [usuarios.dos], similares: true });
+        });
+
+        it("con una coincidencia exacta no muestra parecidos", async () => {
+          expect(await parecidos(`${prefijo} jabones`)).toEqual({ usuarios: [usuarios.tres], similares: false, total: 1 });
+        });
+
+        it("los parecidos también se combinan con la ciudad y el rubro con AND", async () => {
+          expect(await parecidos(`${prefijo} jabonez`, { ciudadId: ciudadA })).toMatchObject({ usuarios: [usuarios.tres], similares: true });
+          expect(await parecidos(`${prefijo} jabonez`, { ciudadId: ciudadB })).toEqual({ usuarios: [], similares: false, total: 0 });
+          expect(await parecidos(`${prefijo} jabonez`, { rubroId: rubroB })).toEqual({ usuarios: [], similares: false, total: 0 });
+        });
+
+        it("un producto oculto o de una cuenta desactivada no hace parecer a su dueña", async () => {
+          expect(await parecidos(`${prefijo} oculto`)).toMatchObject({ usuarios: [] });
+          expect(await parecidos(`${prefijo} desactivda`)).toMatchObject({ usuarios: [] });
+        });
+      });
     });
 
     it("pagina con un total estable", async () => {

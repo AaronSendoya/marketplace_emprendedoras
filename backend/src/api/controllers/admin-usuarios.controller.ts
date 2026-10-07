@@ -3,6 +3,7 @@ import type { ActualizarUsuarioUseCase } from "@/core/auth/application/Actualiza
 import type { AdminRestablecerPasswordUseCase } from "@/core/auth/application/AdminRestablecerPasswordUseCase";
 import type { CambiarEstadoUsuarioUseCase } from "@/core/auth/application/CambiarEstadoUsuarioUseCase";
 import type { CreateUsuarioUseCase, DatosNuevaCuenta } from "@/core/auth/application/CreateUsuarioUseCase";
+import type { EliminarCuentaUseCase } from "@/core/auth/application/EliminarCuentaUseCase";
 import type { GetUsuarioUseCase } from "@/core/auth/application/GetUsuarioUseCase";
 import type { ListUsuariosUseCase } from "@/core/auth/application/ListUsuariosUseCase";
 import type { CambiosUsuario, FiltrosUsuarios } from "@/core/auth/domain/Usuario";
@@ -39,6 +40,11 @@ export async function actualizarUsuario(
   cambios: CambiosUsuario,
 ): Promise<Response> {
   return ok(serializarUsuario(await usecase.ejecutar(adminId, usuarioId, cambios)));
+}
+
+// Regla 5: eliminar la cuenta por completo. La respuesta dice cuánto se eliminó junto con ella.
+export async function eliminarUsuario(usecase: EliminarCuentaUseCase, adminId: string, usuarioId: string, confirmacionEmail: string): Promise<Response> {
+  return ok(await usecase.ejecutar(adminId, usuarioId, confirmacionEmail));
 }
 
 export async function restablecerPasswordAdmin(

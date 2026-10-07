@@ -90,4 +90,10 @@ describe("respuestas de éxito", () => {
 
     expect(await respuesta.json()).toEqual({ datos: [{ id: 1 }], paginacion: { pagina: 2, limite: 20, total: 41 } });
   });
+
+  it("paginado agrega los campos propios del listado junto a datos y paginacion", async () => {
+    const respuesta = paginado({ datos: [], total: 0 }, { pagina: 1, limite: 20 }, { similares: true });
+
+    expect(await respuesta.json()).toEqual({ datos: [], paginacion: { pagina: 1, limite: 20, total: 0 }, similares: true });
+  });
 });

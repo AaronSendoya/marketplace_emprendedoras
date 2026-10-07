@@ -3,11 +3,12 @@ import type { ActualizarUsuarioUseCase } from "@/core/auth/application/Actualiza
 import type { AdminRestablecerPasswordUseCase } from "@/core/auth/application/AdminRestablecerPasswordUseCase";
 import type { CambiarEstadoUsuarioUseCase } from "@/core/auth/application/CambiarEstadoUsuarioUseCase";
 import type { CreateUsuarioUseCase } from "@/core/auth/application/CreateUsuarioUseCase";
+import type { EliminarCuentaUseCase } from "@/core/auth/application/EliminarCuentaUseCase";
 import type { GetUsuarioUseCase } from "@/core/auth/application/GetUsuarioUseCase";
 import type { ListUsuariosUseCase } from "@/core/auth/application/ListUsuariosUseCase";
 import type { Usuario } from "@/core/auth/domain/Usuario";
 import { usuarioDePrueba } from "@/core/auth/testing/dobles";
-import { actualizarUsuario, cambiarEstadoUsuario, crearUsuario, listarUsuarios, obtenerUsuario, restablecerPasswordAdmin } from "./admin-usuarios.controller";
+import { actualizarUsuario, cambiarEstadoUsuario, crearUsuario, eliminarUsuario, listarUsuarios, obtenerUsuario, restablecerPasswordAdmin } from "./admin-usuarios.controller";
 
 const conHash = (parches: Partial<Usuario> = {}) => usuarioDePrueba({ passwordHash: "hash-secreto", ...parches });
 
@@ -115,5 +116,21 @@ describe("controlador de cuentas del Admin", () => {
     expect(cuerpo.password_temporal).toBe("TempPass2026");
     expect(cuerpo.usuario).toMatchObject({ id: "usuario-1" });
     expect(JSON.stringify(cuerpo)).not.toContain("hash-secreto");
+  });
+
+  it("eliminarUsuario responde 200 con cuánto se eliminó y le pasa al caso de uso quién pide, qué cuenta y el correo escrito", async () => {
+    let recibido: unknown[] = [];
+    const usecase = {
+      ejecutar: async (...args: unknown[]) => {
+        recibido = args;
+        return { perfiles: 1, productos: 6, descuentos: 2, clics: 120, imagenes: 8 };
+      },
+    } as unknown as EliminarCuentaUseCase;
+
+    const respuesta = await eliminarUsuario(usecase, "admin-1", "usuario-1", "aaron@gmail.com");
+
+    expect(respuesta.status).toBe(200);
+    expect(recibido).toEqual(["admin-1", "usuario-1", "aaron@gmail.com"]);
+    expect(await respuesta.json()).toEqual({ perfiles: 1, productos: 6, descuentos: 2, clics: 120, imagenes: 8 });
   });
 });

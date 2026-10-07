@@ -14,6 +14,7 @@ export const PATCH = withErrorHandling(
       porcentaje: datos.porcentaje,
       fechaInicio: datos.fecha_inicio,
       fechaFin: datos.fecha_fin,
+      descripcion: datos.descripcion,
     });
   }),
 );

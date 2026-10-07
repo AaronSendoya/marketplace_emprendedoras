@@ -40,6 +40,16 @@ mysql -h HOST -u USUARIO -p BASE < backups/catalogo_....sql
 ```
 y bórralo apenas termines. El script no toca ninguna base por sí solo: restaurar es un paso consciente, no automático.
 
+## Antes de eliminar cuentas en producción
+
+Eliminar una cuenta desde el panel del Admin es irreversible (regla 5): borra el perfil, los productos, los descuentos, los clics y las imágenes, y no hay papelera. Por eso, **antes de eliminar en producción, corre un respaldo a mano**:
+
+```
+pnpm db:backup
+```
+
+Contra TiDB, pasa la cadena de conexión por la terminal, igual que para migrar (`docs/TIDB.md`, sección 4). **No hay respaldo automático** ni uno antes de cada eliminación: la decisión del cliente fue que sea manual. Si se elimina una cuenta por error, lo único que la recupera es restaurar el último respaldo (`pnpm db:restaurar`), y se pierde lo que cambió desde entonces. Las imágenes de R2 que se borraron con la cuenta **no** están en el respaldo de la base (solo trae sus claves): no se pueden recuperar.
+
 ## Pendiente
 
 - **Programarlo como tarea diaria** en Hostinger al desplegar (paso 16 del plan). Hasta entonces, córrelo a mano de vez en cuando, sobre todo antes de una migración.

@@ -66,6 +66,30 @@ describe("CreateDescuentoUseCase", () => {
     expect((await construir().crear.ejecutar(duena, { porcentaje: 10, fechaFin: "2026-01-31" })).estado).toBe("vencido");
   });
 
+  it("sin detalle queda en null; con detalle lo guarda recortado", async () => {
+    const { crear } = construir();
+
+    expect((await crear.ejecutar(duena, { porcentaje: 20 })).descripcion).toBeNull();
+    expect((await crear.ejecutar(duena, { porcentaje: 20, descripcion: "  Día de la Madre  " })).descripcion).toBe("Día de la Madre");
+  });
+
+  it("un detalle vacío o solo de espacios es lo mismo que no tenerlo", async () => {
+    const { crear } = construir();
+
+    expect((await crear.ejecutar(duena, { porcentaje: 20, descripcion: "   " })).descripcion).toBeNull();
+    expect((await crear.ejecutar(duena, { porcentaje: 20, descripcion: null })).descripcion).toBeNull();
+  });
+
+  it("un detalle de más de 280 caracteres da 400 y no crea nada", async () => {
+    const { crear, descuentos } = construir();
+
+    await expect(crear.ejecutar(duena, { porcentaje: 20, descripcion: "a".repeat(281) })).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(crear.ejecutar(duena, { porcentaje: 20, descripcion: "a".repeat(281) })).rejects.toMatchObject({ detalles: [{ campo: "descripcion" }] });
+
+    expect(descuentos.descuentos).toHaveLength(1);
+    expect((await crear.ejecutar(duena, { porcentaje: 20, descripcion: "a".repeat(280) })).descripcion).toHaveLength(280);
+  });
+
   it.each([0, -1, 100.5, 12.345])("un porcentaje inválido (%s) da 400", async (porcentaje) => {
     const { crear, descuentos } = construir();
 
@@ -125,6 +149,26 @@ describe("UpdateDescuentoUseCase (regla 8: no se borra, se termina con fecha_fin
     const editado = await editar.ejecutar(duena, creado.id, { fechaFin: null });
 
     expect(editado).toMatchObject({ fechaFin: null, estado: "vigente" });
+  });
+
+  it("cambia el detalle, lo quita con null o con texto vacío, y omitirlo no lo toca", async () => {
+    const { crear, editar } = construir();
+    const creado = await crear.ejecutar(duena, { porcentaje: 10, descripcion: "Primero" });
+
+    expect((await editar.ejecutar(duena, creado.id, { descripcion: "  Segundo  " })).descripcion).toBe("Segundo");
+    expect((await editar.ejecutar(duena, creado.id, { porcentaje: 12 })).descripcion).toBe("Segundo");
+    expect((await editar.ejecutar(duena, creado.id, { descripcion: "" })).descripcion).toBeNull();
+    await editar.ejecutar(duena, creado.id, { descripcion: "Otra vez" });
+    expect((await editar.ejecutar(duena, creado.id, { descripcion: null })).descripcion).toBeNull();
+  });
+
+  it("un detalle de más de 280 caracteres da 400 y deja el que ya tenía", async () => {
+    const { crear, editar } = construir();
+    const creado = await crear.ejecutar(duena, { porcentaje: 10, descripcion: "El de siempre" });
+
+    await expect(editar.ejecutar(duena, creado.id, { descripcion: "a".repeat(281) })).rejects.toMatchObject({ detalles: [{ campo: "descripcion" }] });
+
+    expect((await editar.ejecutar(duena, creado.id, { porcentaje: 11 })).descripcion).toBe("El de siempre");
   });
 
   it("el rango se valida con lo que quedaría guardado, no solo con lo enviado", async () => {

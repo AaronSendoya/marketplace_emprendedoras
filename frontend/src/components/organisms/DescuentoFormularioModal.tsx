@@ -4,11 +4,12 @@ import { CircleAlert } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, clasesBoton } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
+import { Textarea } from "@/components/atoms/Textarea";
 import { ConfirmModal } from "@/components/molecules/ConfirmModal";
 import { crearDescuentoAction, editarDescuentoAction, type EstadoFormularioDescuento } from "@/lib/admin/descuentos-acciones";
 import type { Descuento } from "@/lib/api/tipos";
 import { fechaParaInputLaPaz } from "@/lib/formato/fecha";
-import { errorPorcentajeDescuento } from "@/lib/validacion/producto";
+import { errorPorcentajeDescuento, LIMITES_DESCUENTO } from "@/lib/validacion/producto";
 
 // Alta y edición de un descuento. Por defecto son las acciones del Admin; el panel de la
 // Emprendedora pasa las suyas (mismo formulario y mismas validaciones, otra ruta a revalidar).
@@ -56,6 +57,10 @@ export function DescuentoFormularioModal({
   const [errorPorcentaje, setErrorPorcentaje] = useState<string | undefined>();
   const [tocadoPorcentaje, setTocadoPorcentaje] = useState(false);
 
+  // Cuántos caracteres lleva el detalle, para el contador `n/280`: el campo no es controlado (como el resto del
+  // formulario), así que solo se lleva la cuenta.
+  const [largoDetalle, setLargoDetalle] = useState(descuento?.descripcion?.length ?? 0);
+
   // Avisa antes de perder cambios sin guardar al cerrar por accidente (fondo, "Cancelar" o
   // Escape).
   const [sinGuardar, setSinGuardar] = useState(false);
@@ -79,6 +84,7 @@ export function DescuentoFormularioModal({
     if (abierto) {
       setErrorPorcentaje(undefined);
       setTocadoPorcentaje(false);
+      setLargoDetalle(descuento?.descripcion?.length ?? 0);
       setSinGuardar(false);
     }
   }
@@ -191,6 +197,32 @@ export function DescuentoFormularioModal({
                   disabled={pendiente}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="descripcion" className={CLASES_LABEL}>
+                Detalle (opcional)
+              </label>
+              <Textarea
+                id="descripcion"
+                name="descripcion"
+                rows={3}
+                maxLength={LIMITES_DESCUENTO.descripcionMax}
+                defaultValue={descuento?.descripcion ?? ""}
+                placeholder="Ej.: Día de la Madre, en toda la línea de tortas"
+                aria-describedby="descripcion-ayuda"
+                disabled={pendiente}
+                onChange={(evento) => setLargoDetalle(evento.currentTarget.value.length)}
+              />
+              <p id="descripcion-ayuda" className="flex items-start justify-between gap-3 font-cuerpo text-xs text-texto-secundario">
+                <span>Una nota para explicar de qué trata. Hasta {LIMITES_DESCUENTO.descripcionMax} caracteres.</span>
+                <span
+                  aria-hidden="true"
+                  className={`shrink-0 tabular-nums ${largoDetalle >= LIMITES_DESCUENTO.descripcionMax - 20 ? "font-medium text-acento" : ""}`.trim()}
+                >
+                  {largoDetalle}/{LIMITES_DESCUENTO.descripcionMax}
+                </span>
+              </p>
             </div>
 
             {estado.error && (

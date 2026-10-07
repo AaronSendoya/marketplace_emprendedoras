@@ -1,9 +1,15 @@
 import type { IPerfilRepository } from "@/core/perfiles/domain/IPerfilRepository";
 import { ErrorNoEncontrado } from "@/shared/domain/errors";
 import type { IClock } from "@/shared/domain/IClock";
-import type { Pagina, ParametrosPagina } from "@/shared/domain/Paginacion";
+import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
+import { ordenarPorSimilitud } from "../domain/BusquedaSimilar";
 import type { IProductoRepository } from "../domain/IProductoRepository";
 import type { FiltrosMarketplace, Producto } from "../domain/Producto";
+
+// `similares`: los productos no son coincidencias exactas del texto buscado sino parecidos (regla 21).
+export interface ResultadoProductos extends Pagina<Producto> {
+  similares: boolean;
+}
 
 // Feed 2 (público, regla 8): productos activos de cuentas activas, con el mayor descuento vigente
 // y el precio con descuento calculados al consultar, sin tareas programadas.
@@ -13,8 +19,19 @@ export class GetMarketplaceUseCase {
     private readonly clock: IClock,
   ) {}
 
-  ejecutar(filtros: FiltrosMarketplace, pagina: ParametrosPagina): Promise<Pagina<Producto>> {
-    return this.productos.listarMarketplace(this.clock.ahora(), filtros, pagina);
+  // Regla 21: con texto de búsqueda y ninguna coincidencia exacta, se devuelven los productos parecidos, con su
+  // descuento vigente. Con al menos una coincidencia exacta solo se devuelven las exactas: lo parecido nunca se mezcla
+  // con ellas.
+  async ejecutar(filtros: FiltrosMarketplace, pagina: ParametrosPagina): Promise<ResultadoProductos> {
+    const ahora = this.clock.ahora();
+    const exactos = await this.productos.listarMarketplace(ahora, filtros, pagina);
+    if (exactos.total > 0 || !filtros.q) return { ...exactos, similares: false };
+
+    const candidatos = await this.productos.textosBuscables({ perfilId: filtros.perfilId, ciudadId: filtros.ciudadId, rubroId: filtros.rubroId });
+    const ids = ordenarPorSimilitud(filtros.q, candidatos);
+    const desde = desplazamiento(pagina);
+    const datos = await this.productos.listarMarketplacePorIds(ahora, ids.slice(desde, desde + pagina.limite));
+    return { datos, total: ids.length, similares: ids.length > 0 };
   }
 }
 

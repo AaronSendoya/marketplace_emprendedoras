@@ -59,7 +59,7 @@ export interface FiltrosMarketplace {
   perfilId?: string;
   ciudadId?: string;
   rubroId?: string;
-  // Texto libre: se busca en el nombre y en la descripción.
+  // Texto libre (regla 21): se busca en el nombre del producto, en su descripción y en el nombre de su negocio.
   q?: string;
 }
 

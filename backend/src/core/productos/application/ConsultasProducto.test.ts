@@ -24,6 +24,82 @@ describe("consultas de productos (regla 18)", () => {
     expect(total).toBe(2);
   });
 
+  describe("búsqueda con resultados similares (regla 21)", () => {
+    const base = productoDePrueba().perfil;
+    const repoConTexto = () =>
+      new ProductoRepositoryEnMemoria([
+        productoDePrueba({ id: "torta", nombre: "Torta de chocolate", descripcion: "Con cobertura" }),
+        productoDePrueba({
+          id: "cafe",
+          nombre: "Café molido",
+          descripcion: "Grano de los Yungas",
+          perfil: { ...base, id: "perfil-2", nombreNegocio: "Café Andino", ciudad: { id: "ciudad-2", nombre: "Cochabamba" } },
+        }),
+        productoDePrueba({ id: "oculto", nombre: "Torta oculta", activo: false }),
+        productoDePrueba({ id: "desactivada", nombre: "Torta de cuenta desactivada", perfil: inactiva }),
+      ]);
+    const buscar = (q: string, filtros: { ciudadId?: string } = {}, pagina = { pagina: 1, limite: 20 }) =>
+      new GetMarketplaceUseCase(repoConTexto(), clock).ejecutar({ q, ...filtros }, pagina);
+
+    it("con una coincidencia exacta devuelve solo las exactas, sin marcarlas como parecidas", async () => {
+      const resultado = await buscar("torta");
+
+      expect(resultado.datos.map((p) => p.id)).toEqual(["torta"]);
+      expect(resultado.similares).toBe(false);
+    });
+
+    it("busca también en el nombre del negocio", async () => {
+      expect((await buscar("andino")).datos.map((p) => p.id)).toEqual(["cafe"]);
+      expect((await buscar("dulces de ana")).datos.map((p) => p.id)).toEqual(["torta"]);
+    });
+
+    it("sin ninguna coincidencia exacta devuelve los productos parecidos y lo dice", async () => {
+      const resultado = await buscar("trota");
+
+      expect(resultado.datos.map((p) => p.id)).toEqual(["torta"]);
+      expect(resultado.total).toBe(1);
+      expect(resultado.similares).toBe(true);
+    });
+
+    it("encuentra un producto, una descripción y un negocio mal escritos", async () => {
+      expect((await buscar("cafee")).datos.map((p) => p.id)).toEqual(["cafe"]);
+      expect((await buscar("cobertura de chocolte")).datos.map((p) => p.id)).toEqual(["torta"]);
+      expect((await buscar("dulses de ana")).datos.map((p) => p.id)).toEqual(["torta"]);
+    });
+
+    it("no devuelve productos ocultos ni de cuentas desactivadas (regla 18)", async () => {
+      expect((await buscar("ocultaa")).datos).toEqual([]);
+      expect((await buscar("desactivda")).datos).toEqual([]);
+    });
+
+    it("respeta la ciudad: un parecido de otra ciudad no aparece", async () => {
+      expect((await buscar("cafee", { ciudadId: "ciudad-1" })).datos).toEqual([]);
+      expect((await buscar("cafee", { ciudadId: "ciudad-2" })).datos.map((p) => p.id)).toEqual(["cafe"]);
+    });
+
+    it("sin parecidos responde vacío y sin marcar como parecidos", async () => {
+      expect(await buscar("zapatos")).toEqual({ datos: [], total: 0, similares: false });
+    });
+
+    it("pagina los parecidos y el total es el de todos", async () => {
+      const repositorio = new ProductoRepositoryEnMemoria(
+        ["a", "b", "c"].map((letra) => productoDePrueba({ id: letra, nombre: `Tortas ${letra}`, descripcion: null })),
+      );
+
+      const segunda = await new GetMarketplaceUseCase(repositorio, clock).ejecutar({ q: "trotas" }, { pagina: 2, limite: 2 });
+
+      expect(segunda.datos.map((p) => p.id)).toEqual(["c"]);
+      expect(segunda.total).toBe(3);
+      expect(segunda.similares).toBe(true);
+    });
+
+    it("sin texto de búsqueda no intenta nada parecido", async () => {
+      const resultado = await new GetMarketplaceUseCase(repoConTexto(), clock).ejecutar({ ciudadId: "ciudad-1" }, { pagina: 1, limite: 20 });
+
+      expect(resultado.similares).toBe(false);
+    });
+  });
+
   it("el detalle de un producto inactivo, de una cuenta desactivada o inexistente da 404", async () => {
     const usecase = new GetProductoMarketplaceUseCase(repo(), clock);
 

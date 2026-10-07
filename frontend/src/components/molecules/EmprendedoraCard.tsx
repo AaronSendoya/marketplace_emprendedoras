@@ -1,75 +1,68 @@
-import Image from "next/image";
+import { ArrowRight, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/atoms/Badge";
-import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
+import { clasesBoton } from "@/components/atoms/Button";
+import { PortadaEmprendedora } from "@/components/molecules/PortadaEmprendedora";
 import { SocialLinks } from "@/components/molecules/SocialLinks";
 import type { Perfil } from "@/lib/api/tipos";
 import { CLASES_FOCO_ENLACE } from "@/lib/estilos";
-import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
 
 interface PropsEmprendedoraCard {
   perfil: Perfil;
+  // Es un resultado parecido al texto buscado y no una coincidencia exacta (regla 20): lleva una línea naranja en el
+  // borde inferior, la misma que explica `AvisoResultadosSimilares`.
+  similar?: boolean;
 }
 
-// Collage de perfil (CLAUDE.md sección 6, regla 9; composición en docs/PLAN_IMPLEMENTACION_FRONTEND.md
-// sección 6.4): la foto ocupa toda la cabecera y el logo se superpone en un círculo sobre la
-// esquina inferior izquierda. foto_perfil_url y logo_url siempre existen (NOT NULL, regla 11
-// backend), así que el mismo patrón vale con las imágenes predeterminadas, sin caso especial.
-export function EmprendedoraCard({ perfil }: PropsEmprendedoraCard) {
-  const fotoUsable = esUrlDeImagenUsable(perfil.foto_perfil_url);
-  const logoUsable = esUrlDeImagenUsable(perfil.logo_url);
-
+// Card de una emprendedora: la identidad del negocio (CLAUDE.md sección 6, regla 14, punto b; rediseño del 2026-10-07).
+// Portada con la foto, el logo grande superpuesto y, a su lado, el nombre del emprendimiento como lo más importante; debajo,
+// quién es, dónde está, su rubro y una descripción de hasta 3 líneas; al pie, «Ver perfil» y los contactos que existan
+// (`SocialLinks` no dibuja nada de lo que no tiene dato, y «Ver perfil» ocupa el espacio que quede). La portada es el único
+// tramo con estado (el visor de imágenes). `@container`: el logo y el pie se ajustan al ancho de la tarjeta y no al de
+// la pantalla. `h-full` + `mt-auto` en el pie: las tarjetas de una fila miden lo mismo y sus botones quedan alineados.
+export function EmprendedoraCard({ perfil, similar = false }: PropsEmprendedoraCard) {
   return (
-    <article className="overflow-hidden rounded-lg border border-borde bg-superficie">
-      <div className="relative aspect-[4/3] bg-borde">
-        {fotoUsable ? (
-          <Image
-            src={perfil.foto_perfil_url}
-            alt={perfil.nombre_negocio}
-            fill
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            className="object-cover"
-          />
-        ) : (
-          <MarcadorImagen etiqueta={perfil.nombre_negocio} className="h-full w-full" />
-        )}
+    <article className="group @container flex h-full flex-col overflow-hidden rounded-superficie border border-borde bg-superficie shadow-tarjeta transition-[translate,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-borde-fuerte hover:shadow-tarjeta-hover motion-reduce:transition-none">
+      <PortadaEmprendedora fotoUrl={perfil.foto_perfil_url} logoUrl={perfil.logo_url} nombre={perfil.nombre_negocio} />
 
-        <div className="absolute bottom-0 left-4 h-14 w-14 translate-y-1/2 overflow-hidden rounded-full border-2 border-superficie bg-superficie">
-          {logoUsable ? (
-            <Image src={perfil.logo_url} alt={`Logo de ${perfil.nombre_negocio}`} fill className="object-cover" />
-          ) : (
-            <MarcadorImagen etiqueta={`Logo de ${perfil.nombre_negocio}`} className="h-full w-full" />
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-3 p-4 pt-10">
-        <div>
-          <h2 className="font-titulo text-lg font-bold text-texto">{perfil.nombre_negocio}</h2>
-          <p className="font-cuerpo text-sm text-texto-secundario">{perfil.emprendedora}</p>
+      <div className="flex flex-1 flex-col gap-3 px-5 pt-3.5 pb-5">
+        {/* A la altura del logo (que ocupa su mitad inferior), el nombre y la persona van a su derecha. */}
+        <div className="min-h-[2.875rem] pl-[5.75rem] @min-[22rem]:pl-[6.75rem]">
+          <h2 className="font-titulo text-[1.1875rem] leading-tight font-extrabold tracking-tight text-texto @min-[22rem]:text-xl">
+            <Link href={`/emprendedoras/${perfil.id}`} className={`break-words hover:underline hover:underline-offset-4 ${CLASES_FOCO_ENLACE}`}>
+              {perfil.nombre_negocio}
+              {similar && <span className="sr-only"> (resultado similar)</span>}
+            </Link>
+          </h2>
+          <p className="mt-0.5 font-cuerpo text-sm text-texto-secundario">Por {perfil.emprendedora}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge>{perfil.ciudad.nombre}</Badge>
-          <Badge>{perfil.rubro.nombre}</Badge>
+          <Badge variante="ciudad" icono={<MapPin size={13} strokeWidth={1.75} />}>
+            {perfil.ciudad.nombre}
+          </Badge>
+          <Badge variante="rubro">{perfil.rubro.nombre}</Badge>
         </div>
 
-        <p className="line-clamp-2 font-cuerpo text-sm text-texto-secundario">{perfil.descripcion}</p>
+        <p className="line-clamp-3 font-cuerpo text-[0.9rem] leading-relaxed text-texto-secundario">{perfil.descripcion}</p>
+      </div>
 
+      <div className="mt-auto flex items-center gap-2 border-t border-borde px-5 py-3.5">
+        <Link href={`/emprendedoras/${perfil.id}`} className={clasesBoton("primario", "min-w-0 flex-1 group/ver", "tarjeta")}>
+          Ver perfil
+          <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" className="transition-transform duration-150 group-hover/ver:translate-x-0.5 motion-reduce:transition-none" />
+        </Link>
         <SocialLinks
           perfilId={perfil.id}
           whatsapp={perfil.whatsapp}
           instagramUsername={perfil.instagram_username}
           otraRedSocial={perfil.otra_red_social}
+          nombreNegocio={perfil.nombre_negocio}
+          variante="tarjeta"
         />
-
-        <Link
-          href={`/emprendedoras/${perfil.id}`}
-          className={`inline-block font-cuerpo text-sm font-medium text-acento transition-colors hover:text-acento-hover ${CLASES_FOCO_ENLACE}`}
-        >
-          Ver perfil
-        </Link>
       </div>
+
+      {similar && <span aria-hidden="true" className="h-[3px] shrink-0 bg-marca" />}
     </article>
   );
 }

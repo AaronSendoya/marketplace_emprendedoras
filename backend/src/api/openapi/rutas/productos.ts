@@ -2,7 +2,7 @@ import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { esquemaPaginacion } from "@/api/http/paginacion";
 import { esPrecioValido, PRECIO_MAXIMO } from "@/core/productos/domain/Producto";
-import { AUTENTICADO, esquemaPagina, PUBLICO, respuestasDeError } from "../componentes";
+import { AUTENTICADO, esquemaPagina, EsquemaPaginacion, PUBLICO, respuestasDeError } from "../componentes";
 
 const booleanoTexto = z.enum(["true", "false"]).transform((valor) => valor === "true");
 const MENSAJE_PRECIO = "El precio debe ser 0 o más, con hasta 2 decimales.";
@@ -57,7 +57,16 @@ const filtrosFeed = {
   perfil_id: z.uuid().optional(),
   ciudad_id: z.uuid().optional(),
   rubro_id: z.uuid().optional(),
-  q: z.string().trim().min(1).max(100).optional().meta({ description: "Texto a buscar en el nombre y la descripción." }),
+  q: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional()
+    .meta({
+      description:
+        "Texto a buscar (regla 21). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del producto, su descripción o el nombre de su negocio; no hace falta que sea en el mismo campo ni en ese orden. Sin distinguir mayúsculas ni acentos. Se combina con ciudad_id, rubro_id y perfil_id con AND. Si no hay ninguna coincidencia exacta, se devuelven los productos parecidos, que toleran errores de tipeo (`dulses` encuentra `Dulces`), y la respuesta lo indica con `similares: true`.",
+    }),
 };
 export const EsquemaMarketplaceQuery = esquemaPaginacion.extend(filtrosFeed);
 export const EsquemaMisProductosQuery = esquemaPaginacion;
@@ -111,6 +120,18 @@ export const EsquemaProductoPropio = z
 // objeto distinto pero el mismo id rompería la generación del documento.
 export const EsquemaMisProductosPagina = esquemaPagina(EsquemaProductoPropio, "MisProductosPagina");
 
+// `GET /marketplace/productos`: la página de siempre más `similares` (regla 21).
+const EsquemaProductosPagina = z
+  .object({
+    datos: z.array(EsquemaProductoPublico),
+    paginacion: EsquemaPaginacion,
+    similares: z.boolean().meta({
+      description:
+        "`true` cuando `q` no tuvo ninguna coincidencia exacta y `datos` son productos parecidos (regla 21); `false` en cualquier otro caso. Los parecidos nunca se mezclan con las coincidencias exactas.",
+    }),
+  })
+  .meta({ id: "ProductosPagina" });
+
 // Solo documentación: describe las partes del formulario, incluido el archivo.
 const EsquemaCrearProductoMultipart = z.object({
   perfil_id: z.string().optional().meta({ description: "Solo Admin: perfil al que pertenece el producto. Una emprendedora usa el suyo." }),
@@ -138,7 +159,7 @@ export function registrarProductos(registro: OpenAPIRegistry): void {
     security: PUBLICO,
     request: { query: EsquemaMarketplaceQuery },
     responses: {
-      200: { description: "Página de productos.", content: { "application/json": { schema: esquemaPagina(EsquemaProductoPublico, "ProductosPagina") } } },
+      200: { description: "Página de productos.", content: { "application/json": { schema: EsquemaProductosPagina } } },
       ...respuestasDeError("VALIDACION"),
     },
   });

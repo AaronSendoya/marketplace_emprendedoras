@@ -1,5 +1,5 @@
-import { actualizarJsonAutenticado, enviarJsonAutenticado, obtenerJsonAutenticado } from "./cliente";
-import type { FiltrosUsuarios, Pagina, Usuario, UsuarioCreado } from "./tipos";
+import { actualizarJsonAutenticado, eliminarJsonAutenticado, enviarJsonAutenticado, obtenerJsonAutenticado } from "./cliente";
+import type { CuentaEliminada, FiltrosUsuarios, Pagina, Usuario, UsuarioCreado } from "./tipos";
 
 // GET /admin/usuarios: todas las cuentas (Admin y Emprendedor), paginadas, las más recientes
 // primero. Admite buscar por texto libre (nombres, apellidos y correo) y filtrar por estado
@@ -31,6 +31,10 @@ export const crearUsuario = (datos: DatosNuevaCuenta) => enviarJsonAutenticado<U
 // impone igual.
 export const cambiarEstadoUsuario = (id: string, activo: boolean) =>
   actualizarJsonAutenticado<Usuario>(`/admin/usuarios/${id}/estado`, { activo });
+
+// Regla 5: elimina la cuenta por completo (solo una de Emprendedor activa). `confirmacionEmail` es el correo escrito por el Admin.
+export const eliminarUsuario = (id: string, confirmacionEmail: string) =>
+  eliminarJsonAutenticado<CuentaEliminada>(`/admin/usuarios/${id}`, { confirmacion_email: confirmacionEmail });
 
 export interface DatosEditarCuenta {
   email?: string;

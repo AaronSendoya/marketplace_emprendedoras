@@ -6,6 +6,7 @@ function iniciales(nombreCompleto: string): string {
 }
 
 const POR_TAMANO = {
+  xs: "h-7 w-7 text-xs",
   sm: "h-8 w-8 text-xs",
   md: "h-10 w-10 text-sm",
   lg: "h-11 w-11 text-sm",

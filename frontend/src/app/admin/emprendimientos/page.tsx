@@ -1,9 +1,10 @@
-import { ChevronRight, Plus, Store } from "lucide-react";
+import { ChevronRight, FileSpreadsheet, Plus, Store } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/atoms/Avatar";
 import { Badge } from "@/components/atoms/Badge";
+import { clasesBoton } from "@/components/atoms/Button";
 import { EstadoVacio } from "@/components/molecules/EstadoVacio";
 import { Paginador } from "@/components/molecules/Paginador";
 import { EncabezadoPaginaAdmin } from "@/components/organisms/EncabezadoPaginaAdmin";
@@ -113,6 +114,12 @@ export default async function PaginaEmprendimientos({ searchParams }: PageProps<
               </span>
             )}
           </>
+        }
+        acciones={
+          <Link href="/admin/emprendimientos/importar" className={clasesBoton("secundario", "min-h-11 w-full sm:w-auto lg:min-h-0")}>
+            <FileSpreadsheet size={16} strokeWidth={1.75} aria-hidden="true" />
+            Importar desde Excel
+          </Link>
         }
       />
 

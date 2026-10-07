@@ -4,7 +4,7 @@ import { Handshake, Percent, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { clasesBoton } from "@/components/atoms/Button";
-import { CLASES_FOCO_ENLACE } from "@/lib/estilos";
+import { CLASES_FOCO_CONTROL } from "@/lib/estilos";
 
 const CARACTERISTICAS = [
   { Icono: Users, verbo: "Conoce", sustantivo: "emprendedoras" },
@@ -39,6 +39,11 @@ function leerVistoServidor(): boolean {
 }
 
 // Un h2, no un h1: el Hero de la página ya tiene el suyo.
+//
+// Aspecto (CLAUDE.md sección 6, regla 14, aprobado con el boceto del 2026-10-05): el fondo es un oscuro plano
+// (`bg-texto/60`), ya no el vidrio esmerilado con degradado de antes, que era el sello de un diseño genérico. La
+// ventana es una superficie blanca con borde y la sombra de los modales, e icono en fichas de naranja tenue. Entra
+// con un desvanecimiento y un ascenso corto; `prefers-reduced-motion` lo desactiva (regla 6).
 export function ModalBienvenida() {
   const yaVistoEnSesion = useSyncExternalStore(suscribirse, leerVistoCliente, leerVistoServidor);
   const [cerrado, setCerrado] = useState(false);
@@ -78,39 +83,32 @@ export function ModalBienvenida() {
   if (!abierto) return null;
 
   return (
-    <div
-      // Vidrio esmerilado (pedido explícito): desenfoca lo que queda detrás (`backdrop-blur`) en
-      // vez de taparlo con un color plano, con un degradado sutil encima — solo el neutro `texto`
-      // en distintas opacidades, sin un color de marca de adorno (regla 2, sección 6: los tres
-      // colores tienen un rol fijo, nunca decorativo).
-      className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-texto/75 via-texto/45 to-texto/75 p-4 backdrop-blur-sm"
-      onClick={() => setCerrado(true)}
-    >
+    <div className="fixed inset-0 z-50 flex animate-aparecer items-center justify-center bg-texto/60 p-4" onClick={() => setCerrado(true)}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="titulo-bienvenida"
         onClick={(evento) => evento.stopPropagation()}
-        className="relative max-h-[calc(100vh-2rem)] w-full max-w-md space-y-6 overflow-y-auto rounded-lg bg-superficie p-8 text-center shadow-lg sm:max-w-lg"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md animate-modal space-y-6 overflow-y-auto rounded-2xl border border-borde bg-superficie px-6 pt-9 pb-7 text-center shadow-modal sm:max-w-[30rem] sm:px-8"
       >
         <button
           ref={cerrarRef}
           type="button"
           onClick={() => setCerrado(true)}
           aria-label="Cerrar"
-          className={`absolute top-4 right-4 text-texto-secundario transition-colors hover:text-acento ${CLASES_FOCO_ENLACE}`}
+          className={`absolute top-3.5 right-3.5 flex h-9 w-9 items-center justify-center rounded-lg text-texto-secundario transition-colors hover:bg-fondo hover:text-texto ${CLASES_FOCO_CONTROL}`}
         >
-          <X size={20} strokeWidth={1.5} />
+          <X size={20} strokeWidth={1.75} />
         </button>
 
-        <div className="space-y-2">
-          <h2 id="titulo-bienvenida" className="font-titulo text-2xl font-extrabold text-texto">
+        <div className="space-y-3">
+          <h2 id="titulo-bienvenida" className="font-titulo text-[1.75rem] leading-tight font-extrabold text-texto">
             ¡Bienvenidas!
           </h2>
-          <p className="font-cuerpo text-sm text-texto-secundario">
+          <p className="font-cuerpo text-[0.9375rem] text-texto-secundario">
             Gracias por ser parte del <span className="font-semibold text-acento">Track de Mujeres</span>.
           </p>
-          <p className="font-cuerpo text-sm text-texto-secundario">
+          <p className="font-cuerpo text-[0.9375rem] leading-relaxed text-texto-secundario">
             Este es un espacio creado para que puedas conocer a otras emprendedoras, descubrir sus negocios,
             acceder a beneficios especiales y generar nuevas conexiones dentro de nuestra comunidad.
           </p>
@@ -118,19 +116,19 @@ export function ModalBienvenida() {
 
         <div className="grid grid-cols-3 gap-3">
           {CARACTERISTICAS.map(({ Icono, verbo, sustantivo }) => (
-            <div key={sustantivo} className="flex flex-col items-center gap-1.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-acento-suave text-acento">
-                <Icono size={20} strokeWidth={1.5} aria-hidden="true" />
+            <div key={sustantivo} className="flex flex-col items-center gap-2">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-enfasis-borde bg-enfasis-suave text-marca">
+                <Icono size={20} strokeWidth={1.75} aria-hidden="true" />
               </div>
-              <p className="font-cuerpo text-xs leading-tight">
-                <span className="block font-bold text-acento">{verbo}</span>
+              <p className="font-cuerpo text-[0.8125rem] leading-tight">
+                <span className="block font-bold text-texto">{verbo}</span>
                 <span className="block text-texto-secundario">{sustantivo}</span>
               </p>
             </div>
           ))}
         </div>
 
-        <Link href="/emprendedoras" className={clasesBoton("primario", "w-full")} onClick={() => setCerrado(true)}>
+        <Link href="/emprendedoras" className={clasesBoton("primario", "w-full", "grande")} onClick={() => setCerrado(true)}>
           Explorar la comunidad
         </Link>
       </div>

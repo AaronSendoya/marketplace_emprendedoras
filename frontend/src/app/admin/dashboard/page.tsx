@@ -6,8 +6,11 @@ import { EncabezadoPaginaAdmin } from "@/components/organisms/EncabezadoPaginaAd
 import { EncabezadoSeccionAdmin } from "@/components/organisms/EncabezadoSeccionAdmin";
 import { GraficoInteraccion } from "@/components/organisms/dashboard/GraficoInteraccion";
 import { GraficoRubros } from "@/components/organisms/dashboard/GraficoRubros";
+import { ConcentracionClics } from "@/components/organisms/dashboard/ConcentracionClics";
 import { LeyendaCanales } from "@/components/organisms/dashboard/LeyendaCanales";
+import { MovimientoMensual } from "@/components/organisms/dashboard/MovimientoMensual";
 import { PesoPorCanal } from "@/components/organisms/dashboard/PesoPorCanal";
+import { PodioEmprendimientos } from "@/components/organisms/dashboard/PodioEmprendimientos";
 import { SelectorPeriodo } from "@/components/organisms/dashboard/SelectorPeriodo";
 import { SelectorTopRanking } from "@/components/organisms/dashboard/SelectorTopRanking";
 import { TablaCalorPerfiles } from "@/components/organisms/dashboard/TablaCalorPerfiles";
@@ -18,7 +21,10 @@ import { obtenerClicsPorRubro, obtenerMapaCalorClics, obtenerResumenClics, obten
 import { haySesion } from "@/lib/auth/sesion";
 import { CLASES_PANEL_ADMIN } from "@/lib/estilos";
 import { COLOR_ENFASIS, COLOR_SECUNDARIO } from "@/lib/graficos/colores";
-import { ETIQUETA_ORDEN, ORDEN_MAPA_CALOR_POR_DEFECTO, ORDENES_MAPA_CALOR } from "@/lib/metricas/mapaCalor";
+import { obtenerIdentidades } from "@/lib/metricas/identidad";
+import { ETIQUETA_ORDEN, ORDEN_MAPA_CALOR_POR_DEFECTO, ORDENES_MAPA_CALOR, UNIDAD_POR_GRANULARIDAD } from "@/lib/metricas/mapaCalor";
+import { mesesParaMovimiento } from "@/lib/metricas/mes";
+import { calcularMovimiento, LIMITE_TOP_MENSUAL } from "@/lib/metricas/movimiento";
 import { etiquetaRangoCorto, hoyLaPaz, resolverRangoConAnterior, TOPE_RANKING_POR_DEFECTO } from "@/lib/metricas/rango";
 import { calcularTendencia } from "@/lib/metricas/tendencia";
 import type { OrdenMapaCalor } from "@/lib/api/tipos";
@@ -66,6 +72,8 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
 
   const hoy = hoyLaPaz();
   const { actual, anterior } = resolverRangoConAnterior(desdeParametro, hastaParametro);
+  // El movimiento mensual no sigue al selector de período: siempre el último mes completo frente al anterior.
+  const meses = mesesParaMovimiento(hoy);
 
   let emprendedorasActivas = 0;
   let resumenClics = { whatsapp: 0, instagram: 0 };
@@ -74,8 +82,10 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
   let serie: Awaited<ReturnType<typeof obtenerSerieClics>> = [];
   let serieAnterior: Awaited<ReturnType<typeof obtenerSerieClics>> = [];
   let porRubro: Awaited<ReturnType<typeof obtenerClicsPorRubro>> = [];
+  let mapaDelMes: Awaited<ReturnType<typeof obtenerMapaCalorClics>> | null = null;
+  let mapaDelMesAnterior: Awaited<ReturnType<typeof obtenerMapaCalorClics>> | null = null;
   try {
-    const [{ datos }, resumen, resumenPrevio, mapa, serieClics, serieClicsPrevia, clicsPorRubro] = await Promise.all([
+    const [{ datos }, resumen, resumenPrevio, mapa, serieClics, serieClicsPrevia, clicsPorRubro, mapaMes, mapaMesAnterior] = await Promise.all([
       listarUsuarios({ estado: "activo", pagina: 1, limite: 100 }),
       obtenerResumenClics(actual),
       obtenerResumenClics(anterior),
@@ -83,6 +93,8 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
       obtenerSerieClics(actual),
       obtenerSerieClics(anterior),
       obtenerClicsPorRubro(actual),
+      obtenerMapaCalorClics(LIMITE_TOP_MENSUAL, { desde: meses.mes.desde, hasta: meses.mes.hasta }, "total"),
+      obtenerMapaCalorClics(LIMITE_TOP_MENSUAL, { desde: meses.anterior.desde, hasta: meses.anterior.hasta }, "total"),
     ]);
     emprendedorasActivas = datos.filter((usuario) => usuario.rol === "Emprendedor").length;
     resumenClics = resumen;
@@ -91,6 +103,8 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
     serie = serieClics;
     serieAnterior = serieClicsPrevia;
     porRubro = clicsPorRubro;
+    mapaDelMes = mapaMes;
+    mapaDelMesAnterior = mapaMesAnterior;
   } catch (error) {
     if (error instanceof ErrorApi && error.status === 401) redirect("/iniciar-sesion");
     throw error;
@@ -99,6 +113,21 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
   // El período anterior solo se superpone si tuvo clics: con cero no hay base honesta para comparar (el
   // mismo criterio de `calcularTendencia`) y una línea plana sobre el eje no dice nada.
   const hayAnterior = resumenAnterior.whatsapp + resumenAnterior.instagram > 0;
+
+  // Los clics del período del mismo tipo que el orden elegido: la base de la concentración del podio.
+  const totalDelOrden = orden === "total" ? resumenClics.whatsapp + resumenClics.instagram : resumenClics[orden];
+
+  // Movimiento mensual: necesita clics en los dos meses para comparar (regla 13, sección 5 del CLAUDE.md).
+  const filasDelMes = mapaDelMes?.filas ?? [];
+  const filasDelMesAnterior = mapaDelMesAnterior?.filas ?? [];
+  const hayMovimiento = filasDelMes.length > 0 && filasDelMesAnterior.length > 0;
+  const movimiento = calcularMovimiento(filasDelMes, filasDelMesAnterior);
+
+  // Quién es cada emprendimiento del ranking y del movimiento (emprendedora, rubro, ciudad). Si la lista
+  // pública de perfiles no responde, el ranking se muestra igual, solo con el nombre del negocio.
+  const identidades = await obtenerIdentidades([
+    ...new Set([...(mapaCalor?.filas ?? []), ...filasDelMes, ...filasDelMesAnterior].map((fila) => fila.perfil_id)),
+  ]);
 
   return (
     <div className="space-y-10">
@@ -181,17 +210,54 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
           descripcion={`Clics a WhatsApp e Instagram de cada emprendimiento, ordenados por ${ETIQUETA_ORDEN[orden]}.`}
           acciones={<SelectorTopRanking valor={top} />}
         />
-        <div className={`${CLASES_PANEL_ADMIN} p-4 sm:p-6`}>
-          {!mapaCalor || mapaCalor.filas.length === 0 ? (
+        {!mapaCalor || mapaCalor.filas.length === 0 ? (
+          <div className={`${CLASES_PANEL_ADMIN} p-4 sm:p-6`}>
             <EstadoVacio
               icono={BarChart3}
               titulo="Todavía no hay datos"
               descripcion="Se mostrará acá en cuanto el catálogo registre los clics a WhatsApp e Instagram."
             />
-          ) : (
-            <TablaCalorPerfiles mapa={mapaCalor} orden={orden} totalPeriodo={resumenClics.whatsapp + resumenClics.instagram} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            {/* El podio y la concentración van en un mismo panel; la tabla, en otro (regla 13, sección 5 del CLAUDE.md). */}
+            <div className={`${CLASES_PANEL_ADMIN} overflow-hidden`}>
+              <PodioEmprendimientos
+                filas={mapaCalor.filas.slice(0, 3)}
+                identidades={identidades}
+                orden={orden}
+                unidad={UNIDAD_POR_GRANULARIDAD[mapaCalor.granularidad]}
+              />
+              <ConcentracionClics filas={mapaCalor.filas} orden={orden} totalDelOrden={totalDelOrden} />
+            </div>
+            <div className={`${CLASES_PANEL_ADMIN} p-4 sm:p-6`}>
+              <TablaCalorPerfiles
+                mapa={mapaCalor}
+                orden={orden}
+                totalPeriodo={resumenClics.whatsapp + resumenClics.instagram}
+                identidades={identidades}
+              />
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="space-y-5">
+        <EncabezadoSeccionAdmin
+          titulo="Movimiento frente al mes anterior"
+          descripcion={`${meses.mes.etiqueta.charAt(0).toUpperCase()}${meses.mes.etiqueta.slice(1)} frente a ${meses.anterior.etiqueta}: quiénes ganaron y quiénes perdieron más clics.`}
+        />
+        {hayMovimiento ? (
+          <MovimientoMensual movimiento={movimiento} identidades={identidades} />
+        ) : (
+          <div className={`${CLASES_PANEL_ADMIN} p-4 sm:p-6`}>
+            <EstadoVacio
+              icono={BarChart3}
+              titulo="Todavía no hay con qué comparar"
+              descripcion={`Se mostrará acá cuando haya clics en ${meses.mes.etiqueta} y en ${meses.anterior.etiqueta}.`}
+            />
+          </div>
+        )}
       </section>
 
       {/* Estas dos secciones van directo sobre el fondo, sin caja (regla 13, nivel 1 de superficie). */}

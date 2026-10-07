@@ -65,7 +65,7 @@ describe("lista blanca de campos de cada respuesta (caja blanca)", () => {
   it("descuento: sin el id de la cuenta dueña", () => {
     const cuerpo = serializarDescuento({ ...descuentoDePrueba({ perfilUsuarioId: "CENTINELA_USUARIO" }), estado: "vigente" });
 
-    expect(claves(cuerpo)).toEqual(["creado_en", "estado", "fecha_fin", "fecha_inicio", "id", "perfil_id", "porcentaje", "producto_ids"].sort());
+    expect(claves(cuerpo)).toEqual(["creado_en", "descripcion", "estado", "fecha_fin", "fecha_inicio", "id", "perfil_id", "porcentaje", "producto_ids"].sort());
     expect(JSON.stringify(cuerpo)).not.toContain("CENTINELA_USUARIO");
   });
 });

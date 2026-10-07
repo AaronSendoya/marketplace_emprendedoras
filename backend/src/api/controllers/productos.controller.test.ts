@@ -61,12 +61,21 @@ describe("serializarProductoPropio", () => {
 
 describe("controlador de productos", () => {
   it("listarMarketplace responde la página con la paginación", async () => {
-    const usecase = { ejecutar: async () => ({ datos: [productoDePrueba()], total: 7 }) } as unknown as GetMarketplaceUseCase;
+    const usecase = { ejecutar: async () => ({ datos: [productoDePrueba()], total: 7, similares: false }) } as unknown as GetMarketplaceUseCase;
 
     const cuerpo = await listarMarketplace(usecase, {}, { pagina: 3, limite: 1 }, url).then((r) => r.json());
 
     expect(cuerpo.paginacion).toEqual({ pagina: 3, limite: 1, total: 7 });
     expect(cuerpo.datos[0].id).toBe("producto-1");
+    expect(cuerpo.similares).toBe(false);
+  });
+
+  it("listarMarketplace dice cuándo los productos son parecidos y no coincidencias exactas (regla 21)", async () => {
+    const usecase = { ejecutar: async () => ({ datos: [productoDePrueba()], total: 1, similares: true }) } as unknown as GetMarketplaceUseCase;
+
+    const cuerpo = await listarMarketplace(usecase, { q: "tortta" }, { pagina: 1, limite: 20 }, url).then((r) => r.json());
+
+    expect(cuerpo.similares).toBe(true);
   });
 
   it("desactivarProducto responde 204 sin cuerpo", async () => {

@@ -20,6 +20,7 @@ export function serializarDescuento(descuento: DescuentoConEstado) {
     porcentaje: descuento.porcentaje,
     fecha_inicio: descuento.fechaInicio ? descuento.fechaInicio.toISOString() : null,
     fecha_fin: descuento.fechaFin ? descuento.fechaFin.toISOString() : null,
+    descripcion: descuento.descripcion,
     estado: descuento.estado,
     producto_ids: descuento.productoIds,
     creado_en: descuento.creadoEn.toISOString(),

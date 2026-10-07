@@ -26,6 +26,24 @@ export const EsquemaCrearUsuarioBody = z
 
 export const EsquemaEstadoBody = z.object({ activo: z.boolean() }).strict();
 
+// Regla 5: eliminar una cuenta es irreversible, así que el Admin escribe el correo de la cuenta para confirmarlo. Sin distinguir
+// mayúsculas; si no coincide, 400 y no se borra nada.
+export const EsquemaEliminarCuentaBody = z
+  .object({
+    confirmacion_email: z.string().trim().min(1).max(150).meta({ description: "El correo de la cuenta, escrito por el Admin.", example: "emprendedora@gmail.com" }),
+  })
+  .strict();
+
+const EsquemaCuentaEliminada = z
+  .object({
+    perfiles: z.number().int().meta({ description: "Perfiles eliminados (0 o 1).", example: 1 }),
+    productos: z.number().int().meta({ example: 6 }),
+    descuentos: z.number().int().meta({ example: 2 }),
+    clics: z.number().int().meta({ description: "Clics de contacto eliminados.", example: 120 }),
+    imagenes: z.number().int().meta({ description: "Imágenes borradas de R2 (nunca las predeterminadas).", example: 8 }),
+  })
+  .meta({ id: "CuentaEliminada" });
+
 // Regla 5: edición sin OTP. Todos los campos son opcionales (solo se cambia lo presente); un
 // cuerpo vacío es un no-op válido, no un error.
 export const EsquemaEditarUsuarioBody = z
@@ -115,6 +133,29 @@ export function registrarAdminUsuarios(registro: OpenAPIRegistry): void {
     },
     responses: {
       200: { description: "Cuenta con su estado actual.", content: { "application/json": { schema: EsquemaUsuario } } },
+      ...respuestasDeError("VALIDACION", "NO_AUTENTICADO", "PROHIBIDO", "NO_ENCONTRADO", "CONFLICTO"),
+    },
+  });
+
+  registro.registerPath({
+    method: "delete",
+    path: "/admin/usuarios/{id}",
+    tags: ["Admin"],
+    summary: "Eliminar una cuenta por completo",
+    description:
+      "Irreversible (regla 5). Distinta de desactivar y no la sustituye. Solo se elimina una cuenta de Emprendedor **activa**: " +
+      "una suspendida da 409 (se activa primero), una de Admin da 403 y la propia cuenta del Admin da 409. El cuerpo lleva " +
+      "`confirmacion_email`, el correo de la cuenta; si no coincide, 400 y no se borra nada. Borra, en una sola transacción, su " +
+      "perfil, sus productos, sus descuentos y las asignaciones entre ambos, todos sus clics de contacto (también dejan de " +
+      "contar en las métricas, regla 19), los códigos OTP y los intentos de acceso de su correo, y la cuenta; después borra de " +
+      "R2 sus imágenes (nunca las predeterminadas). La persona pierde el acceso en su siguiente petición y su correo queda libre.",
+    security: AUTENTICADO,
+    request: {
+      params: EsquemaIdUsuario,
+      body: { content: { "application/json": { schema: EsquemaEliminarCuentaBody } } },
+    },
+    responses: {
+      200: { description: "Lo que se eliminó junto con la cuenta.", content: { "application/json": { schema: EsquemaCuentaEliminada } } },
       ...respuestasDeError("VALIDACION", "NO_AUTENTICADO", "PROHIBIDO", "NO_ENCONTRADO", "CONFLICTO"),
     },
   });
