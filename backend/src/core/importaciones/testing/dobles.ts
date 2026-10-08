@@ -30,7 +30,7 @@ export const catalogoEnMemoria: ICatalogoRepository = {
   listarRubros: async () => RUBROS,
 };
 
-// Los 13 encabezados del Excel real, en su orden, con el espacio final que trae el último.
+// Los 14 encabezados del Excel real, en su orden, con el espacio final que trae el último.
 export const ENCABEZADOS_DE_GOOGLE_FORMS = [
   "Marca temporal",
   "Dirección de correo electrónico",
@@ -43,6 +43,7 @@ export const ENCABEZADOS_DE_GOOGLE_FORMS = [
   "Sube el logo de tu emprendimiento",
   "Rubro",
   "Instagram de tu emprendimiento",
+  "Otra red social",
   "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?",
   "Cuéntanos sobre tu beneficio ",
 ];
@@ -61,7 +62,7 @@ export const celdasDePrueba = (parches: CeldasDeFila = {}): CeldasDeFila => ({
 
 export type ValorDeCelda = string | number | Date | null;
 
-// Una fila con las 13 columnas del formulario, en su orden (incluidas las que la importación ignora: marca temporal, fotos, logo
+// Una fila con las 14 columnas del formulario, en su orden (incluidas las que la importación ignora: marca temporal, fotos, logo
 // y beneficio). El WhatsApp va como número, igual que lo guarda Excel.
 export const filaDeFormulario = (parches: Partial<Record<ClaveFila, ValorDeCelda>> = {}): ValorDeCelda[] => {
   const base: Record<ClaveFila, ValorDeCelda> = {
@@ -76,6 +77,7 @@ export const filaDeFormulario = (parches: Partial<Record<ClaveFila, ValorDeCelda
     logo: "https://drive.google.com/open?id=1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
     rubro: "Alimentos y bebidas",
     instagram: "@dulcesdeana",
+    otraRed: "",
     ofrece: "Si",
     beneficio: "10% de descuento en tortas",
     ...parches,
@@ -92,6 +94,7 @@ export const filaDeFormulario = (parches: Partial<Record<ClaveFila, ValorDeCelda
     base.logo,
     base.rubro,
     base.instagram,
+    base.otraRed,
     base.ofrece,
     base.beneficio,
   ];
@@ -108,6 +111,7 @@ type ClaveFila =
   | "logo"
   | "rubro"
   | "instagram"
+  | "otraRed"
   | "ofrece"
   | "beneficio";
 

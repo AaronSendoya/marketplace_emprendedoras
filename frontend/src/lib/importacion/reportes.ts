@@ -41,12 +41,13 @@ export function csvDeCredenciales(filas: readonly FilaEditable[], resultados: Re
 }
 
 // Las filas creadas con algo que conviene mirar: qué suposición hizo el sistema o qué dato no se guardó, con el texto original
-// de Instagram cuando es de eso.
+// de Instagram y de «otra red social» cuando es de eso.
 export function csvPorRevisar(filas: readonly FilaEditable[], resultados: ResultadosPorFila): string {
-  const encabezado = ["Fila del Excel", "Nombre", "Correo", "Emprendimiento", "Qué revisar", "Instagram que decía el Excel"];
+  const encabezado = ["Fila del Excel", "Nombre", "Correo", "Emprendimiento", "Qué revisar", "Instagram que decía el Excel", "Otra red social que decía el Excel"];
   const cuerpo = filasPorRevisar(filas, resultados).map(({ fila }) => {
     const avisos = fila.avisos.filter((aviso) => aviso.severidad === "revisar" || aviso.reporte);
-    const deInstagram = avisos.some((aviso) => aviso.campo === "instagram" || aviso.campo === "otra_red_social");
+    const deInstagram = avisos.some((aviso) => aviso.campo === "instagram");
+    const deOtraRed = avisos.some((aviso) => aviso.campo === "otra_red_social");
     return [
       String(fila.fila),
       neutralizarFormula(nombreCompleto(fila.datos)),
@@ -54,6 +55,7 @@ export function csvPorRevisar(filas: readonly FilaEditable[], resultados: Result
       neutralizarFormula(fila.datos.nombre_negocio),
       neutralizarFormula(avisos.map((aviso) => aviso.mensaje).join(" | ")),
       neutralizarFormula(deInstagram ? fila.textos.instagram : ""),
+      neutralizarFormula(deOtraRed ? fila.textos.otra_red : ""),
     ];
   });
   return aCsv([encabezado, ...cuerpo]);

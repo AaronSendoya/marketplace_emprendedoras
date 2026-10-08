@@ -102,8 +102,17 @@ describe("rutas de la importación", () => {
     const analisis: ResultadoAnalisis = {
       hoja: "Hoja 1",
       hojas: ["Hoja 1"],
-      columnas: { reconocidas: ["Correo"], ignoradas: ["Sube tu foto"], opcionalesAusentes: ["Instagram"] },
-      filas: [{ fila: 2, oculta: true, estado: "lista", datos, avisos: [AVISOS.filaOculta()], yaExiste: false, repetidaDe: null, textos: { instagram: "" } }],
+      columnas: {
+        reconocidas: ["Correo"],
+        ignoradas: ["Sube tu foto"],
+        opcionalesAusentes: ["Instagram"],
+        obligatoriasAusentes: ["Ciudad"],
+        desconocidas: ["Edad"],
+        aproximadas: [{ encabezado: "Rubr0", columna: "Rubro" }],
+      },
+      filas: [
+        { fila: 2, oculta: true, estado: "lista", datos, avisos: [AVISOS.filaOculta()], yaExiste: false, repetidaDe: null, textos: { instagram: "", otraRed: "TikTok" } },
+      ],
       resumen: { total: 1, listas: 1, revisar: 0, conError: 0, yaExisten: 0, repetidas: 0, ocultas: 1 },
     };
     const usecase = { ejecutar: async (archivo: unknown) => ((recibido = archivo), analisis) } as unknown as AnalizarExcelEmprendedorasUseCase;
@@ -112,7 +121,15 @@ describe("rutas de la importación", () => {
     const cuerpo = await analizarExcel(usecase, archivo).then((r) => r.json());
 
     expect(recibido).toBe(archivo);
-    expect(cuerpo.columnas.opcionales_ausentes).toEqual(["Instagram"]);
+    expect(cuerpo.columnas).toEqual({
+      reconocidas: ["Correo"],
+      ignoradas: ["Sube tu foto"],
+      opcionales_ausentes: ["Instagram"],
+      obligatorias_ausentes: ["Ciudad"],
+      desconocidas: ["Edad"],
+      aproximadas: [{ encabezado: "Rubr0", columna: "Rubro" }],
+    });
+    expect(cuerpo.filas[0].textos).toEqual({ instagram: "", otra_red: "TikTok" });
     expect(cuerpo.resumen).toEqual({ total: 1, listas: 1, revisar: 0, con_error: 0, ya_existen: 0, repetidas: 0, ocultas: 1 });
     expect(cuerpo.filas[0]).toMatchObject({ fila: 2, oculta: true, ya_existe: false, repetida_de: null });
     expect(cuerpo.filas[0].datos.nombre_negocio).toBe("Dulces de Ana");
@@ -145,5 +162,6 @@ describe("descargarPlantilla", () => {
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(contenido as unknown as ArrayBuffer);
     expect(libro.worksheets[0].rowCount).toBe(3);
+    expect(libro.worksheets[0].columnCount).toBe(14);
   });
 });

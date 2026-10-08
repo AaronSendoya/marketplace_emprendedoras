@@ -48,6 +48,9 @@ const R2_CLAVES = [
   "R2_PUBLIC_URL",
 ] as const;
 
+// Purga de la caché de la CDN al borrar imágenes (regla 5). Van juntas o ninguna; en producción son obligatorias.
+const CLOUDFLARE_CLAVES = ["CLOUDFLARE_ZONE_ID", "CLOUDFLARE_API_TOKEN"] as const;
+
 const SMTP_CLAVES = ["EMAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"] as const;
 
 const envSchema = z
@@ -80,6 +83,9 @@ const envSchema = z
     R2_BUCKET: z.string().optional(),
     R2_PUBLIC_URL: urlSinBarraFinal.optional(),
 
+    CLOUDFLARE_ZONE_ID: z.string().optional(),
+    CLOUDFLARE_API_TOKEN: z.string().optional(),
+
     EMAIL_DRIVER: z.enum(["console", "smtp"], { error: "debe ser console o smtp" }).default("console"),
     EMAIL_FROM: z.string().optional(),
     SMTP_HOST: z.string().optional(),
@@ -97,6 +103,19 @@ const envSchema = z
           code: "custom",
           path: [clave],
           message: "es obligatoria (R2 se configura completo y es obligatorio en producción)",
+        });
+      }
+    }
+
+    // Sin la purga, una imagen borrada seguiría sirviéndose desde la caché de la CDN: configurada a medias siempre es un error y
+    // en producción es obligatoria (regla 5).
+    const cfPresentes = CLOUDFLARE_CLAVES.filter((clave) => env[clave] !== undefined);
+    if (cfPresentes.length < CLOUDFLARE_CLAVES.length && (cfPresentes.length > 0 || env.APP_ENV === "production")) {
+      for (const clave of CLOUDFLARE_CLAVES.filter((c) => env[c] === undefined)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [clave],
+          message: "es obligatoria (la purga de la caché de la CDN se configura completa y es obligatoria en producción)",
         });
       }
     }

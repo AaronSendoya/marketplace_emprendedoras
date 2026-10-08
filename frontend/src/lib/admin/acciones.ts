@@ -106,6 +106,10 @@ export async function eliminarCuentaAction(usuarioId: string, confirmacionEmail:
   }
 
   revalidatePath("/admin");
+  // Regla 5: su perfil y sus productos dejan de verse de inmediato en el catálogo público, sin esperar a la caché de 30 segundos.
+  for (const ruta of ["/", "/emprendedoras", "/promociones"]) revalidatePath(ruta);
+  revalidatePath("/emprendedoras/[id]", "page");
+  revalidatePath("/productos/[id]", "page");
   const separador = volverA.includes("?") ? "&" : "?";
   redirect(
     `${volverA}${separador}eliminada=1&p=${eliminado.perfiles}&pr=${eliminado.productos}&d=${eliminado.descuentos}&c=${eliminado.clics}&i=${eliminado.imagenes}`,

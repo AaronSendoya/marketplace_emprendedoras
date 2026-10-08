@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useState, type ReactNode } from "react";
 import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
 import { ChipAmpliar } from "@/components/molecules/ChipAmpliar";
@@ -36,7 +36,7 @@ export function ImagenProducto({ src, nombre, negocio, children }: PropsImagenPr
             aria-label={`Ampliar la imagen de ${nombre}`}
             className={`group/foto absolute inset-0 cursor-zoom-in overflow-hidden ${CLASES_FOCO_CONTROL}`}
           >
-            <Image
+            <ImagenR2
               src={src}
               alt=""
               fill

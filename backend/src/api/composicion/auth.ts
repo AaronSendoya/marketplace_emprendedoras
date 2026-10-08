@@ -16,6 +16,7 @@ import { MySqlEliminacionCuentaRepository } from "@/core/auth/infrastructure/MyS
 import { MySqlOtpRepository } from "@/core/auth/infrastructure/MySqlOtpRepository";
 import { MySqlUsuarioRepository } from "@/core/auth/infrastructure/MySqlUsuarioRepository";
 import { crearEmailSender } from "@/shared/infrastructure/crearEmailSender";
+import { crearCachePublica } from "@/shared/infrastructure/crearCachePublica";
 import { imageStoragePorDefecto } from "@/shared/infrastructure/crearImageStorage";
 import { logger } from "@/shared/infrastructure/logger";
 import { getMySqlClient } from "@/shared/infrastructure/MySqlClient";
@@ -65,7 +66,7 @@ export function crearCambiarEstadoUsuario(): CambiarEstadoUsuarioUseCase {
 
 export function crearEliminarCuenta(): EliminarCuentaUseCase {
   const db = getMySqlClient();
-  return new EliminarCuentaUseCase(dependencias().usuarios, new MySqlEliminacionCuentaRepository(db), imageStoragePorDefecto(), logger);
+  return new EliminarCuentaUseCase(dependencias().usuarios, new MySqlEliminacionCuentaRepository(db), imageStoragePorDefecto(), crearCachePublica(), logger);
 }
 
 export function crearActualizarUsuario(): ActualizarUsuarioUseCase {

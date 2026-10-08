@@ -13,8 +13,8 @@ export interface FilaAnalizada {
   avisos: Aviso[];
   yaExiste: boolean;
   repetidaDe: number | null;
-  // Lo que decía el Excel en lo que no se guarda tal cual: para el reporte "por revisar".
-  textos: { instagram: string };
+  // Lo que decían el Excel en Instagram y en «otra red social»: para el reporte "por revisar".
+  textos: { instagram: string; otraRed: string };
 }
 
 export interface ResumenAnalisis {
@@ -37,6 +37,13 @@ export interface ResultadoAnalisis {
     ignoradas: string[];
     // Columnas opcionales que el archivo no trae (la fila se importa sin ese dato).
     opcionalesAusentes: string[];
+    // Columnas obligatorias que el archivo no trae: el archivo se acepta igual y cada fila queda con el error de ese dato, que el
+    // Admin completa en la vista previa (regla 22, «Tolerancia con el formato»).
+    obligatoriasAusentes: string[];
+    // Encabezados que no se parecen a ninguna columna esperada: no se usan.
+    desconocidas: string[];
+    // Encabezados que se leyeron como una columna esperada por parecerse a ella; el Admin lo confirma.
+    aproximadas: { encabezado: string; columna: string }[];
   };
   filas: FilaAnalizada[];
   resumen: ResumenAnalisis;

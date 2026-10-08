@@ -30,7 +30,7 @@ export interface FilaEditable {
   datos: DatosFilaImportacion;
   // Lo que se muestra debajo de la fila: las suposiciones del análisis que siguen vigentes más lo que dice la validación.
   avisos: AvisoImportacion[];
-  textos: { instagram: string };
+  textos: { instagram: string; otra_red: string };
   elegida: boolean;
   // El Admin cambió algo en esta fila.
   editada: boolean;

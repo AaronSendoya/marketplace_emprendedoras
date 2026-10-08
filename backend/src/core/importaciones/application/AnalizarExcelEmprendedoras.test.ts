@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { UsuarioRepositoryEnMemoria } from "@/core/auth/testing/UsuarioRepositoryEnMemoria";
 import { usuarioDePrueba } from "@/core/auth/testing/dobles";
 import { ErrorValidacion } from "@/shared/domain/errors";
+import { validarDatosFila } from "../domain/FilaImportacion";
 import { MENSAJES_ARCHIVO } from "../domain/ArchivoExcel";
 import { GeneradorPlantillaExceljs } from "../infrastructure/GeneradorPlantillaExceljs";
 import { LectorExcelExceljs } from "../infrastructure/LectorExcelExceljs";
-import { ENCABEZADOS_DE_GOOGLE_FORMS, catalogoEnMemoria, crearExcelDePrueba, filaDeFormulario, idDeCiudad, idDeRubro } from "../testing/dobles";
+import { CIUDADES, ENCABEZADOS_DE_GOOGLE_FORMS, RUBROS, catalogoEnMemoria, crearExcelDePrueba, filaDeFormulario, idDeCiudad, idDeRubro } from "../testing/dobles";
 import { AnalizarExcelEmprendedorasUseCase, MAXIMO_DE_FILAS_POR_IMPORTACION, MENSAJES_ANALISIS } from "./AnalizarExcelEmprendedoras";
 
 const construir = (usuarios = new UsuarioRepositoryEnMemoria()) => ({
@@ -31,7 +32,7 @@ describe("AnalizarExcelEmprendedorasUseCase: un archivo como el del formulario",
     const resultado = await analizar({ filas: [filaDeFormulario()] });
 
     expect(resultado.hoja).toBe("Respuestas de formulario 1");
-    expect(resultado.columnas.reconocidas).toHaveLength(8);
+    expect(resultado.columnas.reconocidas).toHaveLength(9);
     expect(resultado.columnas.ignoradas).toEqual([
       "Marca temporal",
       "Sube tu foto",
@@ -39,7 +40,7 @@ describe("AnalizarExcelEmprendedorasUseCase: un archivo como el del formulario",
       "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?",
       "Cuéntanos sobre tu beneficio",
     ]);
-    expect(resultado.columnas.opcionalesAusentes).toEqual([]);
+    expect(resultado.columnas).toMatchObject({ opcionalesAusentes: [], obligatoriasAusentes: [], desconocidas: [], aproximadas: [] });
   });
 
   it("una fila limpia queda «lista», con los datos normalizados y el número de fila de Excel", async () => {
@@ -128,7 +129,7 @@ describe("AnalizarExcelEmprendedorasUseCase: advertencias por fila", () => {
   it("guarda lo que decía el Excel en Instagram para el reporte «por revisar»", async () => {
     const [fila] = (await analizar({ filas: [filaDeFormulario({ instagram: "Nutrimentos maybo" })] })).filas;
 
-    expect(fila.textos).toEqual({ instagram: "Nutrimentos maybo" });
+    expect(fila.textos).toEqual({ instagram: "Nutrimentos maybo", otraRed: "" });
     expect(fila.avisos.filter((a) => a.reporte).map((a) => a.codigo)).toEqual(["instagram_irreconocible"]);
   });
 
@@ -143,7 +144,7 @@ describe("AnalizarExcelEmprendedorasUseCase: advertencias por fila", () => {
     expect(resultado.resumen).toMatchObject({ total: 3, listas: 3 });
     for (const fila of resultado.filas) {
       expect(fila.datos).not.toHaveProperty("beneficio");
-      expect(fila.textos).toEqual({ instagram: "@dulcesdeana" });
+      expect(fila.textos).toEqual({ instagram: "@dulcesdeana", otraRed: "" });
       expect(fila.avisos).toEqual([]);
     }
   });
@@ -156,33 +157,28 @@ describe("AnalizarExcelEmprendedorasUseCase: advertencias por fila", () => {
 });
 
 describe("AnalizarExcelEmprendedorasUseCase: el archivo es compatible pero no tiene el formato esperado", () => {
-  it("una columna obligatoria que falta se nombra", async () => {
-    const encabezados = ENCABEZADOS_DE_GOOGLE_FORMS.filter((e) => !e.includes("WhatsApp"));
+  it("un archivo cuyas columnas no se parecen a las esperadas dice qué se leyó y qué falta", async () => {
+    const mensaje = await mensajeDelRechazo(analizar({ encabezados: ["Producto", "Precio", "Stock"], filas: [["Torta", 10, 3]] }));
 
-    expect(await mensajeDelRechazo(analizar({ encabezados, filas: [filaDeFormulario()] }))).toBe(
-      "Falta la columna «Número de WhatsApp». Los encabezados deben estar en la fila 1 y llamarse como en la guía.",
-    );
+    expect(mensaje).toContain("El archivo no se parece al del formulario");
+    expect(mensaje).toContain("Encabezados leídos en la fila 1: «Producto», «Precio», «Stock».");
+    expect(mensaje).toContain("Faltan las columnas «Correo»");
+    expect(mensaje).toContain("Los encabezados deben estar en la fila 1 y llamarse como en la guía.");
   });
 
-  it("varias columnas que faltan se nombran todas", async () => {
-    const encabezados = ENCABEZADOS_DE_GOOGLE_FORMS.filter((e) => !/WhatsApp|Rubro|Ciudad/.test(e));
+  it("con solo 3 columnas reconocidas no se parece al formulario y se rechaza; con 4 se acepta", async () => {
+    const tres = ["Correo", "Ciudad", "Rubro", "Edad"];
+    expect(await mensajeDelRechazo(analizar({ encabezados: tres, filas: [["a@b.co", "La Paz", "Comercio", 30]] }))).toContain("no se parece");
 
-    const mensaje = await mensajeDelRechazo(analizar({ encabezados, filas: [filaDeFormulario()] }));
-
-    expect(mensaje).toContain("Faltan las columnas «Número de WhatsApp», «Ciudad», «Rubro».");
+    const cuatro = ["Correo", "Ciudad", "Rubro", "Número de WhatsApp", "Edad"];
+    const resultado = await analizar({ encabezados: cuatro, filas: [["a@b.co", "La Paz", "Comercio", 71234567, 30]] });
+    expect(resultado.filas).toHaveLength(1);
   });
 
   it("los encabezados que no están en la primera fila se explican", async () => {
     expect(await mensajeDelRechazo(analizar({ filasArriba: [["Respuestas de la convocatoria 2026"]], filas: [filaDeFormulario()] }))).toBe(
       MENSAJES_ANALISIS.encabezadosNoEstanEnFila1,
     );
-  });
-
-  it("un archivo cuyas columnas no se parecen a las esperadas dice qué falta", async () => {
-    const mensaje = await mensajeDelRechazo(analizar({ encabezados: ["Producto", "Precio", "Stock"], filas: [["Torta", 10, 3]] }));
-
-    expect(mensaje).toContain("Faltan las columnas");
-    expect(mensaje).toContain("«Correo»");
   });
 
   it("solo los encabezados, sin ninguna fila de datos", async () => {
@@ -221,16 +217,108 @@ describe("AnalizarExcelEmprendedorasUseCase: el archivo es compatible pero no ti
   });
 
   it("las columnas opcionales que no vienen se anotan y la fila se importa sin ese dato", async () => {
-    const quitar = (h: string) => !/Instagram/i.test(h);
+    const quitar = (h: string) => !/Instagram|Otra red/i.test(h);
     const indices = ENCABEZADOS_DE_GOOGLE_FORMS.map((h, i) => [h, i] as const).filter(([h]) => quitar(h)).map(([, i]) => i);
     const resultado = await analizar({
       encabezados: ENCABEZADOS_DE_GOOGLE_FORMS.filter(quitar),
       filas: [filaDeFormulario().filter((_, i) => indices.includes(i))],
     });
 
-    expect(resultado.columnas.opcionalesAusentes).toEqual(["Instagram"]);
+    expect(resultado.columnas.opcionalesAusentes).toEqual(["Instagram", "Otra red social"]);
     expect(resultado.filas[0]).toMatchObject({ estado: "lista" });
-    expect(resultado.filas[0].datos).toMatchObject({ instagram: "" });
+    expect(resultado.filas[0].datos).toMatchObject({ instagram: "", otraRedSocial: "" });
+  });
+});
+
+describe("AnalizarExcelEmprendedorasUseCase: tolerancia con el formato (regla 22)", () => {
+  // El archivo del formulario sin las columnas cuyo encabezado cumple `quitar`, con sus celdas también quitadas.
+  const sin = (quitar: RegExp) => {
+    const indices = ENCABEZADOS_DE_GOOGLE_FORMS.map((h, i) => [h, i] as const).filter(([h]) => !quitar.test(h)).map(([, i]) => i);
+    return {
+      encabezados: ENCABEZADOS_DE_GOOGLE_FORMS.filter((_, i) => indices.includes(i)),
+      filas: [filaDeFormulario(), filaDeFormulario({ correo: "dos@ejemplo.com" })].map((fila) => fila.filter((_, i) => indices.includes(i))),
+    };
+  };
+
+  it("una columna obligatoria que falta no rechaza el archivo: se anota y cada fila queda con el error de ese dato", async () => {
+    const resultado = await analizar(sin(/WhatsApp/));
+
+    expect(resultado.columnas.obligatoriasAusentes).toEqual(["Número de WhatsApp"]);
+    expect(resultado.columnas.reconocidas).toHaveLength(8);
+    expect(resultado.resumen).toMatchObject({ total: 2, listas: 0, conError: 2 });
+    for (const fila of resultado.filas) {
+      expect(fila.estado).toBe("error");
+      expect(fila.avisos.map((a) => a.codigo)).toEqual(["whatsapp_vacio"]);
+      expect(fila.datos).toMatchObject({ correo: expect.any(String), ciudadId: idDeCiudad("La Paz"), whatsapp: "" });
+    }
+  });
+
+  it("varias columnas obligatorias que faltan se anotan todas, en el orden del formulario", async () => {
+    const resultado = await analizar(sin(/WhatsApp|Rubro|Ciudad/));
+
+    expect(resultado.columnas.obligatoriasAusentes).toEqual(["Número de WhatsApp", "Ciudad", "Rubro"]);
+    expect(resultado.filas[0].avisos.map((a) => a.codigo).sort()).toEqual(["ciudad_vacia", "rubro_vacio", "whatsapp_vacio"]);
+  });
+
+  it("sin la columna de correo se lee igual: las filas piden el correo y no se consulta la base", async () => {
+    const resultado = await analizar(sin(/correo/i));
+
+    expect(resultado.columnas.obligatoriasAusentes).toEqual(["Correo"]);
+    expect(resultado.filas.map((f) => f.avisos.map((a) => a.codigo))).toEqual([["correo_vacio"], ["correo_vacio"]]);
+    expect(resultado.filas.map((f) => f.estado)).toEqual(["error", "error"]);
+  });
+
+  it("completar lo que falta es posible: validar acepta la fila con el dato puesto a mano", async () => {
+    const resultado = await analizar(sin(/Ciudad/));
+    const datos = { ...resultado.filas[0].datos, ciudadId: idDeCiudad("La Paz") };
+
+    const errores = validarDatosFila(datos, { ciudades: CIUDADES, rubros: RUBROS });
+
+    expect(errores).toEqual([]);
+  });
+
+  it("una columna que no se parece a ninguna se anota como desconocida y el archivo se lee igual", async () => {
+    const resultado = await analizar({
+      encabezados: [...ENCABEZADOS_DE_GOOGLE_FORMS, "Edad", "Comentarios internos"],
+      filas: [[...filaDeFormulario(), 30, "llamar el lunes"]],
+    });
+
+    expect(resultado.columnas.desconocidas).toEqual(["Edad", "Comentarios internos"]);
+    expect(resultado.columnas.reconocidas).toHaveLength(9);
+    expect(resultado.filas[0].estado).toBe("lista");
+    expect(resultado.filas[0].avisos).toEqual([]);
+  });
+
+  it("un encabezado con una errata se lee como la columna esperada y se anota para que el Admin lo confirme", async () => {
+    const encabezados = ENCABEZADOS_DE_GOOGLE_FORMS.map((h) => (h === "Ciudad" ? "Ciudd" : h));
+
+    const resultado = await analizar({ encabezados, filas: [filaDeFormulario()] });
+
+    expect(resultado.columnas.aproximadas).toEqual([{ encabezado: "Ciudd", columna: "Ciudad" }]);
+    expect(resultado.columnas.obligatoriasAusentes).toEqual([]);
+    expect(resultado.columnas.desconocidas).toEqual([]);
+    expect(resultado.filas[0].datos.ciudadId).toBe(idDeCiudad("La Paz"));
+    expect(resultado.filas[0].estado).toBe("lista");
+  });
+
+  it("la columna «Otra red social» llega a los datos de la fila", async () => {
+    const resultado = await analizar({ filas: [filaDeFormulario({ otraRed: "TikTok @dulcesdeana" })] });
+
+    expect(resultado.filas[0].datos.otraRedSocial).toBe("TikTok @dulcesdeana");
+    expect(resultado.filas[0].textos).toEqual({ instagram: "@dulcesdeana", otraRed: "TikTok @dulcesdeana" });
+    expect(resultado.filas[0].avisos).toEqual([]);
+  });
+
+  it("el orden de las columnas no importa", async () => {
+    const orden = [12, 9, 3, 1, 5, 0, 2, 4, 6, 7, 8, 10, 11, 13];
+    const resultado = await analizar({
+      encabezados: orden.map((i) => ENCABEZADOS_DE_GOOGLE_FORMS[i]),
+      filas: [orden.map((i) => filaDeFormulario()[i])],
+    });
+
+    expect(resultado.columnas).toMatchObject({ obligatoriasAusentes: [], desconocidas: [], aproximadas: [] });
+    expect(resultado.filas[0].estado).toBe("lista");
+    expect(resultado.filas[0].datos).toMatchObject({ correo: "ana.perez@ejemplo.com", ciudadId: idDeCiudad("La Paz") });
   });
 });
 
@@ -253,15 +341,23 @@ describe("AnalizarExcelEmprendedorasUseCase: el archivo no es compatible", () =>
 });
 
 describe("la plantilla de ejemplo se analiza sin problemas", () => {
-  it("sus dos filas salen listas y no ignora ninguna columna", async () => {
+  it("sus dos filas salen listas, usa las 9 columnas y solo ignora las 5 del formulario que no se guardan", async () => {
     const { caso } = construir();
     const contenido = await new GeneradorPlantillaExceljs().generar();
 
     const resultado = await caso.ejecutar({ nombre: "plantilla.xlsx", contenido });
 
     expect(resultado.resumen).toMatchObject({ total: 2, listas: 2, conError: 0, repetidas: 0 });
-    expect(resultado.filas[1].datos).toMatchObject({ instagram: "", whatsapp: "+59160123456" });
-    expect(resultado.columnas).toMatchObject({ reconocidas: expect.any(Array), ignoradas: [], opcionalesAusentes: [] });
-    expect(resultado.columnas.reconocidas).toHaveLength(8);
+    expect(resultado.filas[0].datos).toMatchObject({ instagram: "dulcesdeana", otraRedSocial: "https://www.facebook.com/dulcesdeana" });
+    expect(resultado.filas[1].datos).toMatchObject({ instagram: "", otraRedSocial: "", whatsapp: "+59160123456" });
+    expect(resultado.columnas.reconocidas).toHaveLength(9);
+    expect(resultado.columnas.ignoradas).toEqual([
+      "Marca temporal",
+      "Sube tu foto",
+      "Sube el logo de tu emprendimiento",
+      "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?",
+      "Cuéntanos sobre tu beneficio",
+    ]);
+    expect(resultado.columnas).toMatchObject({ opcionalesAusentes: [], obligatoriasAusentes: [], desconocidas: [], aproximadas: [] });
   });
 });

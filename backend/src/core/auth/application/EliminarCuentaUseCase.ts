@@ -1,5 +1,6 @@
 import { esImagenPredeterminada } from "@/shared/domain/imagenes";
 import { ErrorConflicto, ErrorNoEncontrado, ErrorProhibido, ErrorValidacion } from "@/shared/domain/errors";
+import type { ICachePublica } from "@/shared/domain/ICachePublica";
 import type { IImageStorage } from "@/shared/domain/IImageStorage";
 import type { ILogger } from "@/shared/domain/ILogger";
 import type { IEliminacionCuentaRepository } from "../domain/IEliminacionCuentaRepository";
@@ -26,6 +27,7 @@ export class EliminarCuentaUseCase {
     private readonly usuarios: IUsuarioRepository,
     private readonly eliminacion: IEliminacionCuentaRepository,
     private readonly almacenamiento: IImageStorage,
+    private readonly cache: ICachePublica,
     private readonly logger: ILogger,
   ) {}
 
@@ -50,6 +52,19 @@ export class EliminarCuentaUseCase {
     const noBorradas = claves.filter((_clave, i) => resultados[i].status === "rejected");
     for (const clave of noBorradas) this.logger.warn("imagen_cuenta_no_borrada", { usuarioId, clave });
 
+    // Las imágenes que sí se borraron ya no pueden seguir sirviéndose desde la caché de la CDN (regla 5). Si la purga falla no se
+    // deshace nada: se registra para repetirla a mano.
+    const urlsBorradas = claves.filter((clave) => !noBorradas.includes(clave)).map((clave) => this.almacenamiento.urlPublica(clave));
+    let cachePurgada = true;
+    if (urlsBorradas.length > 0) {
+      try {
+        await this.cache.purgar(urlsBorradas);
+      } catch (error) {
+        cachePurgada = false;
+        this.logger.warn("cache_cdn_no_purgada", { usuarioId, imagenes: urlsBorradas.length, motivo: error instanceof Error ? error.message : "desconocido" });
+      }
+    }
+
     const imagenes = claves.length - noBorradas.length;
     this.logger.info("cuenta_eliminada", {
       usuarioId,
@@ -60,6 +75,7 @@ export class EliminarCuentaUseCase {
       clics: resumen.clics,
       imagenes,
       imagenesNoBorradas: noBorradas.length,
+      cachePurgada,
     });
 
     return { perfiles: resumen.perfiles, productos: resumen.productos, descuentos: resumen.descuentos, clics: resumen.clics, imagenes };

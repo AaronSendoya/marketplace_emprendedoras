@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useState } from "react";
 import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
 import { ChipAmpliar } from "@/components/molecules/ChipAmpliar";
@@ -49,7 +49,7 @@ export function PortadaEmprendedora({ fotoUrl, logoUrl, nombre }: PropsPortadaEm
             aria-label={`Ampliar la foto de ${nombre}`}
             className={`group/foto absolute inset-0 cursor-zoom-in overflow-hidden ${CLASES_FOCO_CONTROL}`}
           >
-            <Image
+            <ImagenR2
               src={fotoUrl}
               alt=""
               fill
@@ -71,7 +71,7 @@ export function PortadaEmprendedora({ fotoUrl, logoUrl, nombre }: PropsPortadaEm
               aria-label={`Ampliar el logo de ${nombre}`}
               className={`absolute inset-0 cursor-zoom-in transition-transform duration-150 hover:scale-105 motion-reduce:transition-none ${CLASES_FOCO_CONTROL}`}
             >
-              <Image src={logoUrl} alt="" fill sizes="92px" onError={() => setLogoFallo(true)} className="object-contain" />
+              <ImagenR2 src={logoUrl} alt="" fill sizes="92px" onError={() => setLogoFallo(true)} className="object-contain" />
             </button>
           ) : (
             <MarcadorImagen etiqueta={`Logo de ${nombre}`} className="h-full w-full" />

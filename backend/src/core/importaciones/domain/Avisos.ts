@@ -109,6 +109,22 @@ export const AVISOS = {
       `El enlace «${valor(texto)}» es demasiado largo para «otra red social» (máximo 50 caracteres). Se dejará vacío y quedará en el reporte.`,
       true,
     ),
+  otraRedColumnaLarga: (texto: string) =>
+    aviso(
+      "otraRedSocial",
+      "otra_red_larga",
+      "info",
+      `«Otra red social» («${valor(texto)}») es demasiado larga (máximo 50 caracteres). Se dejará vacía y quedará en el reporte.`,
+      true,
+    ),
+  otraRedRepetida: (enlace: string) =>
+    aviso(
+      "instagram",
+      "otra_red_repetida",
+      "revisar",
+      `La columna de Instagram trae un enlace que no es de Instagram («${valor(enlace)}»), pero ya hay una «otra red social». Se guardó la de su columna; este enlace queda en el reporte.`,
+      true,
+    ),
   otraRedLargaEditada: (largo: number) =>
     aviso("otraRedSocial", "otra_red_larga", "error", `«Otra red social» tiene ${largo} caracteres; el máximo es 50.`),
 

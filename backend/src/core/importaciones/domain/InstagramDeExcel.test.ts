@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clasificarInstagram } from "./InstagramDeExcel";
+import { clasificarInstagram, clasificarOtraRed } from "./InstagramDeExcel";
 
 describe("clasificarInstagram (regla 22 + regla 3)", () => {
   it("vacío es vacío", () => {
@@ -53,5 +53,27 @@ describe("clasificarInstagram (regla 22 + regla 3)", () => {
   it("un usuario inválido por largo o por símbolos no se reconoce", () => {
     expect(clasificarInstagram("a".repeat(31)).tipo).toBe("irreconocible");
     expect(clasificarInstagram("mi tienda!!").tipo).toBe("irreconocible");
+  });
+});
+
+describe("clasificarOtraRed (regla 22 + regla 3)", () => {
+  it("vacío es vacío", () => {
+    expect(clasificarOtraRed("")).toEqual({ tipo: "vacio" });
+    expect(clasificarOtraRed("   ")).toEqual({ tipo: "vacio" });
+  });
+
+  it.each(["No tengo", "no", "Ninguna", "n/a", "-", "Aún no tiene", "sin redes"])("«%s» es no tener otra red", (texto) => {
+    expect(clasificarOtraRed(texto)).toEqual({ tipo: "sin_red" });
+  });
+
+  it("es texto libre: no adivina de qué red es, solo lo recorta y junta los espacios", () => {
+    expect(clasificarOtraRed("  TikTok:   @dulcesdeana ")).toEqual({ tipo: "texto", texto: "TikTok: @dulcesdeana" });
+    expect(clasificarOtraRed("https://www.facebook.com/Nativa")).toEqual({ tipo: "texto", texto: "https://www.facebook.com/Nativa" });
+    expect(clasificarOtraRed("@dulcesdeana")).toEqual({ tipo: "texto", texto: "@dulcesdeana" });
+  });
+
+  it("50 caracteres caben y 51 no", () => {
+    expect(clasificarOtraRed("a".repeat(50))).toEqual({ tipo: "texto", texto: "a".repeat(50) });
+    expect(clasificarOtraRed("a".repeat(51))).toEqual({ tipo: "texto_largo", texto: "a".repeat(51) });
   });
 });

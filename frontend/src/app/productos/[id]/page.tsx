@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/atoms/Avatar";
@@ -46,7 +46,7 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start">
         <div className="relative aspect-[4/3] overflow-hidden rounded-superficie border border-borde bg-borde shadow-tarjeta">
           {imagenUsable ? (
-            <Image
+            <ImagenR2
               src={producto.imagen_url}
               alt={producto.nombre}
               fill
@@ -78,7 +78,7 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
           <div className="flex items-center gap-2.5 font-cuerpo text-sm text-texto-secundario">
             {logoUsable ? (
               <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full border border-borde-fuerte">
-                <Image src={producto.perfil.logo_url} alt="" fill sizes="28px" className="object-cover" />
+                <ImagenR2 src={producto.perfil.logo_url} alt="" fill sizes="28px" className="object-cover" />
               </span>
             ) : (
               <Avatar nombreCompleto={producto.perfil.nombre_negocio} tamano="xs" />

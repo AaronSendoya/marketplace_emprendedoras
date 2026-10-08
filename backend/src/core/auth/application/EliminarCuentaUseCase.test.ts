@@ -2,12 +2,24 @@ import { describe, expect, it } from "vitest";
 import { ErrorConflicto, ErrorNoEncontrado, ErrorProhibido, ErrorValidacion } from "@/shared/domain/errors";
 import { ImageStorageEnMemoria } from "@/shared/infrastructure/ImageStorageEnMemoria";
 import { CLAVE_FOTO_PERFIL_PREDETERMINADA, CLAVE_LOGO_PREDETERMINADO } from "@/shared/domain/imagenes";
+import type { ICachePublica } from "@/shared/domain/ICachePublica";
 import { LoggerFalso, usuarioDePrueba } from "../testing/dobles";
 import { EliminacionCuentaEnMemoria } from "../testing/EliminacionCuentaEnMemoria";
 import { UsuarioRepositoryEnMemoria } from "../testing/UsuarioRepositoryEnMemoria";
 import { EliminarCuentaUseCase } from "./EliminarCuentaUseCase";
 
 const CLAVES = { foto: "perfiles/a.webp", logo: "logos/b.webp", producto1: "productos/c.webp", producto2: "productos/d.webp" };
+
+// Doble de la CDN: recuerda qué direcciones se le pidió purgar y puede fallar a propósito.
+class CachePublicaFalsa implements ICachePublica {
+  readonly purgadas: string[][] = [];
+  falla: Error | null = null;
+
+  async purgar(urls: string[]) {
+    if (this.falla) throw this.falla;
+    this.purgadas.push(urls);
+  }
+}
 
 async function construir() {
   const usuarios = new UsuarioRepositoryEnMemoria([
@@ -27,7 +39,8 @@ async function construir() {
   await almacenamiento.guardar(CLAVE_FOTO_PERFIL_PREDETERMINADA, Buffer.from("x"));
   await almacenamiento.guardar(CLAVE_LOGO_PREDETERMINADO, Buffer.from("x"));
   const logger = new LoggerFalso();
-  return { usuarios, eliminacion, almacenamiento, logger, useCase: new EliminarCuentaUseCase(usuarios, eliminacion, almacenamiento, logger) };
+  const cache = new CachePublicaFalsa();
+  return { usuarios, eliminacion, almacenamiento, cache, logger, useCase: new EliminarCuentaUseCase(usuarios, eliminacion, almacenamiento, cache, logger) };
 }
 
 describe("EliminarCuentaUseCase", () => {
@@ -83,7 +96,7 @@ describe("EliminarCuentaUseCase", () => {
       {
         nivel: "info",
         evento: "cuenta_eliminada",
-        datos: { usuarioId: "usuario-1", adminId: "admin-1", perfiles: 1, productos: 2, descuentos: 3, clics: 40, imagenes: 4, imagenesNoBorradas: 0 },
+        datos: { usuarioId: "usuario-1", adminId: "admin-1", perfiles: 1, productos: 2, descuentos: 3, clics: 40, imagenes: 4, imagenesNoBorradas: 0, cachePurgada: true },
       },
     ]);
     expect(JSON.stringify(logger.registros)).not.toMatch(/gmail/i);
@@ -130,6 +143,51 @@ describe("EliminarCuentaUseCase", () => {
     expect(eliminacion.eliminadas).toEqual([]);
     expect(usuarios.usuarios.map((u) => u.id)).toContain("usuario-1");
     expect(almacenamiento.claves()).toHaveLength(antes);
+  });
+
+  it("purga de la caché de la CDN las direcciones públicas de las imágenes que se borraron (y solo ésas)", async () => {
+    const { cache, useCase } = await construir();
+
+    await useCase.ejecutar("admin-1", "usuario-1", "aaron@gmail.com");
+
+    expect(cache.purgadas).toHaveLength(1);
+    expect(cache.purgadas[0].sort()).toEqual(Object.values(CLAVES).map((clave) => `memoria://${clave}`).sort());
+  });
+
+  it("no purga las predeterminadas ni llama a la CDN si no hay imágenes propias", async () => {
+    const { usuarios, eliminacion, cache, useCase } = await construir();
+    usuarios.usuarios.push(usuarioDePrueba({ id: "sin-fotos", email: "sinfotos@gmail.com" }));
+    eliminacion.dependientes.set("sin-fotos", { perfiles: 1, productos: 0, descuentos: 0, clics: 0, clavesImagenes: [CLAVE_FOTO_PERFIL_PREDETERMINADA, CLAVE_LOGO_PREDETERMINADO] });
+
+    await useCase.ejecutar("admin-1", "sin-fotos", "sinfotos@gmail.com");
+
+    expect(cache.purgadas).toEqual([]);
+  });
+
+  it("si la CDN no responde, la cuenta igual queda eliminada y el fallo se registra", async () => {
+    const { usuarios, cache, logger, useCase } = await construir();
+    cache.falla = new Error("Cloudflare no purgó la caché (HTTP 500).");
+
+    const resultado = await useCase.ejecutar("admin-1", "usuario-1", "aaron@gmail.com");
+
+    expect(resultado.imagenes).toBe(4);
+    expect(usuarios.usuarios.map((u) => u.id)).not.toContain("usuario-1");
+    expect(logger.registros.find((r) => r.evento === "cache_cdn_no_purgada")).toMatchObject({ nivel: "warn", datos: { usuarioId: "usuario-1", imagenes: 4 } });
+    expect(logger.registros.find((r) => r.evento === "cuenta_eliminada")?.datos).toMatchObject({ cachePurgada: false });
+  });
+
+  it("una imagen que no se pudo borrar de R2 no se purga de la CDN (sigue existiendo)", async () => {
+    const { almacenamiento, cache, useCase } = await construir();
+    const borrarOriginal = almacenamiento.borrar.bind(almacenamiento);
+    almacenamiento.borrar = async (clave: string) => {
+      if (clave === CLAVES.logo) throw new Error("R2 no responde");
+      return borrarOriginal(clave);
+    };
+
+    await useCase.ejecutar("admin-1", "usuario-1", "aaron@gmail.com");
+
+    expect(cache.purgadas[0]).not.toContain(`memoria://${CLAVES.logo}`);
+    expect(cache.purgadas[0]).toHaveLength(3);
   });
 
   it("si la base falla no se borra ninguna imagen de R2 (la cuenta sigue existiendo)", async () => {

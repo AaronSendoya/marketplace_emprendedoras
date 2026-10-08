@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleX, FileSpreadsheet, Info, Minus, TriangleAlert } from "lucide-react";
+import { Check, CircleX, FileSpreadsheet, Minus, TriangleAlert } from "lucide-react";
 import { useState, type Dispatch } from "react";
 import { clasesBoton } from "@/components/atoms/Button";
 import { EstadoVacio } from "@/components/molecules/EstadoVacio";
@@ -14,6 +14,7 @@ import {
   type FilaEditable,
   type FiltroDeFilas,
 } from "@/lib/importacion/filas";
+import { AvisosDeColumnas } from "./AvisosDeColumnas";
 import { TablaDeFilas } from "./TablaDeFilas";
 import { TarjetasDeFilas } from "./TarjetasDeFilas";
 
@@ -23,6 +24,9 @@ export interface DatosDelArchivo {
   hojas: string[];
   ignoradas: string[];
   opcionalesAusentes: string[];
+  obligatoriasAusentes: string[];
+  desconocidas: string[];
+  aproximadas: { encabezado: string; columna: string }[];
 }
 
 interface PropsVistaPrevia {
@@ -82,22 +86,7 @@ export function VistaPreviaImportacion({ archivo, filas, ciudades, rubros, dispa
         </button>
       </div>
 
-      {(archivo.hojas.length > 1 || archivo.opcionalesAusentes.length > 0) && (
-        <ul className="space-y-1.5">
-          {archivo.hojas.length > 1 && (
-            <li className="flex items-start gap-2 rounded-md bg-fondo px-3 py-2 font-cuerpo text-xs text-texto-secundario">
-              <Info size={16} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0" />
-              Se leyó la hoja «{archivo.hoja}» (la que tiene los encabezados). Si necesitabas otra, sube un archivo solo con esa hoja.
-            </li>
-          )}
-          {archivo.opcionalesAusentes.length > 0 && (
-            <li className="flex items-start gap-2 rounded-md bg-fondo px-3 py-2 font-cuerpo text-xs text-texto-secundario">
-              <Info size={16} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0" />
-              El archivo no trae la columna {archivo.opcionalesAusentes.map((nombre) => `«${nombre}»`).join(", ")}: las filas se importan sin ese dato.
-            </li>
-          )}
-        </ul>
-      )}
+      <AvisosDeColumnas archivo={archivo} />
 
       <div role="group" aria-label="Resumen de la hoja" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
         {TARJETAS_DE_RESUMEN.map(({ filtro: destino, nombre, punto, valor }) => {

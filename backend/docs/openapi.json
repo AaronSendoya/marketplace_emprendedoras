@@ -1053,12 +1053,48 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "obligatorias_ausentes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Columnas obligatorias que el archivo no trae. El archivo se acepta igual: cada fila queda con el error de ese dato y se completa en la vista previa."
+              },
+              "desconocidas": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Encabezados que no se parecen a ninguna columna esperada. No se usan."
+              },
+              "aproximadas": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "encabezado": {
+                      "type": "string"
+                    },
+                    "columna": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "encabezado",
+                    "columna"
+                  ]
+                },
+                "description": "Encabezados que se leyeron como una columna esperada por parecerse a ella (una errata)."
               }
             },
             "required": [
               "reconocidas",
               "ignoradas",
-              "opcionales_ausentes"
+              "opcionales_ausentes",
+              "obligatorias_ausentes",
+              "desconocidas",
+              "aproximadas"
             ]
           },
           "filas": {
@@ -1157,12 +1193,16 @@
             "properties": {
               "instagram": {
                 "type": "string"
+              },
+              "otra_red": {
+                "type": "string"
               }
             },
             "required": [
-              "instagram"
+              "instagram",
+              "otra_red"
             ],
-            "description": "Lo que decía el Excel, para el reporte «por revisar»."
+            "description": "Lo que decían las columnas de Instagram y de otra red social, para el reporte «por revisar»."
           }
         },
         "required": [
@@ -5324,7 +5364,7 @@
           "Importaciones"
         ],
         "summary": "Analizar el Excel de emprendedoras (no escribe nada)",
-        "description": "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, 500 filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden. Las columnas de fotos, logo y beneficio se ignoran. No crea nada. El archivo no se guarda.",
+        "description": "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, 500 filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden; el archivo se acepta aunque le falten columnas (se avisa cuáles) siempre que se reconozcan al menos 4. Las columnas de fotos, logo y beneficio se ignoran. No crea nada. El archivo no se guarda.",
         "security": [
           {
             "bearerAuth": []
@@ -5745,7 +5785,7 @@
           "Importaciones"
         ],
         "summary": "Descargar la plantilla de ejemplo",
-        "description": "Solo Admin (regla 22). Un `.xlsx` con los encabezados del formulario de Google Forms y dos filas inventadas que muestran el formato esperado.",
+        "description": "Solo Admin (regla 22). Un `.xlsx` con los 14 encabezados del formulario de Google Forms, en su orden, y dos filas inventadas que muestran el formato esperado.",
         "security": [
           {
             "bearerAuth": []

@@ -1,5 +1,5 @@
 import { ChevronRight, Package, Percent, Store, type LucideIcon } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { clasesBoton } from "@/components/atoms/Button";
@@ -70,7 +70,7 @@ function MiniaturaProducto({ producto }: { producto: ProductoPropio }) {
   return (
     <li title={producto.nombre} className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-borde bg-fondo">
       {esUrlDeImagenUsable(producto.imagen_url) ? (
-        <Image src={producto.imagen_url} alt={producto.nombre} fill sizes="40px" className="object-cover" />
+        <ImagenR2 src={producto.imagen_url} alt={producto.nombre} fill sizes="40px" className="object-cover" />
       ) : (
         <MarcadorImagen etiqueta={producto.nombre} className="h-full w-full" />
       )}

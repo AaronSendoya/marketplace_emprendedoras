@@ -202,6 +202,9 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
       hojas: analisis.hojas,
       ignoradas: analisis.columnas.ignoradas,
       opcionalesAusentes: analisis.columnas.opcionales_ausentes,
+      obligatoriasAusentes: analisis.columnas.obligatorias_ausentes,
+      desconocidas: analisis.columnas.desconocidas,
+      aproximadas: analisis.columnas.aproximadas,
     });
     setResultados({});
     setCredencialesDescargadas(false);

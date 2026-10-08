@@ -99,7 +99,7 @@ const serializarFilaAnalizada = (fila: FilaAnalizada) => ({
   avisos: fila.avisos.map(serializarAviso),
   ya_existe: fila.yaExiste,
   repetida_de: fila.repetidaDe,
-  textos: fila.textos,
+  textos: { instagram: fila.textos.instagram, otra_red: fila.textos.otraRed },
 });
 
 export const serializarAnalisis = (resultado: ResultadoAnalisis) => ({
@@ -109,6 +109,9 @@ export const serializarAnalisis = (resultado: ResultadoAnalisis) => ({
     reconocidas: resultado.columnas.reconocidas,
     ignoradas: resultado.columnas.ignoradas,
     opcionales_ausentes: resultado.columnas.opcionalesAusentes,
+    obligatorias_ausentes: resultado.columnas.obligatoriasAusentes,
+    desconocidas: resultado.columnas.desconocidas,
+    aproximadas: resultado.columnas.aproximadas,
   },
   filas: resultado.filas.map(serializarFilaAnalizada),
   resumen: {

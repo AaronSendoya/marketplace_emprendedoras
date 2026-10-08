@@ -21,13 +21,23 @@ export const MAXIMO_DE_FILAS_POR_IMPORTACION = 500;
 
 const rechazar = (mensaje: string) => new ErrorValidacion(mensaje, [{ campo: "archivo", mensaje }]);
 
+const entre = (textos: string[], maximo = 6) => {
+  const recortados = textos.slice(0, maximo).map((texto) => `«${texto.length > 40 ? `${texto.slice(0, 37)}…` : texto}»`);
+  return textos.length > maximo ? `${recortados.join(", ")} y ${textos.length - maximo} más` : recortados.join(", ");
+};
+
 export const MENSAJES_ANALISIS = {
   sinFilas: "El archivo no tiene filas con datos debajo de los encabezados.",
   encabezadosNoEstanEnFila1: "Los encabezados no están en la primera fila. Borra las filas de arriba y vuelve a subirlo.",
-  faltanColumnas: (nombres: string[]) =>
-    nombres.length === 1
-      ? `Falta la columna «${nombres[0]}». Los encabezados deben estar en la fila 1 y llamarse como en la guía.`
-      : `Faltan las columnas ${nombres.map((nombre) => `«${nombre}»`).join(", ")}. Los encabezados deben estar en la fila 1 y llamarse como en la guía.`,
+  // Solo cuando casi nada del archivo se parece al formulario: con al menos MINIMO_COLUMNAS_PARA_ENCABEZADO columnas conocidas
+  // se acepta, aunque falten otras (regla 22, «Tolerancia con el formato»).
+  noSeParece: (leidos: string[], nombresFaltantes: string[]) =>
+    `El archivo no se parece al del formulario: no reconocimos suficientes columnas (hacen falta al menos ${MINIMO_COLUMNAS_PARA_ENCABEZADO}). ` +
+    (leidos.length > 0 ? `Encabezados leídos en la fila 1: ${entre(leidos)}. ` : "") +
+    (nombresFaltantes.length === 1
+      ? `Falta la columna «${nombresFaltantes[0]}». `
+      : `Faltan las columnas ${nombresFaltantes.map((nombre) => `«${nombre}»`).join(", ")}. `) +
+    "Los encabezados deben estar en la fila 1 y llamarse como en la guía.",
   demasiadasFilas: (filas: number) =>
     `El archivo tiene ${filas} filas y el máximo por importación es ${MAXIMO_DE_FILAS_POR_IMPORTACION}. Divídelo en partes.`,
 };
@@ -77,13 +87,15 @@ export class AnalizarExcelEmprendedorasUseCase {
     const { encontrada, primeraConDatos } = elegirHoja(libro.hojas);
     if (!encontrada) {
       if (!primeraConDatos) throw rechazar(MENSAJES_ANALISIS.sinFilas);
-      throw rechazar(MENSAJES_ANALISIS.faltanColumnas(faltantes(primeraConDatos.deteccion).map((columna) => columna.nombre)));
+      const leidos = (primeraConDatos.hoja.filas[0]?.celdas ?? []).map((celda) => celda.trim()).filter(Boolean);
+      throw rechazar(MENSAJES_ANALISIS.noSeParece(leidos, faltantes(primeraConDatos.deteccion).map((columna) => columna.nombre)));
     }
     if (encontrada.indiceEncabezado > 0) throw rechazar(MENSAJES_ANALISIS.encabezadosNoEstanEnFila1);
 
     const { hoja, deteccion } = encontrada;
+    // Regla 22, «Tolerancia con el formato»: una columna obligatoria que falta no detiene la lectura. Cada fila queda sin ese dato
+    // y con su error de siempre; el Admin lo completa en la vista previa. Aquí solo se anota cuáles faltan para decírselo.
     const columnasFaltantes = faltantes(deteccion);
-    if (columnasFaltantes.length > 0) throw rechazar(MENSAJES_ANALISIS.faltanColumnas(columnasFaltantes.map((columna) => columna.nombre)));
 
     const filasDeDatos = hoja.filas.slice(encontrada.indiceEncabezado + 1);
     if (filasDeDatos.length === 0) throw rechazar(MENSAJES_ANALISIS.sinFilas);
@@ -128,6 +140,9 @@ export class AnalizarExcelEmprendedorasUseCase {
         reconocidas: COLUMNAS.filter((columna) => deteccion.columnas[columna.clave] !== undefined).map((columna) => columna.nombre),
         ignoradas: deteccion.ignoradas,
         opcionalesAusentes: COLUMNAS.filter((columna) => !columna.obligatoria && deteccion.columnas[columna.clave] === undefined).map((columna) => columna.nombre),
+        obligatoriasAusentes: columnasFaltantes.map((columna) => columna.nombre),
+        desconocidas: deteccion.desconocidas,
+        aproximadas: deteccion.aproximadas,
       },
       filas,
       resumen: {

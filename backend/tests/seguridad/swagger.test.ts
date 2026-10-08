@@ -18,6 +18,8 @@ const produccion = {
   R2_SECRET_ACCESS_KEY: "c",
   R2_BUCKET: "d",
   R2_PUBLIC_URL: "https://cdn.ejemplo.com",
+  CLOUDFLARE_ZONE_ID: "zona",
+  CLOUDFLARE_API_TOKEN: "token",
   EMAIL_DRIVER: "smtp",
   EMAIL_FROM: "no-responder@ejemplo.com",
   SMTP_HOST: "smtp.ejemplo.com",

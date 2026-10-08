@@ -5,7 +5,7 @@ import { ErrorValidacion } from "@/shared/domain/errors";
 import { AVISOS, type Aviso } from "./Avisos";
 import { resolverCiudad, resolverRubro, type Referencia } from "./CatalogoDeExcel";
 import type { ClaveColumna } from "./ColumnasExcel";
-import { clasificarInstagram } from "./InstagramDeExcel";
+import { clasificarInstagram, clasificarOtraRed } from "./InstagramDeExcel";
 import { separarNombreCompleto } from "./NombreCompleto";
 
 // Regla 22: lo que la vista previa muestra y el Admin puede corregir de cada fila, y lo que `importar` recibe de vuelta. El
@@ -111,8 +111,8 @@ export type CeldasDeFila = Partial<Record<ClaveColumna, string>>;
 export interface FilaConstruida {
   datos: DatosFila;
   avisos: Aviso[];
-  // Lo que decía el Excel en lo que no se guarda tal cual, para el reporte "por revisar".
-  textos: { instagram: string };
+  // Lo que decían el Excel en Instagram y en «otra red social», para el reporte "por revisar".
+  textos: { instagram: string; otraRed: string };
 }
 
 // De las celdas del Excel a los datos de la fila, con las suposiciones señaladas (nombre, Instagram) y los errores de
@@ -141,16 +141,27 @@ export function construirFila(celdas: CeldasDeFila, catalogos: ContextoCatalogos
   const rubroTexto = texto("rubro");
   const rubro = resolverRubro(rubroTexto, catalogos.rubros);
 
+  // Instagram y «otra red social» son dos columnas. La de Instagram a veces trae un enlace que no es de Instagram: solo se usa
+  // para «otra red social» si su propia columna no trae nada válido.
   let instagram = "";
   let otraRedSocial = "";
-  const redes = clasificarInstagram(texto("instagram"));
-  if (redes.tipo === "instagram") instagram = redes.usuario;
-  else if (redes.tipo === "sin_instagram") avisos.push(AVISOS.instagramNinguno());
-  else if (redes.tipo === "otra_red") {
-    otraRedSocial = redes.texto;
-    avisos.push(AVISOS.otraRed());
-  } else if (redes.tipo === "otra_red_larga") avisos.push(AVISOS.otraRedLarga(redes.texto));
-  else if (redes.tipo === "irreconocible") avisos.push(AVISOS.instagramIrreconocible(redes.texto));
+  const enInstagram = clasificarInstagram(texto("instagram"));
+  const enSuColumna = clasificarOtraRed(texto("otraRed"));
+  if (enInstagram.tipo === "instagram") instagram = enInstagram.usuario;
+  else if (enInstagram.tipo === "sin_instagram") avisos.push(AVISOS.instagramNinguno());
+  else if (enInstagram.tipo === "irreconocible") avisos.push(AVISOS.instagramIrreconocible(enInstagram.texto));
+
+  const enlaceEnInstagram = enInstagram.tipo === "otra_red" || enInstagram.tipo === "otra_red_larga" ? enInstagram : null;
+  if (enSuColumna.tipo === "texto") {
+    otraRedSocial = enSuColumna.texto;
+    if (enlaceEnInstagram) avisos.push(AVISOS.otraRedRepetida(enlaceEnInstagram.texto));
+  } else {
+    if (enSuColumna.tipo === "texto_largo") avisos.push(AVISOS.otraRedColumnaLarga(enSuColumna.texto));
+    if (enlaceEnInstagram?.tipo === "otra_red") {
+      otraRedSocial = enlaceEnInstagram.texto;
+      avisos.push(AVISOS.otraRed());
+    } else if (enlaceEnInstagram?.tipo === "otra_red_larga") avisos.push(AVISOS.otraRedLarga(enlaceEnInstagram.texto));
+  }
 
   const datos: DatosFila = {
     correo: normalizarCorreo(texto("correo")),
@@ -169,5 +180,5 @@ export function construirFila(celdas: CeldasDeFila, catalogos: ContextoCatalogos
   };
 
   avisos.push(...validarDatosFila(datos, catalogos));
-  return { datos, avisos: ordenarAvisos(avisos), textos: { instagram: texto("instagram") } };
+  return { datos, avisos: ordenarAvisos(avisos), textos: { instagram: texto("instagram"), otraRed: texto("otraRed") } };
 }

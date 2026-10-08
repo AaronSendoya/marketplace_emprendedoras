@@ -16,6 +16,11 @@ const r2Completo = {
   R2_PUBLIC_URL: "https://cdn.ejemplo.com",
 };
 
+const cloudflareCompleto = {
+  CLOUDFLARE_ZONE_ID: "zona",
+  CLOUDFLARE_API_TOKEN: "token",
+};
+
 const smtpCompleto = {
   EMAIL_DRIVER: "smtp",
   EMAIL_FROM: "no-responder@ejemplo.com",
@@ -149,13 +154,37 @@ describe("parseEnv", () => {
 
     it("es obligatorio en producción", () => {
       expect(mensajeDeError({ ...base, APP_ENV: "production" })).toContain("R2_BUCKET");
-      expect(() => parseEnv({ ...base, APP_ENV: "production", ...r2Completo, ...smtpCompleto })).not.toThrow();
+      expect(() => parseEnv({ ...base, APP_ENV: "production", ...r2Completo, ...cloudflareCompleto, ...smtpCompleto })).not.toThrow();
     });
 
     it("R2_PUBLIC_URL no admite barra final", () => {
       const mensaje = mensajeDeError({ ...base, ...r2Completo, R2_PUBLIC_URL: "https://cdn.ejemplo.com/" });
 
       expect(mensaje).toContain("R2_PUBLIC_URL: no debe terminar en barra");
+    });
+  });
+
+  describe("Cloudflare (purga de la caché al eliminar cuentas, regla 5)", () => {
+    it("puede faltar entera fuera de producción (desarrollo con r2.dev, que no cachea)", () => {
+      expect(() => parseEnv(base)).not.toThrow();
+      expect(parseEnv(base).CLOUDFLARE_ZONE_ID).toBeUndefined();
+    });
+
+    it("configurada a medias es un error y nombra lo que falta", () => {
+      const mensaje = mensajeDeError({ ...base, CLOUDFLARE_ZONE_ID: "zona" });
+
+      expect(mensaje).toContain("CLOUDFLARE_API_TOKEN");
+      expect(mensaje).not.toContain("CLOUDFLARE_ZONE_ID:");
+    });
+
+    it("es obligatoria en producción: sin ella una imagen borrada seguiría sirviéndose desde la CDN", () => {
+      const produccion = { ...base, APP_ENV: "production", ...r2Completo, ...smtpCompleto };
+
+      const mensaje = mensajeDeError(produccion);
+
+      expect(mensaje).toContain("CLOUDFLARE_ZONE_ID");
+      expect(mensaje).toContain("CLOUDFLARE_API_TOKEN");
+      expect(() => parseEnv({ ...produccion, ...cloudflareCompleto })).not.toThrow();
     });
   });
 
@@ -173,7 +202,7 @@ describe("parseEnv", () => {
     });
 
     it("en producción no admite EMAIL_DRIVER=console (escribiría los códigos OTP en los logs)", () => {
-      const produccion = { ...base, APP_ENV: "production", ...r2Completo };
+      const produccion = { ...base, APP_ENV: "production", ...r2Completo, ...cloudflareCompleto };
 
       expect(mensajeDeError(produccion)).toContain("EMAIL_DRIVER: en producción debe ser smtp");
       expect(mensajeDeError({ ...produccion, EMAIL_DRIVER: "console" })).toContain("EMAIL_DRIVER");

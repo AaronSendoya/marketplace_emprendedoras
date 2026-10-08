@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import type { ReactNode } from "react";
 import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
 import type { Perfil } from "@/lib/api/tipos";
@@ -28,7 +28,7 @@ export function IdentidadNegocio({ perfil, nivelTitulo: Titulo, accion, children
       <div className="relative h-36 sm:h-52 lg:h-60">
         <div className="absolute inset-0 overflow-hidden rounded-t-xl bg-borde">
           {fotoUsable ? (
-            <Image src={perfil.foto_perfil_url} alt="" fill sizes="(min-width: 1280px) 960px, 100vw" className="object-cover" priority />
+            <ImagenR2 src={perfil.foto_perfil_url} alt="" fill sizes="(min-width: 1280px) 960px, 100vw" className="object-cover" priority />
           ) : (
             <MarcadorImagen etiqueta={`Foto de ${perfil.nombre_negocio}`} className="h-full w-full" />
           )}
@@ -36,7 +36,7 @@ export function IdentidadNegocio({ perfil, nivelTitulo: Titulo, accion, children
 
         <div className="absolute bottom-0 left-4 h-[72px] w-[72px] translate-y-1/2 overflow-hidden rounded-full border-4 border-superficie bg-superficie sm:left-8 sm:h-24 sm:w-24">
           {logoUsable ? (
-            <Image src={perfil.logo_url} alt={`Logo de ${perfil.nombre_negocio}`} fill sizes="96px" className="object-cover" />
+            <ImagenR2 src={perfil.logo_url} alt={`Logo de ${perfil.nombre_negocio}`} fill sizes="96px" className="object-cover" />
           ) : (
             <MarcadorImagen etiqueta={`Logo de ${perfil.nombre_negocio}`} className="h-full w-full" />
           )}

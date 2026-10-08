@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useState } from "react";
 import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
@@ -32,7 +32,7 @@ export function TarjetaProductoNegocio({ producto }: PropsTarjetaProductoNegocio
     <article className={CLASES_TARJETA_NEGOCIO}>
       <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl bg-fondo">
         {imagenUsable ? (
-          <Image
+          <ImagenR2
             src={producto.imagen_url}
             alt={producto.nombre}
             fill

@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useActionState } from "react";
 import { Button } from "@/components/atoms/Button";
 import { EntradaArchivoImagen } from "@/components/atoms/EntradaArchivoImagen";
@@ -37,7 +37,7 @@ export function CampoImagen({ titulo, urlActual, alt, accion, textoPredeterminad
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-borde bg-fondo">
           {usable ? (
-            <Image src={urlActual} alt={alt} fill sizes="80px" className="object-cover" />
+            <ImagenR2 src={urlActual} alt={alt} fill sizes="80px" className="object-cover" />
           ) : (
             <MarcadorImagen etiqueta={alt} className="h-full w-full" />
           )}

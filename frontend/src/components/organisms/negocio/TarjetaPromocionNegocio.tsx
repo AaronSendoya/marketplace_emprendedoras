@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useState } from "react";
 import { Badge, type VarianteBadge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
@@ -68,7 +68,7 @@ export function TarjetaPromocionNegocio({ descuento, perfilId, productos }: Prop
               {visibles.map((producto) => (
                 <li key={producto.id} title={producto.nombre} className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-borde bg-fondo">
                   {esUrlDeImagenUsable(producto.imagen_url) ? (
-                    <Image src={producto.imagen_url} alt={producto.nombre} fill sizes="40px" className="object-cover" />
+                    <ImagenR2 src={producto.imagen_url} alt={producto.nombre} fill sizes="40px" className="object-cover" />
                   ) : (
                     <MarcadorImagen etiqueta={producto.nombre} className="h-full w-full" />
                   )}

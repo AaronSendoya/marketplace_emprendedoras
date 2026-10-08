@@ -220,6 +220,65 @@ describe("construirFila: Instagram y otra red", () => {
   });
 });
 
+describe("construirFila: la columna «Otra red social»", () => {
+  it("se guarda tal cual, recortada y sin saltos de más, sin avisos", () => {
+    const { datos, avisos, textos } = construir({ instagram: "@dulcesdeana", otraRed: "  TikTok:   @dulcesdeana " });
+
+    expect(datos).toMatchObject({ instagram: "dulcesdeana", otraRedSocial: "TikTok: @dulcesdeana" });
+    expect(avisos).toEqual([]);
+    expect(textos).toEqual({ instagram: "@dulcesdeana", otraRed: "TikTok:   @dulcesdeana" });
+  });
+
+  it("«No tengo» y similares cuentan como vacío y no avisan", () => {
+    for (const texto of ["No tengo", "ninguna", "-", "N/A"]) {
+      const { datos, avisos } = construir({ otraRed: texto });
+
+      expect(datos.otraRedSocial).toBe("");
+      expect(avisos).toEqual([]);
+    }
+  });
+
+  it("de más de 50 caracteres no cabe: se deja vacía, va al reporte y el aviso es de su campo", () => {
+    const { datos, avisos } = construir({ otraRed: "x".repeat(51) });
+
+    expect(datos.otraRedSocial).toBe("");
+    expect(avisos.find((a) => a.codigo === "otra_red_larga")).toMatchObject({ campo: "otraRedSocial", severidad: "info", reporte: true });
+  });
+
+  it("los 50 caracteres justos caben", () => {
+    expect(construir({ otraRed: "x".repeat(50) }).datos.otraRedSocial).toBe("x".repeat(50));
+  });
+
+  it("si trae las dos cosas manda su columna y el enlace de Instagram queda «para revisar» en el reporte", () => {
+    const { datos, avisos } = construir({ instagram: "https://www.facebook.com/NativaBolivia", otraRed: "TikTok @nativa" });
+
+    expect(datos).toMatchObject({ instagram: "", otraRedSocial: "TikTok @nativa" });
+    expect(avisos.find((a) => a.codigo === "otra_red_repetida")).toMatchObject({ campo: "instagram", severidad: "revisar", reporte: true });
+    expect(codigos(avisos)).not.toContain("otra_red");
+  });
+
+  it("si su columna está vacía se usa el enlace que no es de Instagram de la otra, como antes", () => {
+    const { datos, avisos } = construir({ instagram: "https://www.facebook.com/NativaBolivia", otraRed: "" });
+
+    expect(datos.otraRedSocial).toBe("https://www.facebook.com/NativaBolivia");
+    expect(codigos(avisos)).toContain("otra_red");
+  });
+
+  it("si su columna es demasiado larga y la de Instagram trae un enlace corto, se usa el enlace y se avisa de lo largo", () => {
+    const { datos, avisos } = construir({ instagram: "https://www.facebook.com/Nativa", otraRed: "x".repeat(80) });
+
+    expect(datos.otraRedSocial).toBe("https://www.facebook.com/Nativa");
+    expect(codigos(avisos)).toEqual(expect.arrayContaining(["otra_red_larga", "otra_red"]));
+  });
+
+  it("sin la columna, la fila queda sin otra red social y sin avisos", () => {
+    const { datos, avisos } = construirFila(celdasDePrueba({ otraRed: undefined }), catalogos);
+
+    expect(datos.otraRedSocial).toBe("");
+    expect(avisos).toEqual([]);
+  });
+});
+
 describe("validarDatosFila: lo que corrige el Admin en la vista previa", () => {
   const buenos = (): DatosFila => construir().datos;
 

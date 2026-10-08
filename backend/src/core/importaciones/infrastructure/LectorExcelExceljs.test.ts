@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 import { ErrorValidacion } from "@/shared/domain/errors";
 import { MENSAJES_ARCHIVO } from "../domain/ArchivoExcel";
-import { crearExcelDePrueba, filaDeFormulario } from "../testing/dobles";
+import { ENCABEZADOS_DE_GOOGLE_FORMS, crearExcelDePrueba, filaDeFormulario } from "../testing/dobles";
 import { GeneradorPlantillaExceljs } from "./GeneradorPlantillaExceljs";
 import { LectorExcelExceljs } from "./LectorExcelExceljs";
 
@@ -110,16 +110,22 @@ describe("LectorExcelExceljs", () => {
 });
 
 describe("GeneradorPlantillaExceljs", () => {
-  it("genera un .xlsx que se lee de vuelta, con los encabezados de Google Forms y dos filas de ejemplo inventadas", async () => {
+  it("genera un .xlsx que se lee de vuelta, con los 14 encabezados de Google Forms exactos y en su orden, y dos filas de ejemplo inventadas", async () => {
     const libro = await lector.leer(await new GeneradorPlantillaExceljs().generar());
 
     const [encabezado, uno, dos] = libro.hojas[0].filas;
     expect(libro.hojas[0].filas).toHaveLength(3);
-    expect(encabezado.celdas).toContain("Dirección de correo electrónico");
-    expect(encabezado.celdas).toContain("Instagram de tu emprendimiento");
-    expect(encabezado.celdas.join(" ")).not.toMatch(/beneficio|ofrecer/i);
+    expect(encabezado.celdas).toEqual(ENCABEZADOS_DE_GOOGLE_FORMS.map((e) => e.trim()));
     expect(uno.celdas).toContain("ana.perez@ejemplo.com");
     expect(uno.celdas).toContain("71234567");
+    expect(uno.celdas).toContain("https://www.facebook.com/dulcesdeana");
     expect(dos.celdas).toContain("lucia.vargas@ejemplo.com");
+  });
+
+  it("el último encabezado conserva su espacio final, tal como sale de Google Forms", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load((await new GeneradorPlantillaExceljs().generar()) as unknown as ArrayBuffer);
+
+    expect(libro.worksheets[0].getRow(1).getCell(14).value).toBe("Cuéntanos sobre tu beneficio ");
   });
 });

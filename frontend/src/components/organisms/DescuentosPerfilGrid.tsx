@@ -1,7 +1,7 @@
 "use client";
 
 import { Percent } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useState, type ReactNode } from "react";
 import { Badge, type VarianteBadge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
@@ -134,7 +134,7 @@ export function DescuentosPerfilGrid({
                             className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-borde bg-fondo"
                           >
                             {imagenUsable ? (
-                              <Image src={producto.imagen_url} alt={producto.nombre} fill sizes="32px" className="object-cover" />
+                              <ImagenR2 src={producto.imagen_url} alt={producto.nombre} fill sizes="32px" className="object-cover" />
                             ) : (
                               <MarcadorImagen etiqueta={producto.nombre} className="h-full w-full" />
                             )}

@@ -30,6 +30,23 @@ function comoInstagram(texto: string): ResultadoInstagram {
   }
 }
 
+export type ResultadoOtraRed =
+  | { tipo: "vacio" }
+  | { tipo: "sin_red" }
+  | { tipo: "texto"; texto: string }
+  | { tipo: "texto_largo"; texto: string };
+
+const esSinRed = (normalizado: string) => SIN_INSTAGRAM_SUELTO.has(normalizado) || SIN_INSTAGRAM_FRASE.test(normalizado);
+
+// La columna «Otra red social» (regla 3): texto libre de hasta 50 caracteres, sin saneamiento, salvo "no tengo" y similares, que
+// cuentan como vacío. A diferencia de la de Instagram, aquí no se adivina de qué red es: se guarda lo que escribió.
+export function clasificarOtraRed(entrada: string): ResultadoOtraRed {
+  const texto = entrada.trim().replace(/\s+/g, " ");
+  if (!texto) return { tipo: "vacio" };
+  if (esSinRed(normalizarTexto(texto))) return { tipo: "sin_red" };
+  return texto.length > MAXIMO_OTRA_RED_SOCIAL ? { tipo: "texto_largo", texto } : { tipo: "texto", texto };
+}
+
 export function clasificarInstagram(entrada: string): ResultadoInstagram {
   const texto = entrada.trim();
   if (!texto) return { tipo: "vacio" };

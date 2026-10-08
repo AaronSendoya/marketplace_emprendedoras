@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { Avatar } from "@/components/atoms/Avatar";
 import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
 
@@ -18,7 +18,7 @@ export function LogoMiniNegocio({ nombre, logoUrl, tamano = "md" }: PropsLogoMin
     <span
       className={`relative inline-block shrink-0 overflow-hidden rounded-full border border-borde bg-superficie ${tamano === "md" ? "h-10 w-10" : "h-8 w-8"}`}
     >
-      <Image src={logoUrl} alt="" fill sizes="40px" className="object-cover" />
+      <ImagenR2 src={logoUrl} alt="" fill sizes="40px" className="object-cover" />
     </span>
   );
 }

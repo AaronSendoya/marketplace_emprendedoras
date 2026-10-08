@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/atoms/Badge";
 import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
@@ -42,7 +42,7 @@ export default async function PaginaDetallePerfil({ params }: PageProps<"/empren
           <div className="relative aspect-[16/9] bg-borde sm:aspect-[21/7]">
             <div className="absolute inset-0 overflow-hidden rounded-t-superficie">
               {fotoUsable ? (
-                <Image
+                <ImagenR2
                   src={perfil.foto_perfil_url}
                   alt={perfil.nombre_negocio}
                   fill
@@ -57,7 +57,7 @@ export default async function PaginaDetallePerfil({ params }: PageProps<"/empren
 
             <div className="absolute bottom-0 left-5 h-[5.5rem] w-[5.5rem] translate-y-1/2 overflow-hidden rounded-full border-4 border-superficie bg-superficie shadow-[0_2px_8px_rgb(28_25_23/0.2)] sm:left-8 sm:h-[6.5rem] sm:w-[6.5rem]">
               {logoUsable ? (
-                <Image src={perfil.logo_url} alt={`Logo de ${perfil.nombre_negocio}`} fill sizes="104px" className="object-cover" />
+                <ImagenR2 src={perfil.logo_url} alt={`Logo de ${perfil.nombre_negocio}`} fill sizes="104px" className="object-cover" />
               ) : (
                 <MarcadorImagen etiqueta={`Logo de ${perfil.nombre_negocio}`} className="h-full w-full" />
               )}

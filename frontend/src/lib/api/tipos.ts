@@ -315,14 +315,29 @@ export interface FilaAnalizadaImportacion {
   avisos: AvisoImportacion[];
   ya_existe: boolean;
   repetida_de: number | null;
-  // Lo que decía el Excel en lo que no se guarda tal cual, para el reporte "por revisar".
-  textos: { instagram: string };
+  // Lo que decían las columnas de Instagram y de otra red social, para el reporte "por revisar".
+  textos: { instagram: string; otra_red: string };
+}
+
+// Cómo se leyeron los encabezados del archivo (regla 22, «Tolerancia con el formato»): el archivo se acepta aunque falten
+// columnas o traiga otras, y la vista previa lo dice.
+export interface ColumnasAnalisisImportacion {
+  reconocidas: string[];
+  // Se ignoran a propósito: marca temporal, fotos, logo y beneficio.
+  ignoradas: string[];
+  opcionales_ausentes: string[];
+  // Obligatorias que el archivo no trae: cada fila queda con el error de ese dato y se completa en la vista previa.
+  obligatorias_ausentes: string[];
+  // No se parecen a ninguna columna esperada: no se usan.
+  desconocidas: string[];
+  // Se leyeron como una columna esperada por parecerse a ella (una errata): el Admin lo confirma.
+  aproximadas: { encabezado: string; columna: string }[];
 }
 
 export interface AnalisisImportacion {
   hoja: string;
   hojas: string[];
-  columnas: { reconocidas: string[]; ignoradas: string[]; opcionales_ausentes: string[] };
+  columnas: ColumnasAnalisisImportacion;
   filas: FilaAnalizadaImportacion[];
   resumen: { total: number; listas: number; revisar: number; con_error: number; ya_existen: number; repetidas: number; ocultas: number };
 }

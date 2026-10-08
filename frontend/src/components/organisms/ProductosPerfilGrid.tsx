@@ -1,7 +1,7 @@
 "use client";
 
 import { Package } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { useState } from "react";
 import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
@@ -54,7 +54,7 @@ export function ProductosPerfilGrid({ perfilId, usuarioId, productos }: PropsPro
                     un overflow-hidden del contenedor completo se lo corte. */}
                 <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg bg-fondo">
                   {imagenUsable ? (
-                    <Image
+                    <ImagenR2
                       src={producto.imagen_url}
                       alt={producto.nombre}
                       fill

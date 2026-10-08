@@ -77,7 +77,9 @@ const EsquemaFilaAnalizada = z
     avisos: z.array(EsquemaAviso),
     ya_existe: z.boolean(),
     repetida_de: z.number().int().nullable().meta({ description: "Fila donde aparece primero el mismo correo." }),
-    textos: z.object({ instagram: z.string() }).meta({ description: "Lo que decía el Excel, para el reporte «por revisar»." }),
+    textos: z
+      .object({ instagram: z.string(), otra_red: z.string() })
+      .meta({ description: "Lo que decían las columnas de Instagram y de otra red social, para el reporte «por revisar»." }),
   })
   .meta({ id: "FilaAnalizadaImportacion" });
 
@@ -89,6 +91,13 @@ const EsquemaAnalisis = z
       reconocidas: z.array(z.string()),
       ignoradas: z.array(z.string()).meta({ description: "Encabezados que se ignoran a propósito (fotos, logo, marca temporal y el beneficio, que no se registra)." }),
       opcionales_ausentes: z.array(z.string()),
+      obligatorias_ausentes: z.array(z.string()).meta({
+        description: "Columnas obligatorias que el archivo no trae. El archivo se acepta igual: cada fila queda con el error de ese dato y se completa en la vista previa.",
+      }),
+      desconocidas: z.array(z.string()).meta({ description: "Encabezados que no se parecen a ninguna columna esperada. No se usan." }),
+      aproximadas: z
+        .array(z.object({ encabezado: z.string(), columna: z.string() }))
+        .meta({ description: "Encabezados que se leyeron como una columna esperada por parecerse a ella (una errata)." }),
     }),
     filas: z.array(EsquemaFilaAnalizada),
     resumen: z.object({
@@ -141,7 +150,8 @@ export function registrarImportaciones(registro: OpenAPIRegistry): void {
     description:
       "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, " +
       `${MAXIMO_DE_FILAS_POR_IMPORTACION} filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista ` +
-      "previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden. Las columnas de fotos, logo y beneficio se ignoran. " +
+      "previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden; el archivo se acepta aunque le falten columnas " +
+      "(se avisa cuáles) siempre que se reconozcan al menos 4. Las columnas de fotos, logo y beneficio se ignoran. " +
       "No crea nada. El archivo no se guarda.",
     security: AUTENTICADO,
     request: { body: { content: { "multipart/form-data": { schema: EsquemaArchivoMultipart } } } },
@@ -191,7 +201,7 @@ export function registrarImportaciones(registro: OpenAPIRegistry): void {
     tags: ["Importaciones"],
     summary: "Descargar la plantilla de ejemplo",
     description:
-      "Solo Admin (regla 22). Un `.xlsx` con los encabezados del formulario de Google Forms y dos filas inventadas que muestran el formato esperado.",
+      "Solo Admin (regla 22). Un `.xlsx` con los 14 encabezados del formulario de Google Forms, en su orden, y dos filas inventadas que muestran el formato esperado.",
     security: AUTENTICADO,
     responses: {
       200: {

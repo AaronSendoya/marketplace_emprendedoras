@@ -61,6 +61,12 @@ const TarjetaDeFila = memo(function TarjetaDeFila({ fila, ciudades, rubros, disp
         <dd>{nombreDe(rubros, datos.rubro_id) ?? <span className="text-error">Falta elegir</span>}</dd>
         <dt className="text-xs text-texto-secundario">Instagram</dt>
         <dd className="break-all">{datos.instagram || "—"}</dd>
+        {datos.otra_red_social && (
+          <>
+            <dt className="text-xs text-texto-secundario">Otra red social</dt>
+            <dd className="break-all">{datos.otra_red_social}</dd>
+          </>
+        )}
         <dt className="text-xs text-texto-secundario">Emprendimiento</dt>
         <dd className="break-words">{datos.nombre_negocio || <span className="text-error">Falta</span>}</dd>
         <dt className="text-xs text-texto-secundario">Descripción</dt>

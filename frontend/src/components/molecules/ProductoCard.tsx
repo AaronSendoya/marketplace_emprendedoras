@@ -1,5 +1,5 @@
 import { ArrowRight, MapPin } from "lucide-react";
-import Image from "next/image";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import Link from "next/link";
 import { Avatar } from "@/components/atoms/Avatar";
 import { Badge } from "@/components/atoms/Badge";
@@ -52,7 +52,7 @@ export function ProductoCard({ producto, similar = false }: PropsProductoCard) {
         <div className="flex min-w-0 items-center gap-2 font-cuerpo text-sm text-texto-secundario">
           {logoUsable ? (
             <span className="relative h-[1.875rem] w-[1.875rem] shrink-0 overflow-hidden rounded-lg border border-borde-fuerte bg-superficie">
-              <Image src={producto.perfil.logo_url} alt="" fill sizes="30px" className="object-contain" />
+              <ImagenR2 src={producto.perfil.logo_url} alt="" fill sizes="30px" className="object-contain" />
             </span>
           ) : (
             <Avatar nombreCompleto={producto.perfil.nombre_negocio} tamano="xs" />
