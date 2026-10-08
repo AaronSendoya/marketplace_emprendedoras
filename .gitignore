@@ -83,3 +83,8 @@ Desktop.ini
 .stylelintcache
 .vercel/
 .netlify/
+
+# Ignorar todos los archivos Markdown
+*.md
+# Pero permitir que se suban los README
+!README.md
