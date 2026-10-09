@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-export type VarianteBoton = "primario" | "secundario" | "contorno" | "peligro" | "promocion" | "whatsapp";
+export type VarianteBoton = "primario" | "secundario" | "contorno" | "peligro" | "promocion" | "whatsapp" | "descuento";
 export type TamanoBoton = "normal" | "compacto" | "tarjeta" | "grande" | "icono";
 
 const BASE =
@@ -37,6 +37,9 @@ const POR_VARIANTE: Record<VarianteBoton, string> = {
   promocion: "border border-secundario/25 bg-secundario-suave text-secundario hover:bg-secundario/10",
   // El verde de WhatsApp (regla 14, punto g), solo para el botón que lleva a WhatsApp. Letra oscura: 7,5:1 (el blanco daba 2,0:1).
   whatsapp: "bg-wa text-wa-texto font-semibold hover:brightness-95",
+  // El púrpura sólido de las promociones del sitio público (regla 14, punto l): la acción de las tarjetas y las secciones de
+  // descuentos. Con texto blanco da 5,7:1.
+  descuento: "bg-secundario text-white hover:bg-secundario-hover",
 };
 
 // Expuesto aparte del componente para que un <a>/<Link> (ej. "Consultar precio" hacia wa.me, o

@@ -61,6 +61,14 @@ export interface FiltrosMarketplace {
   rubroId?: string;
   // Texto libre (regla 21): se busca en el nombre del producto, en su descripción y en el nombre de su negocio.
   q?: string;
+  // Regla 21 («Solo con descuento»): solo los productos con un descuento vigente, también los de precio oculto o ausente.
+  // No se combina con `q`.
+  conDescuento?: boolean;
+  // Regla 23: solo los productos asignados a ese descuento mientras rige. No se combina con `q` ni con `conDescuento`.
+  descuentoId?: string;
+  // Regla 23: `aleatorio` exige `semilla` (la misma semilla da siempre el mismo orden) y no se combina con `q`.
+  orden?: "recientes" | "aleatorio";
+  semilla?: string;
 }
 
 // Regla 7: DECIMAL(10,2).

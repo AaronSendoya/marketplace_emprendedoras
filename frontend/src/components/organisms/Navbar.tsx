@@ -21,6 +21,7 @@ interface PropsNavbar {
 const ENLACES = [
   { href: "/", etiqueta: "Inicio" },
   { href: "/emprendedoras", etiqueta: "Emprendedoras" },
+  { href: "/productos", etiqueta: "Productos" },
   { href: "/promociones", etiqueta: "Promociones" },
 ];
 

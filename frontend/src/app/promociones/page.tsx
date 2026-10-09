@@ -1,22 +1,25 @@
-import { Package } from "lucide-react";
+import { Percent } from "lucide-react";
 import type { Metadata } from "next";
+import { EstadoVacio } from "@/components/molecules/EstadoVacio";
+import { Paginador } from "@/components/molecules/Paginador";
+import { PromocionCard } from "@/components/molecules/PromocionCard";
 import { BusquedaProvider, EncabezadoResultados, ResultadosBusqueda, SinResultadosBusqueda } from "@/components/organisms/BusquedaCatalogo";
 import { CatalogGrid } from "@/components/organisms/CatalogGrid";
 import { CatalogHeader } from "@/components/organisms/CatalogHeader";
 import { CatalogToolbar } from "@/components/organisms/CatalogToolbar";
-import { AvisoResultadosSimilares } from "@/components/molecules/AvisoResultadosSimilares";
-import { EstadoVacio } from "@/components/molecules/EstadoVacio";
-import { ProductoCard } from "@/components/molecules/ProductoCard";
-import { Paginador } from "@/components/molecules/Paginador";
+import { SelectorOrdenPromociones } from "@/components/organisms/SelectorOrdenPromociones";
 import { listarCiudades, listarRubros } from "@/lib/api/catalogos";
-import { listarProductos } from "@/lib/api/productos";
+import { listarPromociones } from "@/lib/api/promociones";
+import type { OrdenPromociones } from "@/lib/api/tipos";
 import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
+import { semillaDe } from "@/lib/inicio/semilla";
 
 export const metadata: Metadata = {
   title: "Promociones — Track de Mujeres",
 };
 
 const LIMITE = 12;
+const ORDENES: readonly OrdenPromociones[] = ["aleatorio", "mayor_descuento", "termina_pronto"];
 
 // Un valor de searchParams puede llegar repetido (?q=a&q=b); nos quedamos con el primero, como
 // hacen los ejemplos de Next para este mismo caso (string | string[] | undefined).
@@ -24,28 +27,33 @@ function primerValor(valor: string | string[] | undefined): string {
   return (Array.isArray(valor) ? valor[0] : valor) ?? "";
 }
 
-// Feed 2 completo (sección 0 del plan): no filtra por "tiene descuento", porque el backend ya
-// resuelve las tres presentaciones posibles de cada producto (precio normal, con descuento
-// vigente o "Consultar precio", sección 5.2) y esta página solo las muestra tal cual llegan.
+// Promociones (CLAUDE.md sección 6, regla 14, punto l): una tarjeta por descuento vigente de cada emprendedora (regla 23 del backend). Cada tarjeta lleva a
+// los productos que tiene (`/promociones/[id]`). Los productos sueltos viven en `/productos`. Lo que dice cada tarjeta (vigencia, cuántos
+// productos) llega resuelto del backend. Por defecto el orden es al azar y cambia en cada visita, con la misma semilla en la dirección mientras se pasa
+// de página; «Mayor descuento» y «Termina pronto» no necesitan semilla.
 export default async function PaginaPromociones({ searchParams }: PageProps<"/promociones">) {
   const parametros = await searchParams;
-  // El backend acepta de 1 a 100 caracteres (regla 21): un texto más largo, escrito a mano en la URL, no debe llegar
-  // a la API ni terminar en una página de error.
+  // El backend acepta de 1 a 100 caracteres: un texto más largo, escrito a mano en la URL, no debe llegar a la API ni terminar en una página de error.
   const q = primerValor(parametros.q).trim().slice(0, 100);
   const ciudadId = primerValor(parametros.ciudad_id);
   const rubroId = primerValor(parametros.rubro_id);
   const pagina = Number(primerValor(parametros.pagina)) || 1;
+  const pedido = primerValor(parametros.orden);
+  const orden = (ORDENES as readonly string[]).includes(pedido) ? (pedido as OrdenPromociones) : "aleatorio";
+  const semilla = orden === "aleatorio" ? semillaDe(primerValor(parametros.semilla)) : undefined;
   const hayFiltros = Boolean(q || ciudadId || rubroId);
 
-  const [ciudades, rubros, { datos: productos, paginacion, similares }] = await Promise.all([
+  const [ciudades, rubros, { datos: promociones, paginacion }] = await Promise.all([
     listarCiudades(),
     listarRubros(),
-    listarProductos({
+    listarPromociones({
       q: q || undefined,
       ciudad_id: ciudadId || undefined,
       rubro_id: rubroId || undefined,
       pagina,
       limite: LIMITE,
+      orden,
+      semilla,
     }),
   ]);
 
@@ -54,6 +62,8 @@ export default async function PaginaPromociones({ searchParams }: PageProps<"/pr
     if (q) parametrosUrl.set("q", q);
     if (ciudadId) parametrosUrl.set("ciudad_id", ciudadId);
     if (rubroId) parametrosUrl.set("rubro_id", rubroId);
+    if (orden !== "aleatorio") parametrosUrl.set("orden", orden);
+    if (semilla) parametrosUrl.set("semilla", semilla);
     parametrosUrl.set("pagina", String(nuevaPagina));
     return `/promociones?${parametrosUrl.toString()}`;
   }
@@ -62,50 +72,39 @@ export default async function PaginaPromociones({ searchParams }: PageProps<"/pr
     <main className="flex-1">
       <CatalogHeader
         titulo="Promociones"
-        descripcion="Productos de la comunidad Track de Mujeres, con sus descuentos vigentes cuando corresponde."
+        descripcion="Descuentos vigentes de las emprendedoras. Elige uno para ver los productos que incluye."
         imagen="/Portada 2.png"
       />
 
-      {/* Sin relleno arriba (`pt-0`): la barra de filtros se superpone al borde inferior del banner (CLAUDE.md
-          sección 6, regla 14). */}
+      {/* Sin relleno arriba (`pt-0`): la barra de filtros se superpone al borde inferior del banner (regla 14). */}
       <div className={`mx-auto w-full ${CONTENEDOR_PUBLICO} space-y-8 px-4 pt-0 pb-16 sm:px-6 lg:px-8`}>
-        {/* Búsqueda en vivo (CLAUDE.md sección 5): el proveedor comparte el estado "buscando" entre la barra de
-            filtros y los resultados. No pinta nada propio, así que `space-y-8` sigue separándolos. */}
         <BusquedaProvider>
-          <CatalogToolbar
-            ciudades={ciudades}
-            rubros={rubros}
-            placeholderBusqueda="Buscar por producto o negocio..."
-          />
+          <CatalogToolbar ciudades={ciudades} rubros={rubros} placeholderBusqueda="Buscar por negocio o texto de la promoción..." tono="purpura" />
 
           <ResultadosBusqueda className="space-y-6">
-            <EncabezadoResultados
-              total={paginacion.total}
-              unidades={similares ? ["producto similar", "productos similares"] : ["producto", "productos"]}
-              ciudades={ciudades}
-              rubros={rubros}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              <EncabezadoResultados total={paginacion.total} unidades={["promoción", "promociones"]} ciudades={ciudades} rubros={rubros} />
+              {promociones.length > 0 && <SelectorOrdenPromociones orden={orden} />}
+            </div>
 
-            {productos.length === 0 ? (
+            {promociones.length === 0 ? (
               hayFiltros ? (
-                <SinResultadosBusqueda ruta="/promociones" plural="productos" />
+                <SinResultadosBusqueda ruta="/promociones" plural="promociones" />
               ) : (
                 <EstadoVacio
-                  icono={Package}
-                  titulo="Aún no hay productos publicados"
-                  descripcion="Vuelve pronto: las emprendedoras están subiendo sus productos y promociones."
+                  icono={Percent}
+                  titulo="Todavía no hay promociones vigentes"
+                  descripcion="Las promociones que creen las emprendedoras aparecen aquí. Mientras tanto, mira los productos de la comunidad."
+                  accion={{ etiqueta: "Ver los productos", href: "/productos" }}
                   className="bg-superficie"
                 />
               )
             ) : (
-              <div className="space-y-4">
-                {similares && <AvisoResultadosSimilares busqueda={q} />}
-                <CatalogGrid>
-                  {productos.map((producto) => (
-                    <ProductoCard key={producto.id} producto={producto} similar={similares} />
-                  ))}
-                </CatalogGrid>
-              </div>
+              <CatalogGrid>
+                {promociones.map((promocion) => (
+                  <PromocionCard key={promocion.id} promocion={promocion} />
+                ))}
+              </CatalogGrid>
             )}
 
             <Paginador paginacion={paginacion} crearHref={crearHref} superficie />

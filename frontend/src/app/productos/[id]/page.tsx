@@ -41,7 +41,7 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
 
   return (
     <main className={`mx-auto w-full ${CONTENEDOR_PUBLICO} flex-1 px-4 pb-16 sm:px-6 lg:px-8`}>
-      <Migas items={[{ etiqueta: "Promociones", href: "/promociones" }, { etiqueta: producto.nombre }]} />
+      <Migas items={[{ etiqueta: "Productos", href: "/productos" }, { etiqueta: producto.nombre }]} />
 
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start">
         <div className="relative aspect-[4/3] overflow-hidden rounded-superficie border border-borde bg-borde shadow-tarjeta">
@@ -59,7 +59,7 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
           )}
 
           {producto.porcentaje !== null && (
-            <span className="absolute top-4 left-4 rounded-lg bg-enfasis px-3 py-2 font-titulo text-base leading-none font-extrabold text-white">
+            <span className="absolute top-4 left-4 rounded-lg bg-secundario px-3 py-2 font-titulo text-base leading-none font-extrabold text-white">
               -{producto.porcentaje}%
             </span>
           )}

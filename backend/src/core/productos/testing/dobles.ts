@@ -73,9 +73,10 @@ export class ProductoRepositoryEnMemoria implements IProductoRepository {
     producto.actualizadoEn = ahora;
   }
 
-  private delFeed(filtros: Pick<FiltrosMarketplace, "perfilId" | "ciudadId" | "rubroId">): Producto[] {
+  private delFeed(filtros: Pick<FiltrosMarketplace, "perfilId" | "ciudadId" | "rubroId" | "conDescuento">): Producto[] {
     return this.productos
       .filter((p) => p.activo && p.perfil.usuarioActivo)
+      .filter((p) => !filtros.conDescuento || p.porcentajeVigente !== null)
       .filter((p) => !filtros.perfilId || p.perfilId === filtros.perfilId)
       .filter((p) => !filtros.ciudadId || p.perfil.ciudad.id === filtros.ciudadId)
       .filter((p) => !filtros.rubroId || p.perfil.rubro.id === filtros.rubroId);

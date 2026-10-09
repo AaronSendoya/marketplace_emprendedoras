@@ -16,9 +16,9 @@ import type { Actor } from "@/shared/domain/Actor";
 import type { ParametrosPagina } from "@/shared/domain/Paginacion";
 import type { UrlImagen } from "./perfiles.controller";
 
-// Regla 18: con el precio oculto o ausente no viajan ni el precio, ni el porcentaje, ni el precio con
-// descuento; `consultar_precio` le dice al frontend que muestre "Consultar Precio" (regla 7). El
-// frontend no calcula precios ni vigencia (regla 8).
+// Regla 18: con el precio oculto o ausente no viajan ni el precio ni el precio con descuento; el porcentaje del descuento vigente sí
+// (solo dice cuánto es, no revela el precio: regla 8). `consultar_precio` le dice al frontend que muestre "Consultar Precio"
+// (regla 7). El frontend no calcula precios ni vigencia (regla 8).
 export function serializarProductoPublico(producto: Producto, urlImagen: UrlImagen) {
   const visible = precioVisible(producto);
   return {
@@ -27,7 +27,7 @@ export function serializarProductoPublico(producto: Producto, urlImagen: UrlImag
     descripcion: producto.descripcion,
     imagen_url: urlImagen(producto.imagenKey),
     precio: visible ? producto.precio : null,
-    porcentaje: visible ? producto.porcentajeVigente : null,
+    porcentaje: producto.porcentajeVigente,
     precio_con_descuento: visible ? producto.precioConDescuento : null,
     consultar_precio: !visible,
     creado_en: producto.creadoEn.toISOString(),
@@ -53,7 +53,7 @@ export function serializarProductoPropio(producto: Producto, urlImagen: UrlImage
     precio: producto.precio,
     mostrar_precio: producto.mostrarPrecio,
     activo: producto.activo,
-    porcentaje: producto.precio === null ? null : producto.porcentajeVigente,
+    porcentaje: producto.porcentajeVigente,
     precio_con_descuento: producto.precioConDescuento,
     creado_en: producto.creadoEn.toISOString(),
     actualizado_en: producto.actualizadoEn.toISOString(),

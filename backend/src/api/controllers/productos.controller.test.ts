@@ -18,17 +18,21 @@ describe("serializarProductoPublico (reglas 7, 8 y 18)", () => {
     expect(serializarProductoPublico(productoDePrueba(), url)).toMatchObject({ precio: 100, porcentaje: null, precio_con_descuento: null, consultar_precio: false });
   });
 
-  it("con el precio oculto no viaja ni el precio, ni el porcentaje, ni el precio con descuento", () => {
+  it("con el precio oculto no viaja ni el precio ni el precio con descuento, pero sí el porcentaje (regla 8, 2026-10-08)", () => {
     const cuerpo = serializarProductoPublico(productoDePrueba({ ...conDescuento, mostrarPrecio: false }), url);
 
-    expect(cuerpo).toMatchObject({ precio: null, porcentaje: null, precio_con_descuento: null, consultar_precio: true });
+    expect(cuerpo).toMatchObject({ precio: null, porcentaje: 15, precio_con_descuento: null, consultar_precio: true });
     expect(JSON.stringify(cuerpo)).not.toMatch(/\b(100|85)\b/);
   });
 
-  it("sin precio: consultar_precio, aunque tenga un descuento asignado", () => {
+  it("sin precio: consultar_precio y el porcentaje del descuento asignado, sin ningún precio", () => {
     const cuerpo = serializarProductoPublico(productoDePrueba({ precio: null, porcentajeVigente: 15 }), url);
 
-    expect(cuerpo).toMatchObject({ precio: null, porcentaje: null, precio_con_descuento: null, consultar_precio: true });
+    expect(cuerpo).toMatchObject({ precio: null, porcentaje: 15, precio_con_descuento: null, consultar_precio: true });
+  });
+
+  it("sin precio y sin descuento: ni precio ni porcentaje", () => {
+    expect(serializarProductoPublico(productoDePrueba({ precio: null }), url)).toMatchObject({ precio: null, porcentaje: null, consultar_precio: true });
   });
 
   it("un precio 0 visible no se confunde con \"sin precio\"", () => {

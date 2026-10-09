@@ -3,6 +3,7 @@ import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
 
 const ENLACES = [
   { href: "/emprendedoras", etiqueta: "Emprendedoras" },
+  { href: "/productos", etiqueta: "Productos" },
   { href: "/promociones", etiqueta: "Promociones" },
 ];
 

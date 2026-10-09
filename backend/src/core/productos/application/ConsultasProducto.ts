@@ -1,5 +1,5 @@
 import type { IPerfilRepository } from "@/core/perfiles/domain/IPerfilRepository";
-import { ErrorNoEncontrado } from "@/shared/domain/errors";
+import { ErrorNoEncontrado, ErrorValidacion } from "@/shared/domain/errors";
 import type { IClock } from "@/shared/domain/IClock";
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import { ordenarPorSimilitud } from "../domain/BusquedaSimilar";
@@ -23,6 +23,14 @@ export class GetMarketplaceUseCase {
   // descuento vigente. Con al menos una coincidencia exacta solo se devuelven las exactas: lo parecido nunca se mezcla
   // con ellas.
   async ejecutar(filtros: FiltrosMarketplace, pagina: ParametrosPagina): Promise<ResultadoProductos> {
+    // Regla 21 («Solo con descuento») y regla 23 (`descuento_id`, orden al azar): la búsqueda de parecidos no distingue
+    // descuentos ni orden, así que no se combinan con `q`; el orden al azar necesita su semilla.
+    const rechazar = (campo: string, mensaje: string) => new ErrorValidacion(mensaje, [{ campo, mensaje }]);
+    if (filtros.conDescuento && filtros.q) throw rechazar("con_descuento", "con_descuento no se puede usar junto con q.");
+    if (filtros.descuentoId && filtros.q) throw rechazar("descuento_id", "descuento_id no se puede usar junto con q.");
+    if (filtros.descuentoId && filtros.conDescuento) throw rechazar("descuento_id", "descuento_id no se puede usar junto con con_descuento.");
+    if (filtros.orden === "aleatorio" && !filtros.semilla) throw rechazar("semilla", "El orden aleatorio necesita una semilla.");
+    if (filtros.orden === "aleatorio" && filtros.q) throw rechazar("orden", "orden=aleatorio no se puede usar junto con q.");
     const ahora = this.clock.ahora();
     const exactos = await this.productos.listarMarketplace(ahora, filtros, pagina);
     if (exactos.total > 0 || !filtros.q) return { ...exactos, similares: false };

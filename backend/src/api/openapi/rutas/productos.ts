@@ -57,6 +57,27 @@ const filtrosFeed = {
   perfil_id: z.uuid().optional(),
   ciudad_id: z.uuid().optional(),
   rubro_id: z.uuid().optional(),
+  con_descuento: z
+    .enum(["true", "false"])
+    .optional()
+    .meta({
+      description:
+        "`true`: solo los productos con un descuento vigente ahora, también los de precio oculto o ausente (regla 21, «Solo con descuento»), con la paginación y el `total` sobre ese filtro. `false` o sin el parámetro: sin filtro. Se combina con ciudad_id, rubro_id y perfil_id, pero no con `q` (400).",
+    }),
+  descuento_id: z.uuid().optional().meta({
+    description:
+      "Regla 23: solo los productos activos asignados a ese descuento mientras rige (los de una promoción). Se combina con ciudad_id, rubro_id y perfil_id, pero no con `q` ni con `con_descuento` (400).",
+  }),
+  orden: z.enum(["recientes", "aleatorio"]).optional().meta({
+    description: "`recientes` (por defecto) o `aleatorio` (regla 23: exige `semilla` y no se combina con `q`).",
+  }),
+  semilla: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/, "La semilla solo admite letras, números, guion y guion bajo.")
+    .optional()
+    .meta({ description: "Con `orden=aleatorio`: la misma semilla da siempre el mismo orden, así que las páginas no repiten ni saltan productos.", example: "k3x9q2" }),
   q: z
     .string()
     .trim()
@@ -153,9 +174,10 @@ export function registrarProductos(registro: OpenAPIRegistry): void {
     tags: ["Marketplace"],
     summary: "Feed de productos",
     description:
-      "Público. Solo productos activos de cuentas activas (regla 18), más recientes primero. Cada producto trae el " +
-      "mayor descuento vigente y su precio con descuento, calculados al consultar (regla 8). Con el precio oculto o " +
-      "ausente, `precio`, `porcentaje` y `precio_con_descuento` son nulos y `consultar_precio` es `true`.",
+      "Público. Solo productos activos de cuentas activas (regla 18), más recientes primero (o al azar con `orden=aleatorio` y " +
+      "`semilla`, regla 23). Cada producto trae el mayor descuento vigente y su precio con descuento, calculados al consultar " +
+      "(regla 8). Con el precio oculto o ausente, `precio` y `precio_con_descuento` son nulos y `consultar_precio` es `true`; " +
+      "el `porcentaje` del descuento vigente sí viaja.",
     security: PUBLICO,
     request: { query: EsquemaMarketplaceQuery },
     responses: {

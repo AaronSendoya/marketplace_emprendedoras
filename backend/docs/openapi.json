@@ -816,6 +816,140 @@
           "perfil"
         ]
       },
+      "PromocionesPagina": {
+        "type": "object",
+        "properties": {
+          "datos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromocionPublica"
+            }
+          },
+          "paginacion": {
+            "$ref": "#/components/schemas/Paginacion"
+          }
+        },
+        "required": [
+          "datos",
+          "paginacion"
+        ]
+      },
+      "PromocionPublica": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0b0f1a0e-2c6b-4c7a-9a38-6f8c1f0d3e11"
+          },
+          "porcentaje": {
+            "type": "number",
+            "example": 10
+          },
+          "descripcion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Detalle del descuento (regla 8); `null` si no tiene.",
+            "example": "Descuento por el día del estudiante."
+          },
+          "fecha_inicio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "`null` = rige desde que se creó."
+          },
+          "fecha_fin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "`null` = sin fecha de fin (permanente)."
+          },
+          "productos_total": {
+            "type": "integer",
+            "description": "Cuántos productos activos lo llevan."
+          },
+          "productos_muestra": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hasta 3 imágenes de esos productos (URLs)."
+          },
+          "perfil": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nombre_negocio": {
+                "type": "string",
+                "example": "Dulces de prueba"
+              },
+              "whatsapp": {
+                "type": "string"
+              },
+              "ciudad": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "Cobija"
+                  }
+                },
+                "required": [
+                  "id",
+                  "nombre"
+                ]
+              },
+              "rubro": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "Alimentos y bebidas"
+                  }
+                },
+                "required": [
+                  "id",
+                  "nombre"
+                ]
+              },
+              "logo_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "nombre_negocio",
+              "whatsapp",
+              "ciudad",
+              "rubro",
+              "logo_url"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "porcentaje",
+          "descripcion",
+          "fecha_inicio",
+          "fecha_fin",
+          "productos_total",
+          "productos_muestra",
+          "perfil"
+        ]
+      },
       "ResumenClics": {
         "type": "object",
         "properties": {
@@ -3657,7 +3791,7 @@
           "Marketplace"
         ],
         "summary": "Feed de productos",
-        "description": "Público. Solo productos activos de cuentas activas (regla 18), más recientes primero. Cada producto trae el mayor descuento vigente y su precio con descuento, calculados al consultar (regla 8). Con el precio oculto o ausente, `precio`, `porcentaje` y `precio_con_descuento` son nulos y `consultar_precio` es `true`.",
+        "description": "Público. Solo productos activos de cuentas activas (regla 18), más recientes primero (o al azar con `orden=aleatorio` y `semilla`, regla 23). Cada producto trae el mayor descuento vigente y su precio con descuento, calculados al consultar (regla 8). Con el precio oculto o ausente, `precio` y `precio_con_descuento` son nulos y `consultar_precio` es `true`; el `porcentaje` del descuento vigente sí viaja.",
         "security": [],
         "parameters": [
           {
@@ -3707,6 +3841,59 @@
             },
             "required": false,
             "name": "rubro_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "`true`: solo los productos con un descuento vigente ahora, también los de precio oculto o ausente (regla 21, «Solo con descuento»), con la paginación y el `total` sobre ese filtro. `false` o sin el parámetro: sin filtro. Se combina con ciudad_id, rubro_id y perfil_id, pero no con `q` (400)."
+            },
+            "required": false,
+            "description": "`true`: solo los productos con un descuento vigente ahora, también los de precio oculto o ausente (regla 21, «Solo con descuento»), con la paginación y el `total` sobre ese filtro. `false` o sin el parámetro: sin filtro. Se combina con ciudad_id, rubro_id y perfil_id, pero no con `q` (400).",
+            "name": "con_descuento",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Regla 23: solo los productos activos asignados a ese descuento mientras rige (los de una promoción). Se combina con ciudad_id, rubro_id y perfil_id, pero no con `q` ni con `con_descuento` (400)."
+            },
+            "required": false,
+            "description": "Regla 23: solo los productos activos asignados a ese descuento mientras rige (los de una promoción). Se combina con ciudad_id, rubro_id y perfil_id, pero no con `q` ni con `con_descuento` (400).",
+            "name": "descuento_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recientes",
+                "aleatorio"
+              ],
+              "description": "`recientes` (por defecto) o `aleatorio` (regla 23: exige `semilla` y no se combina con `q`)."
+            },
+            "required": false,
+            "description": "`recientes` (por defecto) o `aleatorio` (regla 23: exige `semilla` y no se combina con `q`).",
+            "name": "orden",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Con `orden=aleatorio`: la misma semilla da siempre el mismo orden, así que las páginas no repiten ni saltan productos.",
+              "example": "k3x9q2"
+            },
+            "required": false,
+            "description": "Con `orden=aleatorio`: la misma semilla da siempre el mismo orden, así que las páginas no repiten ni saltan productos.",
+            "name": "semilla",
             "in": "query"
           },
           {
@@ -4805,6 +4992,186 @@
           },
           "403": {
             "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marketplace/promociones": {
+      "get": {
+        "tags": [
+          "Marketplace"
+        ],
+        "summary": "Promociones vigentes",
+        "description": "Público (regla 23). Una promoción es un descuento que rige ahora, de una cuenta activa y con al menos un producto activo asignado; se muestra aunque esos productos tengan el precio oculto o ausente. Cada una trae el descuento, el negocio, cuántos productos lleva y hasta tres imágenes de ellos. Los productos de una promoción se piden con `GET /marketplace/productos?descuento_id=`.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "pagina",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "perfil_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "ciudad_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "rubro_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "description": "Texto a buscar (regla 23). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del negocio o en el texto del descuento. Sin distinguir mayúsculas ni acentos y sin resultados parecidos. Se combina con los demás filtros con AND."
+            },
+            "required": false,
+            "description": "Texto a buscar (regla 23). Se separa en palabras (hasta 6) y cada una debe aparecer en el nombre del negocio o en el texto del descuento. Sin distinguir mayúsculas ni acentos y sin resultados parecidos. Se combina con los demás filtros con AND.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recientes",
+                "aleatorio",
+                "mayor_descuento",
+                "termina_pronto"
+              ],
+              "description": "`recientes` (por defecto), `aleatorio` (exige `semilla`), `mayor_descuento` o `termina_pronto` (los que no tienen fecha de fin, al final)."
+            },
+            "required": false,
+            "description": "`recientes` (por defecto), `aleatorio` (exige `semilla`), `mayor_descuento` o `termina_pronto` (los que no tienen fecha de fin, al final).",
+            "name": "orden",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Obligatoria con `orden=aleatorio`: la misma semilla da siempre el mismo orden (regla 23).",
+              "example": "k3x9q2"
+            },
+            "required": false,
+            "description": "Obligatoria con `orden=aleatorio`: la misma semilla da siempre el mismo orden (regla 23).",
+            "name": "semilla",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de promociones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionesPagina"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marketplace/promociones/{id}": {
+      "get": {
+        "tags": [
+          "Marketplace"
+        ],
+        "summary": "Detalle de una promoción",
+        "description": "Público (regla 23). Una promoción que no rige, es de una cuenta desactivada o no tiene productos activos responde 404.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Id de la promoción (del descuento)."
+            },
+            "required": true,
+            "description": "Id de la promoción (del descuento).",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Promoción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionPublica"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
             "content": {
               "application/json": {
                 "schema": {

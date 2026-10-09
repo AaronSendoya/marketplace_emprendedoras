@@ -35,7 +35,7 @@ export function ProductoCard({ producto, similar = false }: PropsProductoCard) {
     <article className="group @container flex h-full flex-col overflow-hidden rounded-superficie border border-borde bg-superficie shadow-tarjeta transition-[translate,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-borde-fuerte hover:shadow-tarjeta-hover motion-reduce:transition-none">
       <ImagenProducto src={producto.imagen_url} nombre={producto.nombre} negocio={producto.perfil.nombre_negocio}>
         {producto.porcentaje !== null && (
-          <span className="pointer-events-none absolute top-3 left-3 rounded-lg bg-enfasis px-2.5 py-2 font-titulo text-[0.9375rem] leading-none font-extrabold text-white">
+          <span className="pointer-events-none absolute top-3 left-3 rounded-lg bg-secundario px-2.5 py-2 font-titulo text-[0.9375rem] leading-none font-extrabold text-white">
             -{producto.porcentaje}%
           </span>
         )}

@@ -13,6 +13,8 @@ const PUBLICAS = new Set([
   "GET /perfiles/{id}",
   "GET /marketplace/productos",
   "GET /marketplace/productos/{id}",
+  "GET /marketplace/promociones",
+  "GET /marketplace/promociones/{id}",
   "POST /auth/login",
   "POST /auth/password/solicitar-codigo",
   "POST /auth/password/restablecer",

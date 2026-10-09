@@ -5,9 +5,10 @@ import type { FiltrosProductos, Pagina, PaginaProductos, ParametrosPagina, Produ
 // descuento se evalúa al consultar, así que no conviene cachear por más tiempo del que se
 // tolere de retraso (valor por defecto del cliente: 30 s, ver cliente.ts). Con texto de búsqueda
 // (`q`) no se cachea: la búsqueda en vivo pide una consulta distinta por cada pausa al escribir y
-// guardarlas todas llenaría la caché de Next con textos que casi nadie repite.
+// guardarlas todas llenaría la caché de Next con textos que casi nadie repite. Con una semilla
+// (orden al azar, regla 23) tampoco: cada visita trae una semilla nueva y guardarlas todas sería lo mismo.
 export const listarProductos = (filtros: FiltrosProductos = {}) =>
-  obtenerJson<PaginaProductos>("/marketplace/productos", { parametros: { ...filtros }, revalidarSegundos: filtros.q ? 0 : undefined });
+  obtenerJson<PaginaProductos>("/marketplace/productos", { parametros: { ...filtros }, revalidarSegundos: filtros.q || filtros.semilla ? 0 : undefined });
 
 export const obtenerProducto = (id: string) => obtenerJson<ProductoPublico>(`/marketplace/productos/${id}`);
 

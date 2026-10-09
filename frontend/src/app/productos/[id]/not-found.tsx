@@ -8,8 +8,8 @@ export default function ProductoNoEncontrado() {
       <p className="max-w-sm font-cuerpo text-sm text-texto-secundario">
         Este producto no existe o ya no está disponible.
       </p>
-      <Link href="/promociones" className={clasesBoton("primario")}>
-        Volver a promociones
+      <Link href="/productos" className={clasesBoton("primario")}>
+        Volver a productos
       </Link>
     </main>
   );

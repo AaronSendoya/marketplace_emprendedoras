@@ -13,6 +13,8 @@ interface PropsCatalogToolbar {
   ciudades: ReferenciaCatalogo[];
   rubros: ReferenciaCatalogo[];
   placeholderBusqueda?: string;
+  // El color del chip de rubro elegido: naranja (Emprendedoras y Productos) o púrpura (Promociones), regla 14, punto l.
+  tono?: "naranja" | "purpura";
 }
 
 interface Filtros {
@@ -36,7 +38,7 @@ interface Filtros {
 // se busca mientras se escribe (con un retraso), el encabezado de resultados dice "Buscando…" hasta que llegan y la
 // ciudad y el rubro elegidos se ven al instante, sin esperar a la respuesta. Sin él (Promociones) todo es como siempre:
 // el texto se envía con Enter y cada cambio es una navegación.
-export function CatalogToolbar({ ciudades, rubros, placeholderBusqueda }: PropsCatalogToolbar) {
+export function CatalogToolbar({ ciudades, rubros, placeholderBusqueda, tono = "naranja" }: PropsCatalogToolbar) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -120,6 +122,7 @@ export function CatalogToolbar({ ciudades, rubros, placeholderBusqueda }: PropsC
           valor={filtros.rubro_id}
           onChange={(valor) => actualizarParametro("rubro_id", valor)}
           etiquetaTodas="Todos los rubros"
+          tono={tono}
         />
       </div>
     </div>

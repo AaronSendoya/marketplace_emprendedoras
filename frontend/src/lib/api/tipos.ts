@@ -224,7 +224,43 @@ export interface FiltrosProductos extends ParametrosPagina {
   ciudad_id?: string;
   rubro_id?: string;
   q?: string;
+  // Regla 21 (backend, «Solo con descuento»): solo los productos con un descuento vigente (también con el precio oculto o
+  // ausente). No se combina con `q`. Se manda como texto (`"true"`), que es lo que espera la API en la URL.
+  con_descuento?: "true";
+  // Regla 23 (backend): solo los productos asignados a ese descuento mientras rige (los de una promoción). No se combina con `q`.
+  descuento_id?: string;
+  // Regla 23: `aleatorio` exige `semilla` (la misma semilla da siempre el mismo orden) y no se combina con `q`.
+  orden?: "recientes" | "aleatorio";
+  semilla?: string;
 }
+
+// Promociones públicas (regla 23, backend; `docs/openapi.json`, GET /marketplace/promociones): un descuento que rige ahora, el negocio
+// que lo ofrece y cuántos productos lleva. Los productos se piden aparte con `descuento_id`.
+export interface PromocionPublica {
+  id: string;
+  porcentaje: number;
+  descripcion: string | null;
+  fecha_inicio: string | null;
+  // `null` = sin fecha de fin (permanente).
+  fecha_fin: string | null;
+  productos_total: number;
+  // Hasta 3 imágenes de esos productos (URLs).
+  productos_muestra: string[];
+  perfil: PerfilResumen;
+}
+
+export type OrdenPromociones = "recientes" | "aleatorio" | "mayor_descuento" | "termina_pronto";
+
+export interface FiltrosPromociones extends ParametrosPagina {
+  perfil_id?: string;
+  ciudad_id?: string;
+  rubro_id?: string;
+  q?: string;
+  orden?: OrdenPromociones;
+  semilla?: string;
+}
+
+export type PaginaPromociones = Pagina<PromocionPublica>;
 
 // GET /admin/usuarios (regla 5): busca por texto libre en nombres, apellidos y correo, y filtra
 // por estado.

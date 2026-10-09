@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { perfilDePrueba, PerfilRepositoryEnMemoria } from "@/core/perfiles/testing/dobles";
-import { ErrorNoEncontrado } from "@/shared/domain/errors";
+import { ErrorNoEncontrado, ErrorValidacion } from "@/shared/domain/errors";
 import { FakeClock } from "@/shared/testing/FakeClock";
 import { productoDePrueba, ProductoRepositoryEnMemoria } from "../testing/dobles";
 import { GetMarketplaceUseCase, GetProductoMarketplaceUseCase, ListMisProductosUseCase } from "./ConsultasProducto";
@@ -22,6 +22,75 @@ describe("consultas de productos (regla 18)", () => {
 
     expect(datos.map((p) => p.id)).toEqual(["p1", "p4"]);
     expect(total).toBe(2);
+  });
+
+  describe("solo con descuento (regla 21)", () => {
+    const base = productoDePrueba().perfil;
+    const conDescuento = (parches: Parameters<typeof productoDePrueba>[0]) => productoDePrueba({ porcentajeVigente: 20, precioConDescuento: 80, ...parches });
+    const repoConDescuentos = () =>
+      new ProductoRepositoryEnMemoria([
+        conDescuento({ id: "con-dto" }),
+        productoDePrueba({ id: "sin-dto" }),
+        conDescuento({ id: "sin-precio", precio: null, precioConDescuento: null }),
+        conDescuento({ id: "precio-oculto", mostrarPrecio: false }),
+        conDescuento({ id: "inactivo", activo: false }),
+        conDescuento({ id: "cuenta-desactivada", perfil: { ...base, usuarioActivo: false } }),
+        conDescuento({ id: "otra-ciudad", perfil: { ...base, ciudad: { id: "ciudad-2", nombre: "Sucre" } } }),
+      ]);
+
+    it("trae solo los de descuento vigente (también con el precio oculto o ausente), de productos activos y de cuentas activas, con su total", async () => {
+      const { datos, total, similares } = await new GetMarketplaceUseCase(repoConDescuentos(), clock).ejecutar({ conDescuento: true }, { pagina: 1, limite: 20 });
+
+      expect(datos.map((p) => p.id)).toEqual(["con-dto", "sin-precio", "precio-oculto", "otra-ciudad"]);
+      expect(total).toBe(4);
+      expect(similares).toBe(false);
+    });
+
+    it("se combina con la ciudad con AND", async () => {
+      const { datos } = await new GetMarketplaceUseCase(repoConDescuentos(), clock).ejecutar({ conDescuento: true, ciudadId: "ciudad-2" }, { pagina: 1, limite: 20 });
+
+      expect(datos.map((p) => p.id)).toEqual(["otra-ciudad"]);
+    });
+
+    it("false o sin el filtro no cambia nada: trae también los que no tienen descuento", async () => {
+      const casoDeUso = new GetMarketplaceUseCase(repoConDescuentos(), clock);
+
+      expect((await casoDeUso.ejecutar({ conDescuento: false }, { pagina: 1, limite: 20 })).total).toBe(5);
+      expect((await casoDeUso.ejecutar({}, { pagina: 1, limite: 20 })).total).toBe(5);
+    });
+
+    it("no se combina con el texto de búsqueda: error de validación que nombra el campo", async () => {
+      const intento = new GetMarketplaceUseCase(repoConDescuentos(), clock).ejecutar({ conDescuento: true, q: "torta" }, { pagina: 1, limite: 20 });
+
+      await expect(intento).rejects.toBeInstanceOf(ErrorValidacion);
+      await expect(intento).rejects.toMatchObject({ detalles: [{ campo: "con_descuento" }] });
+    });
+  });
+
+  describe("filtros de las promociones y orden al azar (regla 23)", () => {
+    const casoDeUso = () => new GetMarketplaceUseCase(repo(), clock);
+    const pagina = { pagina: 1, limite: 20 };
+    const rechazo = (filtros: Parameters<GetMarketplaceUseCase["ejecutar"]>[0]) => casoDeUso().ejecutar(filtros, pagina);
+    const ID = "0b0f1a0e-2c6b-4c7a-9a38-6f8c1f0d3e11";
+
+    it("descuento_id no se combina con el texto de búsqueda ni con con_descuento: error de validación que nombra el campo", async () => {
+      await expect(rechazo({ descuentoId: ID, q: "torta" })).rejects.toMatchObject({ detalles: [{ campo: "descuento_id" }] });
+      await expect(rechazo({ descuentoId: ID, conDescuento: true })).rejects.toMatchObject({ detalles: [{ campo: "descuento_id" }] });
+      await expect(rechazo({ descuentoId: ID, q: "torta" })).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it("el orden aleatorio exige una semilla", async () => {
+      await expect(rechazo({ orden: "aleatorio" })).rejects.toMatchObject({ detalles: [{ campo: "semilla" }] });
+      await expect(casoDeUso().ejecutar({ orden: "aleatorio", semilla: "abc123" }, pagina)).resolves.toMatchObject({ total: 2 });
+    });
+
+    it("el orden aleatorio no se combina con el texto de búsqueda (con texto manda la relevancia)", async () => {
+      await expect(rechazo({ orden: "aleatorio", semilla: "abc123", q: "torta" })).rejects.toMatchObject({ detalles: [{ campo: "orden" }] });
+    });
+
+    it("el orden por defecto y una semilla suelta (sin aleatorio) no cambian nada", async () => {
+      await expect(casoDeUso().ejecutar({ orden: "recientes", semilla: "abc123" }, pagina)).resolves.toMatchObject({ total: 2 });
+    });
   });
 
   describe("búsqueda con resultados similares (regla 21)", () => {

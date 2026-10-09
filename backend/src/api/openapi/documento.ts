@@ -10,6 +10,7 @@ import { registrarDescuentos } from "./rutas/descuentos";
 import { registrarMetricas } from "./rutas/metricas";
 import { registrarPerfiles } from "./rutas/perfiles";
 import { registrarProductos } from "./rutas/productos";
+import { registrarPromociones } from "./rutas/promociones";
 
 // Cada paso que agrega rutas suma aquí su registrar*() y, si hace falta, su etiqueta.
 export function generarDocumento() {
@@ -22,6 +23,7 @@ export function generarDocumento() {
   registrarPerfiles(registro);
   registrarProductos(registro);
   registrarDescuentos(registro);
+  registrarPromociones(registro);
   registrarMetricas(registro);
   registrarImportaciones(registro);
 

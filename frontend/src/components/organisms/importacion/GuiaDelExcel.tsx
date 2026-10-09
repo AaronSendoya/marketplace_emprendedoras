@@ -15,7 +15,7 @@ type Condicion = "obligatoria" | "opcional" | "ignorada";
 // formulario real; el orden real no importa al importar). Es lo mismo que lleva la fila 1 de la plantilla descargable
 // (`ENCABEZADOS_DEL_FORMULARIO`, backend). Las obligatorias no pueden faltar en cada fila; las opcionales se importan sin ese dato
 // si faltan; las ignoradas se leen y no se guardan (regla 22). En el ejemplo, una persona inventada.
-const COLUMNAS: readonly { encabezado: string; condicion: Condicion; ejemplo: string }[] = [
+const COLUMNAS: readonly { encabezado: string; condicion: Condicion; ejemplo: string; ancha?: boolean }[] = [
   { encabezado: "Marca temporal", condicion: "ignorada", ejemplo: "07/10/2026 14:32:10" },
   { encabezado: "Dirección de correo electrónico", condicion: "obligatoria", ejemplo: "ana.perez@ejemplo.com" },
   { encabezado: "Nombre Completo", condicion: "obligatoria", ejemplo: "Ana María Pérez Rojas" },
@@ -28,7 +28,7 @@ const COLUMNAS: readonly { encabezado: string; condicion: Condicion; ejemplo: st
   { encabezado: "Rubro", condicion: "obligatoria", ejemplo: "Alimentos y bebidas" },
   { encabezado: "Instagram de tu emprendimiento", condicion: "opcional", ejemplo: "@dulcesdeana" },
   { encabezado: "Otra red social", condicion: "opcional", ejemplo: "https://www.facebook.com/dulcesdeana" },
-  { encabezado: "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?", condicion: "ignorada", ejemplo: "" },
+  { encabezado: "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?", condicion: "ignorada", ejemplo: "", ancha: true },
   { encabezado: "Cuéntanos sobre tu beneficio ", condicion: "ignorada", ejemplo: "" },
 ];
 
@@ -38,6 +38,11 @@ const CONDICIONES: Record<Condicion, { etiqueta: string; fondo: string; muestra:
   opcional: { etiqueta: "Opcional", fondo: "bg-secundario-suave text-secundario", muestra: "border-secundario bg-secundario-suave" },
   ignorada: { etiqueta: "Se ignora", fondo: "bg-fondo text-texto-secundario", muestra: "border-borde-fuerte bg-fondo" },
 };
+
+// Cada columna mide lo mismo (un encabezado largo se parte en dos líneas y no estira la fila); solo la pregunta del beneficio,
+// de más de 80 caracteres, es más ancha para que también quepa en dos líneas.
+const ANCHO_NORMAL = "w-48 min-w-48 max-w-48";
+const ANCHO_ANCHA = "w-96 min-w-96 max-w-96";
 
 const CONSEJOS = [
   "Escribe el nombre y los apellidos juntos: «Ana María Pérez Rojas».",
@@ -83,18 +88,18 @@ export function GuiaDelExcel() {
           <table className="min-w-max border-collapse text-left font-cuerpo text-xs">
             <thead>
               <tr>
-                {COLUMNAS.map(({ encabezado, condicion }, indice) => (
-                  <th key={indice} scope="col" className={`max-w-56 min-w-36 px-2.5 py-2 align-top font-semibold ${CONDICIONES[condicion].fondo}`}>
-                    <span className="block">{encabezado}</span>
-                    <span className="mt-0.5 block font-normal">{CONDICIONES[condicion].etiqueta}</span>
+                {COLUMNAS.map(({ encabezado, condicion, ancha }, indice) => (
+                  <th key={indice} scope="col" className={`${ancha ? ANCHO_ANCHA : ANCHO_NORMAL} px-3 py-2.5 align-top font-semibold ${CONDICIONES[condicion].fondo}`}>
+                    <span className="block leading-snug">{encabezado}</span>
+                    <span className="mt-1 block font-normal opacity-90">{CONDICIONES[condicion].etiqueta}</span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr>
-                {COLUMNAS.map(({ ejemplo }, indice) => (
-                  <td key={indice} className="border-t border-borde px-2.5 py-2 whitespace-nowrap text-texto">
+                {COLUMNAS.map(({ ejemplo, ancha }, indice) => (
+                  <td key={indice} className={`${ancha ? ANCHO_ANCHA : ANCHO_NORMAL} border-t border-borde px-3 py-2.5 align-top leading-snug break-words text-texto`}>
                     {ejemplo || (
                       <span aria-hidden="true" className="text-texto-secundario">
                         —
@@ -107,10 +112,10 @@ export function GuiaDelExcel() {
           </table>
         </div>
 
-        <ul className="flex flex-wrap gap-x-5 gap-y-1 font-cuerpo text-xs text-texto-secundario">
+        <ul className="space-y-1.5 font-cuerpo text-xs text-texto-secundario">
           {(Object.keys(CONDICIONES) as Condicion[]).map((condicion) => (
-            <li key={condicion} className="flex items-start gap-1.5">
-              <span aria-hidden="true" className={`mt-0.5 size-3 shrink-0 rounded-sm border ${CONDICIONES[condicion].muestra}`} />
+            <li key={condicion} className="flex items-start gap-2">
+              <span aria-hidden="true" className={`mt-px size-3.5 shrink-0 rounded-sm border ${CONDICIONES[condicion].muestra}`} />
               <span>
                 <b className="font-semibold text-texto">{CONDICIONES[condicion].etiqueta}:</b>{" "}
                 {condicion === "obligatoria" && "no puede faltar en ninguna fila"}

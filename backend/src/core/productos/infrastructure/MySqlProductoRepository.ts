@@ -31,9 +31,20 @@ interface FilaProducto {
   rubro_nombre: string;
 }
 
-// Regla 8: la consulta del feed. El descuento vigente es el mayor de los que ya empezaron y aún no
-// caducaron (MAX con GROUP BY: MariaDB no tiene LATERAL); devuelve una sola fila por producto. Lleva
-// dos `?` (ahora) antes de cualquier otro parámetro.
+// Regla 8: el descuento vigente es el mayor de los que ya empezaron y aún no caducaron (MAX con GROUP BY:
+// MariaDB no tiene LATERAL); devuelve una sola fila por producto. Lleva dos `?` (ahora).
+const DESCUENTO_VIGENTE = `
+  LEFT JOIN (
+    SELECT pd.producto_id, MAX(d.porcentaje) AS porcentaje
+    FROM producto_descuentos pd
+    JOIN descuentos d ON d.id = pd.descuento_id
+    WHERE (d.fecha_inicio IS NULL OR d.fecha_inicio <= ?)
+      AND (d.fecha_fin IS NULL OR d.fecha_fin >= ?)
+    GROUP BY pd.producto_id
+  ) dv ON dv.producto_id = p.id
+`;
+
+// Regla 8: la consulta del feed, una sola fila por producto. Lleva dos `?` (ahora) antes de cualquier otro parámetro.
 const SELECT_PRODUCTO = `
   SELECT p.id, p.perfil_id, p.nombre, p.descripcion, p.precio, p.mostrar_precio, p.imagen_key, p.activo,
          p.creado_en, p.actualizado_en,
@@ -46,14 +57,7 @@ const SELECT_PRODUCTO = `
   JOIN usuarios u ON u.id = pe.usuario_id
   JOIN ciudades c ON c.id = pe.ciudad_id
   JOIN rubros r ON r.id = pe.rubro_id
-  LEFT JOIN (
-    SELECT pd.producto_id, MAX(d.porcentaje) AS porcentaje
-    FROM producto_descuentos pd
-    JOIN descuentos d ON d.id = pd.descuento_id
-    WHERE (d.fecha_inicio IS NULL OR d.fecha_inicio <= ?)
-      AND (d.fecha_fin IS NULL OR d.fecha_fin >= ?)
-    GROUP BY pd.producto_id
-  ) dv ON dv.producto_id = p.id
+  ${DESCUENTO_VIGENTE}
 `;
 
 interface FilaBuscable {
@@ -68,6 +72,11 @@ const DESDE_CONTEO = `
   JOIN perfiles_emprendedores pe ON pe.id = p.perfil_id
   JOIN usuarios u ON u.id = pe.usuario_id
 `;
+
+// Regla 23: el orden por defecto y el orden al azar. `MD5(CONCAT(id, semilla))` parece al azar pero es el mismo mientras la
+// semilla sea la misma, así que recorrer las páginas no repite ni salta productos. Texto fijo: nunca se arma con datos.
+const ORDEN_RECIENTES = "ORDER BY p.creado_en DESC, p.id";
+const ORDEN_ALEATORIO = "ORDER BY MD5(CONCAT(p.id, ?)), p.id";
 
 // Solo estas columnas se pueden actualizar: el SET se arma con esta lista, nunca con claves de la entrada.
 const COLUMNAS_EDITABLES: Record<keyof CambiosProducto, string> = {
@@ -163,7 +172,19 @@ export class MySqlProductoRepository implements IProductoRepository {
       condiciones.push("(p.nombre LIKE ? OR p.descripcion LIKE ? OR pe.nombre_negocio LIKE ?)");
       valores.push(patron, patron, patron);
     }
-    return this.listar(ahora, `WHERE ${condiciones.join(" AND ")}`, valores, pagina);
+    // Regla 21 («Solo con descuento»): los que tienen un descuento vigente (aunque el precio esté oculto o ausente, regla 8).
+    if (filtros.conDescuento) condiciones.push("dv.porcentaje IS NOT NULL");
+    // Regla 23: los asignados a ese descuento mientras rige.
+    if (filtros.descuentoId) {
+      condiciones.push(
+        "EXISTS (SELECT 1 FROM producto_descuentos pdx JOIN descuentos dx ON dx.id = pdx.descuento_id WHERE pdx.producto_id = p.id AND pdx.descuento_id = ? AND (dx.fecha_inicio IS NULL OR dx.fecha_inicio <= ?) AND (dx.fecha_fin IS NULL OR dx.fecha_fin >= ?))",
+      );
+      valores.push(filtros.descuentoId, ahora, ahora);
+    }
+    return this.listar(ahora, `WHERE ${condiciones.join(" AND ")}`, valores, pagina, {
+      conDescuento: filtros.conDescuento === true,
+      semilla: filtros.orden === "aleatorio" ? (filtros.semilla ?? "") : undefined,
+    });
   }
 
   async textosBuscables(filtros: Pick<FiltrosMarketplace, "perfilId" | "ciudadId" | "rubroId">): Promise<ProductoBuscable[]> {
@@ -204,16 +225,29 @@ export class MySqlProductoRepository implements IProductoRepository {
     return this.listar(ahora, "WHERE p.perfil_id = ?", [perfilId], pagina);
   }
 
-  private async listar(ahora: Date, donde: string, valores: unknown[], pagina: ParametrosPagina): Promise<Pagina<Producto>> {
+  // `conDescuento`: la condición usa el descuento vigente, así que el conteo también necesita su unión (y su `ahora`). `semilla`
+  // presente = orden al azar con esa semilla (regla 23); sin ella, los más recientes primero.
+  private async listar(
+    ahora: Date,
+    donde: string,
+    valores: unknown[],
+    pagina: ParametrosPagina,
+    opciones: { conDescuento?: boolean; semilla?: string } = {},
+  ): Promise<Pagina<Producto>> {
+    const { conDescuento = false, semilla } = opciones;
+    const ORDEN = semilla !== undefined ? ORDEN_ALEATORIO : ORDEN_RECIENTES;
     const [filas, totales] = await Promise.all([
-      this.db.consultar<FilaProducto>(`${SELECT_PRODUCTO} ${donde} ORDER BY p.creado_en DESC, p.id LIMIT ? OFFSET ?`, [
+      this.db.consultar<FilaProducto>(`${SELECT_PRODUCTO} ${donde} ${ORDEN} LIMIT ? OFFSET ?`, [
         ahora,
         ahora,
         ...valores,
+        ...(semilla !== undefined ? [semilla] : []),
         pagina.limite,
         desplazamiento(pagina),
       ]),
-      this.db.consultar<{ total: number }>(`SELECT COUNT(*) AS total ${DESDE_CONTEO} ${donde}`, valores),
+      conDescuento
+        ? this.db.consultar<{ total: number }>(`SELECT COUNT(*) AS total ${DESDE_CONTEO} ${DESCUENTO_VIGENTE} ${donde}`, [ahora, ahora, ...valores])
+        : this.db.consultar<{ total: number }>(`SELECT COUNT(*) AS total ${DESDE_CONTEO} ${donde}`, valores),
     ]);
     return { datos: filas.map(mapear), total: Number(totales[0]?.total ?? 0) };
   }

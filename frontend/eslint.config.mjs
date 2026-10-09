@@ -37,6 +37,8 @@ const eslintConfig = defineConfig([
     files: [
       "src/components/atoms/ImagenR2.tsx",
       "src/components/atoms/FondoFotografico.tsx",
+      "src/components/atoms/FotoPrograma.tsx",
+      "src/components/organisms/inicio/Comunidad.tsx",
       "src/components/organisms/Navbar.tsx",
       "src/components/organisms/AdminSidebar.tsx",
       "src/components/organisms/negocio/CabeceraMovilNegocio.tsx",

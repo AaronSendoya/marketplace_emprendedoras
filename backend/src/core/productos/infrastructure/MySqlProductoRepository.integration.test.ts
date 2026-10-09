@@ -330,6 +330,58 @@ describe("MySqlProductoRepository: listados", () => {
   });
 });
 
+describe("MySqlProductoRepository: solo con descuento (regla 21)", () => {
+  const conDescuento = (pagina = { pagina: 1, limite: 100 }) => repositorio.listarMarketplace(T0, { perfilId: ids.perfilA, conDescuento: true }, pagina);
+
+  it("solo trae los productos con un descuento vigente ahora (también con el precio oculto o ausente), y el total cuenta lo mismo", async () => {
+    const vigente = await nuevoProducto("Dto vigente", { precio: 100 });
+    const programado = await nuevoProducto("Dto programado");
+    const vencido = await nuevoProducto("Dto vencido");
+    const sinPrecio = await nuevoProducto("Dto sin precio", { precio: null });
+    const precioOculto = await nuevoProducto("Dto precio oculto", { mostrarPrecio: false });
+    const inactivo = await nuevoProducto("Dto inactivo");
+    await repositorio.actualizar(inactivo.id, { activo: false }, T0);
+    const sinDescuento = await nuevoProducto("Sin descuento");
+    await descuento(10, null, null, [vigente.id, sinPrecio.id, precioOculto.id, inactivo.id]);
+    await descuento(20, enDias(10), enDias(20), [programado.id]);
+    await descuento(30, enDias(-20), enDias(-10), [vencido.id]);
+
+    const { datos, total } = await conDescuento();
+    const idsDevueltos = datos.map((p) => p.id);
+
+    for (const dentro of [vigente, sinPrecio, precioOculto]) expect(idsDevueltos).toContain(dentro.id);
+    for (const fuera of [programado, vencido, inactivo, sinDescuento]) expect(idsDevueltos).not.toContain(fuera.id);
+    expect(datos.every((p) => p.porcentajeVigente !== null)).toBe(true);
+    expect(total).toBe(datos.length);
+  });
+
+  it("al llegar la fecha de inicio, el producto programado entra solo; al pasar la de fin, sale", async () => {
+    const programado = await nuevoProducto("Dto entra y sale");
+    await descuento(25, enDias(5), enDias(6), [programado.id]);
+    const en = async (ahora: Date) =>
+      (await repositorio.listarMarketplace(ahora, { perfilId: ids.perfilA, conDescuento: true }, { pagina: 1, limite: 100 })).datos.map((p) => p.id);
+
+    expect(await en(enDias(1))).not.toContain(programado.id);
+    expect(await en(enDias(5))).toContain(programado.id);
+    expect(await en(enDias(7))).not.toContain(programado.id);
+  });
+
+  it("pagina con un total estable, igual al de todos los que cumplen", async () => {
+    const todos = await conDescuento();
+    const pagina1 = await conDescuento({ pagina: 1, limite: 1 });
+    const pagina2 = await conDescuento({ pagina: 2, limite: 1 });
+
+    expect(pagina1.total).toBe(todos.total);
+    expect(pagina2.total).toBe(todos.total);
+    expect(pagina1.datos).toHaveLength(1);
+    expect(pagina1.datos[0].id).not.toBe(pagina2.datos[0].id);
+  });
+
+  it("se combina con la ciudad y el rubro con AND", async () => {
+    expect((await repositorio.listarMarketplace(T0, { perfilId: ids.perfilA, ciudadId: ids.ciudadB, conDescuento: true }, { pagina: 1, limite: 10 })).total).toBe(0);
+  });
+});
+
 describe("MySqlProductoRepository: búsqueda de productos (regla 21)", () => {
   const usecase = new GetMarketplaceUseCase(repositorio, new FakeClock(T0));
   const ids2: Record<string, string> = {};

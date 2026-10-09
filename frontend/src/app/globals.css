@@ -22,10 +22,14 @@
   --color-acento: #9d174d;
   --color-acento-hover: #831843;
   --color-acento-suave: #fdf2f8;
+  /* Borde del rosa tenue: solo la banda de comunidad del Inicio (sección 6, regla 14, punto k). */
+  --color-acento-borde: #fbcfe8;
 
   --color-secundario: #7c3aed;
   --color-secundario-hover: #6d28d9;
   --color-secundario-suave: #f5f3ff;
+  /* Borde del lila tenue: las promociones del sitio público (sección 6, regla 14, puntos k y l). */
+  --color-secundario-borde: #ddd6fe;
 
   /* Naranja: el único color de acción del sitio público. El botón usa #c2410c, que con texto blanco da 5,2:1
      (el #ea580c de la marca solo daba 3,6:1); el naranja de marca queda para iconos y el anillo de foco. */
@@ -44,6 +48,8 @@
   --color-pie-texto: #efe6ec;
   --color-pie-tenue: #c4adbd;
   --color-pie-acento: #fdba74;
+  /* Acento claro del hero sobre la ciruela: el rosa de la paleta (sección 6, regla 14, punto k). */
+  --color-pie-rosa: #f9a8d4;
 
   /* Color de cada canal de contacto en los gráficos y tablas del Admin (sección 6, regla 13): WhatsApp
      en el naranja de la marca (y su versión fuerte, con texto blanco encima) e Instagram en el púrpura
@@ -129,10 +135,12 @@
   --color-acento: var(--color-acento);
   --color-acento-hover: var(--color-acento-hover);
   --color-acento-suave: var(--color-acento-suave);
+  --color-acento-borde: var(--color-acento-borde);
 
   --color-secundario: var(--color-secundario);
   --color-secundario-hover: var(--color-secundario-hover);
   --color-secundario-suave: var(--color-secundario-suave);
+  --color-secundario-borde: var(--color-secundario-borde);
 
   --color-enfasis: var(--color-enfasis);
   --color-enfasis-hover: var(--color-enfasis-hover);
@@ -145,6 +153,7 @@
   --color-pie-texto: var(--color-pie-texto);
   --color-pie-tenue: var(--color-pie-tenue);
   --color-pie-acento: var(--color-pie-acento);
+  --color-pie-rosa: var(--color-pie-rosa);
 
   --color-whatsapp: var(--color-whatsapp);
   --color-whatsapp-fuerte: var(--color-whatsapp-fuerte);

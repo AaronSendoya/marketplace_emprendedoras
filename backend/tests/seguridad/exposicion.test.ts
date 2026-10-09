@@ -36,7 +36,7 @@ describe("lista blanca de campos de cada respuesta (caja blanca)", () => {
     expect(texto).not.toMatch(/CENTINELA_USUARIO|usuario_id|usuarioId|email|correo|_key|Key/);
   });
 
-  it("producto (público): con el precio oculto no sale ni el precio ni el descuento, y nunca el id de la cuenta", () => {
+  it("producto (público): con el precio oculto no sale ni el precio ni el precio con descuento (sí el porcentaje), y nunca el id de la cuenta", () => {
     const producto = productoDePrueba({ precio: 8888.77, mostrarPrecio: false, porcentajeVigente: 41, precioConDescuento: 5244.23 });
     producto.perfil.usuarioId = "CENTINELA_USUARIO";
     const cuerpo = serializarProductoPublico(producto, url);
@@ -46,8 +46,8 @@ describe("lista blanca de campos de cada respuesta (caja blanca)", () => {
     );
     expect(claves(cuerpo.perfil)).toEqual(["ciudad", "id", "logo_url", "nombre_negocio", "rubro", "whatsapp"].sort());
     const texto = JSON.stringify(cuerpo);
-    expect(texto).not.toMatch(/8888|5244|"porcentaje":41|CENTINELA_USUARIO|activo|_key/);
-    expect(cuerpo).toMatchObject({ precio: null, porcentaje: null, precio_con_descuento: null, consultar_precio: true });
+    expect(texto).not.toMatch(/8888|5244|CENTINELA_USUARIO|activo|_key/);
+    expect(cuerpo).toMatchObject({ precio: null, porcentaje: 41, precio_con_descuento: null, consultar_precio: true });
   });
 
   it("producto (propio): sí muestra el precio real y el estado, pero tampoco el id de la cuenta", () => {

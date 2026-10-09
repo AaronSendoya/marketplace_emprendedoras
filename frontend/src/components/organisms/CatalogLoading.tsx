@@ -4,7 +4,45 @@ import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
 
 interface PropsCatalogLoading {
   etiqueta: string;
-  variante?: "emprendedora" | "producto";
+  // «mercado»: las tarjetas compactas de Productos; «promocion»: las de Promociones (regla 14, punto l).
+  variante?: "emprendedora" | "producto" | "mercado" | "promocion";
+}
+
+// La silueta de una tarjeta compacta del mercado de Productos: imagen cuadrada y tres líneas.
+function EsqueletoMercado() {
+  return (
+    <div className="space-y-2.5">
+      <Skeleton className="aspect-square w-full rounded-xl" />
+      <Skeleton className="h-5 w-24" />
+      <Skeleton className="h-4 w-4/5" />
+      <Skeleton className="h-3.5 w-3/5" />
+    </div>
+  );
+}
+
+// La silueta de una tarjeta de promoción: la tira de productos, el negocio, el titular, el texto y el botón.
+function EsqueletoPromocion() {
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-superficie border border-borde bg-superficie shadow-tarjeta">
+      <Skeleton className="h-32 w-full rounded-none" />
+      <div className="flex-1 space-y-3 px-5 pt-4 pb-3">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="size-[2.375rem] rounded-[0.625rem]" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-3.5 w-16" />
+          </div>
+        </div>
+        <Skeleton className="h-5 w-full" />
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-6 w-44 rounded-full" />
+      </div>
+      <div className="px-5 pt-1 pb-5">
+        <Skeleton className="h-11 w-full rounded-lg" />
+      </div>
+    </div>
+  );
 }
 
 // loading.tsx de /emprendedoras y /promociones (Next envuelve la página en Suspense mientras el
@@ -37,11 +75,19 @@ export function CatalogLoading({ etiqueta, variante = "emprendedora" }: PropsCat
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 rejilla:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, indice) => (
-              <TarjetaEsqueleto key={indice} variante={variante} />
-            ))}
-          </div>
+          {variante === "mercado" ? (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-4 md:grid-cols-3 rejilla:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, indice) => (
+                <EsqueletoMercado key={indice} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 rejilla:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, indice) =>
+                variante === "promocion" ? <EsqueletoPromocion key={indice} /> : <TarjetaEsqueleto key={indice} variante={variante} />,
+              )}
+            </div>
+          )}
         </div>
       </div>
     </main>

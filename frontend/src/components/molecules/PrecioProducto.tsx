@@ -36,7 +36,7 @@ export function PrecioProducto({ precio, porcentaje, precioConDescuento, tamano 
       <div className={`flex flex-wrap items-baseline gap-x-2.5 gap-y-1 ${className}`.trim()}>
         <span className={`font-titulo ${claseCifra} leading-none font-extrabold tracking-tight text-texto`}>{formatearPrecio(precioConDescuento)}</span>
         <span className={`font-cuerpo ${claseAnterior} text-texto-secundario line-through`}>{formatearPrecio(precio)}</span>
-        {tamano === "detalle" && <Badge variante="acento" className="self-center">-{porcentaje}%</Badge>}
+        {tamano === "detalle" && <Badge variante="descuento" className="self-center">-{porcentaje}%</Badge>}
       </div>
     );
   }
