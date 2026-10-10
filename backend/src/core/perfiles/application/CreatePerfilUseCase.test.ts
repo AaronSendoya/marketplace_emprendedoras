@@ -91,6 +91,29 @@ describe("CreatePerfilUseCase", () => {
     });
   });
 
+  describe("imagen ya procesada (importación desde Drive, regla 22)", () => {
+    it("se guarda tal cual, sin pasar otra vez por el procesador (no se recomprime)", async () => {
+      const { useCase, procesador, almacenamiento } = construir();
+
+      const perfil = await useCase.ejecutar(emprendedora, datos({ foto: { yaProcesada: Buffer.from("webp-ya-listo") }, logo: "predeterminada" }));
+
+      expect(procesador.procesados).toEqual([]);
+      expect(perfil.fotoPerfilKey).toMatch(/^perfiles\/.+\.webp$/);
+      expect(perfil.logoKey).toBe(CLAVE_LOGO_PREDETERMINADO);
+      expect(almacenamiento.claves()).toEqual([perfil.fotoPerfilKey]);
+    });
+
+    it("si el alta falla, la imagen ya procesada que se subió también se borra", async () => {
+      const { useCase, almacenamiento } = construir();
+
+      await expect(useCase.ejecutar(emprendedora, datos({ ciudadId: "ciudad-que-no-existe", foto: { yaProcesada: Buffer.from("webp") } }))).rejects.toBeInstanceOf(
+        ErrorValidacion,
+      );
+
+      expect(almacenamiento.claves()).toEqual([]);
+    });
+  });
+
   describe("quién crea el perfil (regla 18)", () => {
     it("un Admin lo crea en nombre de una cuenta Emprendedor", async () => {
       const perfil = await construir().useCase.ejecutar(admin, datos({ usuarioId: "usuario-2" }));

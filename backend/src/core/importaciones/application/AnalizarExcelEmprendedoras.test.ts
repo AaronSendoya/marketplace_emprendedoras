@@ -28,15 +28,14 @@ const mensajeDelRechazo = async (promesa: Promise<unknown>) => {
 };
 
 describe("AnalizarExcelEmprendedorasUseCase: un archivo como el del formulario", () => {
-  it("reconoce las columnas, ignora a propósito fotos, logo y beneficio, y dice cuáles opcionales faltan", async () => {
+  it("reconoce las columnas (también la foto y el logo), ignora a propósito la marca temporal y el beneficio, y dice cuáles opcionales faltan", async () => {
     const resultado = await analizar({ filas: [filaDeFormulario()] });
 
     expect(resultado.hoja).toBe("Respuestas de formulario 1");
-    expect(resultado.columnas.reconocidas).toHaveLength(9);
+    expect(resultado.columnas.reconocidas).toHaveLength(11);
+    expect(resultado.columnas.reconocidas).toEqual(expect.arrayContaining(["Foto de perfil", "Logo"]));
     expect(resultado.columnas.ignoradas).toEqual([
       "Marca temporal",
-      "Sube tu foto",
-      "Sube el logo de tu emprendimiento",
       "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?",
       "Cuéntanos sobre tu beneficio",
     ]);
@@ -244,7 +243,7 @@ describe("AnalizarExcelEmprendedorasUseCase: tolerancia con el formato (regla 22
     const resultado = await analizar(sin(/WhatsApp/));
 
     expect(resultado.columnas.obligatoriasAusentes).toEqual(["Número de WhatsApp"]);
-    expect(resultado.columnas.reconocidas).toHaveLength(8);
+    expect(resultado.columnas.reconocidas).toHaveLength(10);
     expect(resultado.resumen).toMatchObject({ total: 2, listas: 0, conError: 2 });
     for (const fila of resultado.filas) {
       expect(fila.estado).toBe("error");
@@ -284,7 +283,7 @@ describe("AnalizarExcelEmprendedorasUseCase: tolerancia con el formato (regla 22
     });
 
     expect(resultado.columnas.desconocidas).toEqual(["Edad", "Comentarios internos"]);
-    expect(resultado.columnas.reconocidas).toHaveLength(9);
+    expect(resultado.columnas.reconocidas).toHaveLength(11);
     expect(resultado.filas[0].estado).toBe("lista");
     expect(resultado.filas[0].avisos).toEqual([]);
   });
@@ -341,7 +340,7 @@ describe("AnalizarExcelEmprendedorasUseCase: el archivo no es compatible", () =>
 });
 
 describe("la plantilla de ejemplo se analiza sin problemas", () => {
-  it("sus dos filas salen listas, usa las 9 columnas y solo ignora las 5 del formulario que no se guardan", async () => {
+  it("sus dos filas salen listas, usa las 11 columnas y solo ignora las 3 del formulario que no se guardan", async () => {
     const { caso } = construir();
     const contenido = await new GeneradorPlantillaExceljs().generar();
 
@@ -350,14 +349,85 @@ describe("la plantilla de ejemplo se analiza sin problemas", () => {
     expect(resultado.resumen).toMatchObject({ total: 2, listas: 2, conError: 0, repetidas: 0 });
     expect(resultado.filas[0].datos).toMatchObject({ instagram: "dulcesdeana", otraRedSocial: "https://www.facebook.com/dulcesdeana" });
     expect(resultado.filas[1].datos).toMatchObject({ instagram: "", otraRedSocial: "", whatsapp: "+59160123456" });
-    expect(resultado.columnas.reconocidas).toHaveLength(9);
+    expect(resultado.columnas.reconocidas).toHaveLength(11);
     expect(resultado.columnas.ignoradas).toEqual([
       "Marca temporal",
-      "Sube tu foto",
-      "Sube el logo de tu emprendimiento",
       "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?",
       "Cuéntanos sobre tu beneficio",
     ]);
     expect(resultado.columnas).toMatchObject({ opcionalesAusentes: [], obligatoriasAusentes: [], desconocidas: [], aproximadas: [] });
+  });
+
+  it("la primera fila de la plantilla trae enlaces de ejemplo (que no abren nada) y la segunda no trae ninguno, sin avisos", async () => {
+    const { caso } = construir();
+    const contenido = await new GeneradorPlantillaExceljs().generar();
+
+    const resultado = await caso.ejecutar({ nombre: "plantilla.xlsx", contenido });
+
+    expect(resultado.filas[0].datos.fotoDriveId).toMatch(/^EJEMPLO_foto/);
+    expect(resultado.filas[0].datos.logoDriveId).toMatch(/^EJEMPLO_logo/);
+    expect(resultado.filas[1].datos).toMatchObject({ fotoDriveId: "", logoDriveId: "" });
+    expect(resultado.filas[1].avisos.filter((a) => a.campo === "foto" || a.campo === "logo")).toEqual([]);
+  });
+});
+
+describe("fotos y logos: enlaces de Drive (regla 22, 2026-10-09)", () => {
+  const ID_FOTO = "1FotoDeLaEmprendedoraUnoAAAAAAAAAA";
+  const ID_LOGO = "1LogoDeLaEmprendedoraUnoBBBBBBBBBB";
+
+  it("de cada enlace solo se toma el id del archivo, con cualquiera de las formas de enlace de Drive", async () => {
+    const resultado = await analizar({
+      filas: [
+        filaDeFormulario({ foto: `https://drive.google.com/open?id=${ID_FOTO}`, logo: `https://drive.google.com/file/d/${ID_LOGO}/view?usp=drive_link` }),
+      ],
+    });
+
+    expect(resultado.filas[0].datos).toMatchObject({ fotoDriveId: ID_FOTO, logoDriveId: ID_LOGO });
+    expect(resultado.filas[0].avisos).toEqual([]);
+    expect(resultado.filas[0].estado).toBe("lista");
+  });
+
+  it("una celda vacía es «sin imagen»: ni id ni aviso", async () => {
+    const resultado = await analizar({ filas: [filaDeFormulario({ foto: "", logo: null })] });
+
+    expect(resultado.filas[0].datos).toMatchObject({ fotoDriveId: "", logoDriveId: "" });
+    expect(resultado.filas[0].avisos).toEqual([]);
+    expect(resultado.filas[0].estado).toBe("lista");
+  });
+
+  it("un enlace que no es un archivo de Drive es una advertencia (revisar), no un error: la fila sigue importable", async () => {
+    const resultado = await analizar({
+      filas: [filaDeFormulario({ foto: "la subo mañana", logo: `https://drive.google.com/drive/folders/${ID_LOGO}` })],
+    });
+
+    const [fila] = resultado.filas;
+    expect(fila.datos).toMatchObject({ fotoDriveId: "", logoDriveId: "" });
+    expect(fila.avisos.map((a) => [a.campo, a.codigo, a.severidad, a.reporte])).toEqual([
+      ["foto", "foto_enlace_invalido", "revisar", true],
+      ["logo", "logo_es_carpeta", "revisar", true],
+    ]);
+    expect(fila.estado).toBe("revisar");
+    expect(fila.avisos[0].mensaje).toContain("súbela a mano");
+  });
+
+  it("un enlace que apunta a otro sitio (o a una dirección interna) nunca da un id", async () => {
+    const resultado = await analizar({
+      filas: [filaDeFormulario({ foto: `https://ejemplo.com/open?id=${ID_FOTO}`, logo: "http://169.254.169.254/latest/meta-data/" })],
+    });
+
+    expect(resultado.filas[0].datos).toMatchObject({ fotoDriveId: "", logoDriveId: "" });
+    expect(resultado.filas[0].avisos.map((a) => a.codigo)).toEqual(["foto_enlace_invalido", "logo_enlace_invalido"]);
+  });
+
+  it("un archivo sin las columnas de foto y logo se lee igual y las dice como opcionales ausentes", async () => {
+    const indices = ENCABEZADOS_DE_GOOGLE_FORMS.map((h, i) => [h, i] as const).filter(([h]) => !/Sube/.test(h)).map(([, i]) => i);
+    const resultado = await analizar({
+      encabezados: ENCABEZADOS_DE_GOOGLE_FORMS.filter((_, i) => indices.includes(i)),
+      filas: [filaDeFormulario().filter((_, i) => indices.includes(i))],
+    });
+
+    expect(resultado.columnas.opcionalesAusentes).toEqual(["Foto de perfil", "Logo"]);
+    expect(resultado.filas[0].estado).toBe("lista");
+    expect(resultado.filas[0].datos).toMatchObject({ fotoDriveId: "", logoDriveId: "" });
   });
 });

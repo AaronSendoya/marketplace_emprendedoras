@@ -6,6 +6,7 @@ import { LoginUseCase } from "@/core/auth/application/LoginUseCase";
 import { BcryptPasswordHasher } from "@/core/auth/infrastructure/BcryptPasswordHasher";
 import { crearJwtTokenService } from "@/core/auth/infrastructure/JwtTokenService";
 import { MySqlIntentosLoginRepository } from "@/core/auth/infrastructure/MySqlIntentosLoginRepository";
+import { MySqlSesionRepository } from "@/core/auth/infrastructure/MySqlSesionRepository";
 import { MySqlUsuarioRepository } from "@/core/auth/infrastructure/MySqlUsuarioRepository";
 import { logger } from "@/shared/infrastructure/logger";
 import { getMySqlClient } from "@/shared/infrastructure/MySqlClient";
@@ -19,6 +20,7 @@ export const POST = withErrorHandling(async (request) => {
     new BcryptPasswordHasher(),
     crearJwtTokenService(),
     new MySqlIntentosLoginRepository(db),
+    new MySqlSesionRepository(db),
     new SystemClock(),
     logger,
   );

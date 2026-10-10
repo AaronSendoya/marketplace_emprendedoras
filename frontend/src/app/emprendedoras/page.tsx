@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { BusquedaProvider, EncabezadoResultados, ResultadosBusqueda, SinResultadosBusqueda } from "@/components/organisms/BusquedaCatalogo";
 import { CatalogGrid } from "@/components/organisms/CatalogGrid";
 import { CatalogHeader } from "@/components/organisms/CatalogHeader";
@@ -11,6 +12,7 @@ import { Paginador } from "@/components/molecules/Paginador";
 import { listarCiudades, listarRubros } from "@/lib/api/catalogos";
 import { listarPerfiles } from "@/lib/api/perfiles";
 import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
+import { idDeParametro, paginaDeParametro, ultimaPagina } from "@/lib/parametros";
 
 export const metadata: Metadata = {
   title: "Emprendedoras — Track de Mujeres",
@@ -29,9 +31,10 @@ export default async function PaginaEmprendedoras({ searchParams }: PageProps<"/
   // El backend acepta de 1 a 100 caracteres (regla 20): un texto más largo, escrito a mano en la URL, no debe llegar
   // a la API ni terminar en una página de error.
   const q = primerValor(parametros.q).trim().slice(0, 100);
-  const ciudadId = primerValor(parametros.ciudad_id);
-  const rubroId = primerValor(parametros.rubro_id);
-  const pagina = Number(primerValor(parametros.pagina)) || 1;
+  // Un id o una página que el backend rechazaría (400) se ignoran: el enlace sigue mostrando el catálogo.
+  const ciudadId = idDeParametro(primerValor(parametros.ciudad_id));
+  const rubroId = idDeParametro(primerValor(parametros.rubro_id));
+  const pagina = paginaDeParametro(primerValor(parametros.pagina));
   const hayFiltros = Boolean(q || ciudadId || rubroId);
 
   const [ciudades, rubros, { datos: perfiles, paginacion, similares }] = await Promise.all([
@@ -54,6 +57,10 @@ export default async function PaginaEmprendedoras({ searchParams }: PageProps<"/
     parametrosUrl.set("pagina", String(nuevaPagina));
     return `/emprendedoras?${parametrosUrl.toString()}`;
   }
+
+  // Una página que ya no existe (un enlace viejo, o se quitaron emprendimientos) lleva a la última, no a «aún no hay emprendedoras».
+  const ultima = ultimaPagina(paginacion.total, LIMITE);
+  if (pagina > ultima) redirect(crearHref(ultima));
 
   return (
     <main className="flex-1">

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { requireAuth } from "@/api/middlewares/requireAuth";
 import { ErrorConflicto, ErrorNoAutenticado, ErrorNoEncontrado } from "@/shared/domain/errors";
 import { JwtTokenService } from "../infrastructure/JwtTokenService";
+import { SystemClock } from "@/shared/infrastructure/SystemClock";
 import { LoggerFalso, usuarioDePrueba } from "../testing/dobles";
+import { emitirConSesion, SesionRepositoryEnMemoria } from "../testing/SesionRepositoryEnMemoria";
 import { UsuarioRepositoryEnMemoria } from "../testing/UsuarioRepositoryEnMemoria";
 import { CambiarEstadoUsuarioUseCase } from "./CambiarEstadoUsuarioUseCase";
 
@@ -70,8 +72,9 @@ describe("CambiarEstadoUsuarioUseCase", () => {
   it("desactivar una cuenta hace que su token deje de valer en la siguiente petición (regla 5)", async () => {
     const { repo, useCase } = construir();
     const tokens = new JwtTokenService("secreto-de-prueba-de-al-menos-32-caracteres");
-    const token = await tokens.emitir({ id: "usuario-1", tokenVersion: 3, rol: "Emprendedor" });
-    const protegida = requireAuth(() => new Response("ok"), { usuarios: repo, tokens });
+    const sesiones = new SesionRepositoryEnMemoria();
+    const token = await emitirConSesion(tokens, sesiones, { id: "usuario-1", tokenVersion: 3, rol: "Emprendedor" });
+    const protegida = requireAuth(() => new Response("ok"), { usuarios: repo, sesiones, tokens, clock: new SystemClock() });
     const peticion = () => new Request("http://localhost/x", { headers: { authorization: `Bearer ${token}` } });
     expect((await protegida(peticion(), undefined)).status).toBe(200);
 

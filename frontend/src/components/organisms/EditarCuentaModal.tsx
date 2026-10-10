@@ -1,11 +1,13 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Button, clasesBoton } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { editarCuentaAction, type EstadoEditarCuenta } from "@/lib/admin/acciones";
 import type { Usuario } from "@/lib/api/tipos";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 const ESTADO_INICIAL: EstadoEditarCuenta = {};
 
@@ -21,8 +23,11 @@ interface PropsEditarCuentaModal {
 // ConfirmModal/ModalBienvenida (foco al abrir, Escape y clic afuera cierran), pero con un
 // formulario de verdad en vez de solo confirmar/cancelar.
 export function EditarCuentaModal({ usuario, abierto, onCerrar }: PropsEditarCuentaModal) {
-  const [estado, accion, pendiente] = useActionState(editarCuentaAction.bind(null, usuario.id), ESTADO_INICIAL);
+  const { estado, alEnviar, pendiente } = useEnvioSinReinicio(editarCuentaAction.bind(null, usuario.id), ESTADO_INICIAL);
   const cerrarRef = useRef<HTMLButtonElement>(null);
+
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
 
   useEffect(() => {
     if (estado.guardado) onCerrar();
@@ -52,6 +57,8 @@ export function EditarCuentaModal({ usuario, abierto, onCerrar }: PropsEditarCue
       <div
         role="dialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="editar-cuenta-titulo"
         onClick={(evento) => evento.stopPropagation()}
         className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
@@ -60,7 +67,7 @@ export function EditarCuentaModal({ usuario, abierto, onCerrar }: PropsEditarCue
           Editar los datos de la cuenta
         </h2>
 
-        <form action={accion} className="space-y-4">
+        <form onSubmit={alEnviar} className="space-y-4">
           <div className="space-y-1">
             <label htmlFor={`email-${usuario.id}`} className={CLASES_LABEL}>
               Correo electrónico

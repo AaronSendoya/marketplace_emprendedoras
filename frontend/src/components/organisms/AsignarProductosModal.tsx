@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { clasesBoton } from "@/components/atoms/Button";
 import { asignarDescuentoAction, quitarDescuentoAction } from "@/lib/admin/descuentos-acciones";
 import type { Descuento, ProductoPropio } from "@/lib/api/tipos";
+import { mensajeDeFallo, type ResultadoDeAccion } from "@/lib/errores/clasificar";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
 
 // Asignar y quitar un producto de un descuento. Por defecto son las acciones del Admin; el panel de
 // la Emprendedora pasa las suyas (otra ruta a revalidar) y sus propios textos.
 export interface AccionesAsignacion {
-  asignar: (descuentoId: string, productoId: string) => Promise<void>;
-  quitar: (descuentoId: string, productoId: string) => Promise<void>;
+  asignar: (descuentoId: string, productoId: string) => Promise<void | ResultadoDeAccion>;
+  quitar: (descuentoId: string, productoId: string) => Promise<void | ResultadoDeAccion>;
 }
 
 interface PropsAsignarProductosModal {
@@ -39,7 +41,16 @@ export function AsignarProductosModal({
   const asignar = acciones?.asignar ?? ((descuentoId: string, productoId: string) => asignarDescuentoAction(descuentoId, productoId, usuarioId));
   const quitar = acciones?.quitar ?? ((descuentoId: string, productoId: string) => quitarDescuentoAction(descuentoId, productoId, usuarioId));
   const [, iniciarTransicion] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const cerrarRef = useRef<HTMLButtonElement>(null);
+  // Cerrar limpia el aviso: al volver a abrir no queda el de la vez anterior.
+  const cerrar = () => {
+    setError(null);
+    onCerrar();
+  };
+
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
 
   useEffect(() => {
     if (!abierto) return;
@@ -62,19 +73,24 @@ export function AsignarProductosModal({
 
   function alCambiar(productoId: string, asignado: boolean) {
     iniciarTransicion(async () => {
-      if (asignado) {
-        await quitar(descuento.id, productoId);
-      } else {
-        await asignar(descuento.id, productoId);
+      setError(null);
+      try {
+        const resultado = asignado ? await quitar(descuento.id, productoId) : await asignar(descuento.id, productoId);
+        // La casilla sigue el estado del servidor (`producto_ids`): si falló, no cambia y aquí se dice por qué.
+        if (resultado && typeof resultado === "object" && resultado.error) setError(resultado.error);
+      } catch (fallo) {
+        setError(mensajeDeFallo(fallo));
       }
     });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-texto/60 p-4" onClick={onCerrar}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-texto/60 p-4" onClick={cerrar}>
       <div
         role="dialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="asignar-productos-titulo"
         onClick={(evento) => evento.stopPropagation()}
         className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
@@ -101,8 +117,14 @@ export function AsignarProductosModal({
           </ul>
         )}
 
+        {error && (
+          <p role="alert" className="rounded-md border border-error-borde bg-error-suave px-3 py-2 font-cuerpo text-sm text-texto">
+            {error}
+          </p>
+        )}
+
         <div className="flex justify-end pt-2">
-          <button ref={cerrarRef} type="button" onClick={onCerrar} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
+          <button ref={cerrarRef} type="button" onClick={cerrar} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
             Listo
           </button>
         </div>

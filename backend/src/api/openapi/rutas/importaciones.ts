@@ -1,12 +1,23 @@
 import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { MAXIMO_DE_FILAS_POR_IMPORTACION } from "@/core/importaciones/application/AnalizarExcelEmprendedoras";
-import { MAXIMO_DE_FILAS_POR_TANDA } from "@/core/importaciones/application/ImportarEmprendedoras";
+import { MAXIMO_DE_FILAS_POR_TANDA, MAXIMO_DE_FILAS_POR_TANDA_CON_IMAGENES } from "@/core/importaciones/application/ImportarEmprendedoras";
+import { MAXIMO_DE_FILAS_A_VERIFICAR } from "@/core/importaciones/application/VerificarImagenesDrive";
 import { AUTENTICADO, respuestasDeError } from "../componentes";
 
 // Regla 22. Los límites de aquí solo frenan abusos (un cuerpo enorme); los mensajes situacionales de cada dato los pone el dominio
 // al validar, por eso un texto largo o vacío no es un 400 del esquema sino un aviso de la fila.
 const texto = (maximo: number) => z.string().max(maximo);
+
+// Id de un archivo de Drive (regla 22, «Imágenes desde Drive»): solo letras, números, guion y guion bajo. Vacío = sin imagen. Nunca una
+// dirección: el servidor arma la suya y solo habla con los servidores de Google (regla 17).
+const idDeDrive = (descripcion: string) =>
+  z
+    .string()
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]*$/, "Debe ser el id de un archivo de Drive (letras, números, guion y guion bajo).")
+    .default("")
+    .meta({ description: descripcion });
 
 export const EsquemaDatosFila = z
   .object({
@@ -23,6 +34,8 @@ export const EsquemaDatosFila = z
     descripcion: texto(4000),
     instagram: texto(300).meta({ description: "Usuario sin arroba; vacío si no tiene." }),
     otra_red_social: texto(300),
+    foto_drive_id: idDeDrive("Id del archivo de Drive de la foto de perfil, sacado del enlace del Excel. Vacío si la fila no trae foto."),
+    logo_drive_id: idDeDrive("Id del archivo de Drive del logo. Vacío si la fila no trae logo."),
   })
   .strict();
 
@@ -65,6 +78,8 @@ const EsquemaDatosFilaRespuesta = z
     descripcion: z.string(),
     instagram: z.string(),
     otra_red_social: z.string(),
+    foto_drive_id: z.string(),
+    logo_drive_id: z.string(),
   })
   .meta({ id: "DatosFilaImportacion" });
 
@@ -89,7 +104,7 @@ const EsquemaAnalisis = z
     hojas: z.array(z.string()),
     columnas: z.object({
       reconocidas: z.array(z.string()),
-      ignoradas: z.array(z.string()).meta({ description: "Encabezados que se ignoran a propósito (fotos, logo, marca temporal y el beneficio, que no se registra)." }),
+      ignoradas: z.array(z.string()).meta({ description: "Encabezados que se ignoran a propósito (marca temporal y el beneficio, que no se registra)." }),
       opcionales_ausentes: z.array(z.string()),
       obligatorias_ausentes: z.array(z.string()).meta({
         description: "Columnas obligatorias que el archivo no trae. El archivo se acepta igual: cada fila queda con el error de ese dato y se completa en la vista previa.",
@@ -129,6 +144,8 @@ const EsquemaResultadoDeImportacion = z
         estado: z.enum(["creada", "omitida", "error"]),
         cuenta_creada: z.boolean(),
         perfil_creado: z.boolean(),
+        foto_cargada: z.boolean().meta({ description: "La foto salió de Drive; si no, el perfil tiene la imagen predeterminada (regla 11)." }),
+        logo_cargado: z.boolean().meta({ description: "El logo salió de Drive; si no, el perfil tiene la imagen predeterminada (regla 11)." }),
         password_temporal: z.string().nullable().meta({ description: "Solo si se creó la cuenta, y solo en esta respuesta: no se guarda en claro ni se vuelve a mostrar (regla 5)." }),
         avisos: z.array(EsquemaAviso),
         mensaje: z.string().nullable(),
@@ -136,6 +153,44 @@ const EsquemaResultadoDeImportacion = z
     ),
   })
   .meta({ id: "ResultadoImportacion" });
+
+export const EsquemaVerificarImagenesBody = z
+  .object({
+    filas: z
+      .array(
+        z
+          .object({
+            fila: z.number().int().min(1).max(1_048_576),
+            foto_drive_id: idDeDrive("Id del archivo de Drive de la foto; vacío si no trae."),
+            logo_drive_id: idDeDrive("Id del archivo de Drive del logo; vacío si no trae."),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(MAXIMO_DE_FILAS_A_VERIFICAR),
+  })
+  .strict();
+
+const EsquemaImagenVerificada = z.object({
+  estado: z.enum(["sin_imagen", "ok", "problema", "sin_comprobar"]).meta({
+    description: "`sin_imagen`: la fila no trae enlace; `ok`: se puede cargar; `problema`: el aviso dice por qué no; `sin_comprobar`: no hay conexión con Google.",
+  }),
+  aviso: EsquemaAviso.nullable(),
+});
+
+const EsquemaVerificacionImagenes = z
+  .object({
+    conexion: z.enum(["ok", "sin_conexion", "vencida"]).meta({ description: "`sin_conexion`: no llegó el token de Google; `vencida`: Google lo rechazó (hay que volver a conectar)." }),
+    cuenta: z.string().nullable().meta({ description: "El correo de la cuenta conectada." }),
+    filas: z.array(z.object({ fila: z.number().int(), foto: EsquemaImagenVerificada, logo: EsquemaImagenVerificada })),
+  })
+  .meta({ id: "VerificacionImagenes" });
+
+const EsquemaCabeceraGoogle = z.object({
+  "x-google-access-token": z.string().optional().meta({
+    description: "El token de la cuenta de Google conectada (regla 17). Sin él, las imágenes quedan predeterminadas. Nunca se registra ni se guarda.",
+  }),
+});
 
 const EsquemaArchivoMultipart = z.object({
   archivo: z.string().meta({ type: "string", format: "binary", description: "Un archivo Excel `.xlsx` (sin macros) de hasta 2 MB." }),
@@ -151,7 +206,8 @@ export function registrarImportaciones(registro: OpenAPIRegistry): void {
       "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, " +
       `${MAXIMO_DE_FILAS_POR_IMPORTACION} filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista ` +
       "previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden; el archivo se acepta aunque le falten columnas " +
-      "(se avisa cuáles) siempre que se reconozcan al menos 4. Las columnas de fotos, logo y beneficio se ignoran. " +
+      "(se avisa cuáles) siempre que se reconozcan al menos 4. Las columnas de foto y logo son enlaces de Drive: de cada uno se devuelve el id " +
+      "del archivo (`foto_drive_id`, `logo_drive_id`) y un enlace que no sirve es una advertencia de la fila. La marca temporal y el beneficio se ignoran. " +
       "No crea nada. El archivo no se guarda.",
     security: AUTENTICADO,
     request: { body: { content: { "multipart/form-data": { schema: EsquemaArchivoMultipart } } } },
@@ -184,13 +240,34 @@ export function registrarImportaciones(registro: OpenAPIRegistry): void {
     summary: "Importar emprendedoras",
     description:
       `Solo Admin (regla 22). Hasta ${MAXIMO_DE_FILAS_POR_TANDA} filas por petición. Por cada fila crea la cuenta (rol Emprendedor, correo sin verificar, ` +
-      "contraseña temporal aleatoria), el perfil con las imágenes predeterminadas (regla 11); no crea descuentos. " +
+      "contraseña temporal aleatoria) y el perfil; no crea descuentos. Con la cabecera `X-Google-Access-Token` descarga de Drive la foto y el logo " +
+      `de cada fila (regla 22; con imágenes, hasta ${MAXIMO_DE_FILAS_POR_TANDA_CON_IMAGENES} filas por petición) y los procesa como cualquier imagen ` +
+      "(regla 16, con hasta 20 MB de entrada). Una imagen que falla deja la predeterminada (regla 11) y un aviso en la fila: nunca la detiene. " +
+      "Si Google rechaza el token, 409 con el campo `google` y no se crea nada. " +
       "Vuelve a validar todo: la vista previa no se da por buena. Una cuenta cuyo correo ya existe se omite. Una fila que falla no " +
       "detiene a las demás. La contraseña temporal solo sale en esta respuesta.",
     security: AUTENTICADO,
-    request: { body: { content: { "application/json": { schema: EsquemaFilasBody } } } },
+    request: { headers: EsquemaCabeceraGoogle, body: { content: { "application/json": { schema: EsquemaFilasBody } } } },
     responses: {
       200: { description: "Resultado de cada fila.", content: { "application/json": { schema: EsquemaResultadoDeImportacion } } },
+      ...respuestasDeError("VALIDACION", "NO_AUTENTICADO", "PROHIBIDO", "CONFLICTO"),
+    },
+  });
+
+  registro.registerPath({
+    method: "post",
+    path: "/admin/importaciones/emprendedoras/imagenes/verificar",
+    tags: ["Importaciones"],
+    summary: "Comprobar en Drive las fotos y logos de la vista previa (no escribe nada)",
+    description:
+      `Solo Admin (regla 22). Hasta ${MAXIMO_DE_FILAS_A_VERIFICAR} filas. Con la cuenta de Google conectada (cabecera \`X-Google-Access-Token\`), consulta en Drive ` +
+      "los metadatos de cada archivo (no descarga nada) y dice, por fila, si la foto y el logo se pueden cargar. Un problema (sin acceso, no es una " +
+      "imagen JPG, PNG o WebP, pesa más de 20 MB, no se pudo comprobar) es una advertencia con su mensaje, nunca un error. Sin token responde " +
+      "`conexion: sin_conexion`; con un token que Google rechaza, `conexion: vencida`.",
+    security: AUTENTICADO,
+    request: { headers: EsquemaCabeceraGoogle, body: { content: { "application/json": { schema: EsquemaVerificarImagenesBody } } } },
+    responses: {
+      200: { description: "Estado de la foto y del logo de cada fila.", content: { "application/json": { schema: EsquemaVerificacionImagenes } } },
       ...respuestasDeError("VALIDACION", "NO_AUTENTICADO", "PROHIBIDO"),
     },
   });

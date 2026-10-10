@@ -64,6 +64,7 @@ export class MySqlEliminacionCuentaRepository implements IEliminacionCuentaRepos
       // No referencian a `usuarios` (son del correo): sin esto quedarían códigos e intentos de una cuenta que ya no existe.
       await tx.ejecutar("DELETE FROM otp_codigos WHERE email = ?", [cuenta.email]);
       await tx.ejecutar("DELETE FROM intentos_login WHERE email = ?", [cuenta.email]);
+      await tx.ejecutar("DELETE FROM sesiones WHERE usuario_id = ?", [usuarioId]);
 
       const borrada = await tx.ejecutar("DELETE FROM usuarios WHERE id = ?", [usuarioId]);
       if (borrada.filasAfectadas !== 1) throw new ErrorNoEncontrado("La cuenta no existe.");

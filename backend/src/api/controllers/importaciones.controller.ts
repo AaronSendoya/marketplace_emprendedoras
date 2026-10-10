@@ -7,6 +7,12 @@ import type {
   ValidacionDeFila,
   ValidarFilasEmprendedorasUseCase,
 } from "@/core/importaciones/application/ImportarEmprendedoras";
+import type {
+  FilaAVerificar,
+  ImagenVerificada,
+  ResultadoDeVerificacion,
+  VerificarImagenesDriveUseCase,
+} from "@/core/importaciones/application/VerificarImagenesDrive";
 import type { Aviso, CampoFila } from "@/core/importaciones/domain/Avisos";
 import type { DatosFila } from "@/core/importaciones/domain/FilaImportacion";
 import type { IGeneradorPlantilla } from "@/core/importaciones/domain/ILectorExcel";
@@ -28,6 +34,8 @@ const CAMPO: Record<CampoFila, string> = {
   descripcion: "descripcion",
   instagram: "instagram",
   otraRedSocial: "otra_red_social",
+  foto: "foto",
+  logo: "logo",
 };
 
 export const serializarAviso = (aviso: Aviso) => ({
@@ -52,6 +60,8 @@ export const serializarDatosFila = (datos: DatosFila) => ({
   descripcion: datos.descripcion,
   instagram: datos.instagram,
   otra_red_social: datos.otraRedSocial,
+  foto_drive_id: datos.fotoDriveId,
+  logo_drive_id: datos.logoDriveId,
 });
 
 // Lo que llega en el cuerpo de `validar` e `importar`, ya validado por el esquema.
@@ -69,6 +79,8 @@ export interface DatosFilaDeCuerpo {
   descripcion: string;
   instagram: string;
   otra_red_social: string;
+  foto_drive_id: string;
+  logo_drive_id: string;
 }
 
 export const filasDeCuerpo = (filas: { fila: number; datos: DatosFilaDeCuerpo }[]): FilaAImportar[] =>
@@ -88,6 +100,8 @@ export const filasDeCuerpo = (filas: { fila: number; datos: DatosFilaDeCuerpo }[
       descripcion: datos.descripcion,
       instagram: datos.instagram,
       otraRedSocial: datos.otra_red_social,
+      fotoDriveId: datos.foto_drive_id,
+      logoDriveId: datos.logo_drive_id,
     },
   }));
 
@@ -139,6 +153,8 @@ export const serializarResultado = (resultado: ResultadoDeFila) => ({
   estado: resultado.estado,
   cuenta_creada: resultado.cuentaCreada,
   perfil_creado: resultado.perfilCreado,
+  foto_cargada: resultado.fotoCargada,
+  logo_cargado: resultado.logoCargado,
   password_temporal: resultado.passwordTemporal,
   avisos: resultado.avisos.map(serializarAviso),
   mensaje: resultado.mensaje,
@@ -152,8 +168,42 @@ export async function validarFilas(usecase: ValidarFilasEmprendedorasUseCase, fi
   return ok({ filas: (await usecase.ejecutar(filas)).map(serializarValidacion) });
 }
 
-export async function importarEmprendedoras(usecase: ImportarEmprendedorasUseCase, admin: Actor, filas: FilaAImportar[]): Promise<Response> {
-  return ok({ resultados: (await usecase.ejecutar(admin, filas)).map(serializarResultado) });
+// `tokenGoogle`: el de la cuenta que conectó el Admin (regla 17); nunca se guarda ni se registra.
+export async function importarEmprendedoras(
+  usecase: ImportarEmprendedorasUseCase,
+  admin: Actor,
+  filas: FilaAImportar[],
+  tokenGoogle: string | null = null,
+): Promise<Response> {
+  return ok({ resultados: (await usecase.ejecutar(admin, filas, tokenGoogle)).map(serializarResultado) });
+}
+
+export interface FilaAVerificarDeCuerpo {
+  fila: number;
+  foto_drive_id: string;
+  logo_drive_id: string;
+}
+
+export const filasAVerificarDeCuerpo = (filas: FilaAVerificarDeCuerpo[]): FilaAVerificar[] =>
+  filas.map((f) => ({ fila: f.fila, fotoDriveId: f.foto_drive_id, logoDriveId: f.logo_drive_id }));
+
+const serializarImagenVerificada = (imagen: ImagenVerificada) => ({
+  estado: imagen.estado,
+  aviso: imagen.aviso ? serializarAviso(imagen.aviso) : null,
+});
+
+export const serializarVerificacion = (resultado: ResultadoDeVerificacion) => ({
+  conexion: resultado.conexion,
+  cuenta: resultado.cuenta,
+  filas: resultado.filas.map((fila) => ({
+    fila: fila.fila,
+    foto: serializarImagenVerificada(fila.foto),
+    logo: serializarImagenVerificada(fila.logo),
+  })),
+});
+
+export async function verificarImagenes(usecase: VerificarImagenesDriveUseCase, filas: FilaAVerificar[], tokenGoogle: string | null): Promise<Response> {
+  return ok(serializarVerificacion(await usecase.ejecutar(filas, tokenGoogle)));
 }
 
 export const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

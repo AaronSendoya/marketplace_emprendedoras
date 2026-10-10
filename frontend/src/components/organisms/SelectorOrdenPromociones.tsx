@@ -39,10 +39,11 @@ export function SelectorOrdenPromociones({ orden }: PropsSelectorOrdenPromocione
   }
 
   return (
-    <div className="flex items-center gap-2.5 font-cuerpo text-sm text-texto-secundario" aria-busy={pendiente}>
+    <div className="flex max-w-full min-w-0 items-center gap-2.5 font-cuerpo text-sm text-texto-secundario" aria-busy={pendiente}>
       <label htmlFor={id}>Orden</label>
-      <div className="relative">
-        <Select id={id} value={orden} onChange={(evento) => elegir(evento.target.value)} className="h-10 w-auto appearance-none rounded-lg border-borde-fuerte py-0 pr-9 pl-3 font-medium">
+      {/* `min-w-0` y `max-w-full`: la opción más larga hace al selector de unos 256 px, más de lo que queda al lado de «Orden» en un teléfono de 320 px. */}
+      <div className="relative min-w-0">
+        <Select id={id} value={orden} onChange={(evento) => elegir(evento.target.value)} className="h-10 w-auto max-w-full appearance-none rounded-lg border-borde-fuerte py-0 pr-9 pl-3 font-medium">
           {OPCIONES.map((opcion) => (
             <option key={opcion.valor} value={opcion.valor}>
               {opcion.etiqueta}

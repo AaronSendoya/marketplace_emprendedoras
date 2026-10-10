@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { ErrorArchivoMuyGrande, ErrorValidacion } from "@/shared/domain/errors";
-import { LADO_MAX_PX, TAMANO_MAX_IMAGEN_BYTES } from "@/shared/domain/imagenes";
+import { LADO_MAX_PX, TAMANO_MAX_IMAGEN_BYTES, TAMANO_MAX_IMAGEN_DRIVE_BYTES } from "@/shared/domain/imagenes";
 import { ImageProcessorService } from "./ImageProcessorService";
 
 const procesador = new ImageProcessorService();
@@ -106,5 +106,45 @@ describe("ImageProcessorService (regla 16)", () => {
     const jpeg = await ruido(400, 400).jpeg().toBuffer();
 
     await expect(procesador.procesar(jpeg.subarray(0, 40), "perfil")).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  describe("tope de entrada configurable (la importación desde Drive admite 20 MB, regla 16)", () => {
+    it("sin indicarlo, el tope sigue siendo de 5 MB y el mensaje lo dice", async () => {
+      const error = await procesador.procesar(Buffer.alloc(TAMANO_MAX_IMAGEN_BYTES + 1), "perfil").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ErrorArchivoMuyGrande);
+      expect((error as ErrorArchivoMuyGrande).message).toContain("5 MB");
+    });
+
+    it("con el tope de Drive, un archivo de más de 5 MB (y menos de 20) ya no se rechaza por peso", async () => {
+      // Un buffer que no es imagen: pasa el control de peso y lo rechaza el control de formato, no el de tamaño.
+      const error = await procesador
+        .procesar(Buffer.alloc(TAMANO_MAX_IMAGEN_BYTES + 1), "perfil", { tamanoMaxBytes: TAMANO_MAX_IMAGEN_DRIVE_BYTES })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ErrorValidacion);
+      expect(error).not.toBeInstanceOf(ErrorArchivoMuyGrande);
+    });
+
+    it("con el tope de Drive, más de 20 MB se rechaza por peso y el mensaje dice 20 MB", async () => {
+      const error = await procesador
+        .procesar(Buffer.alloc(TAMANO_MAX_IMAGEN_DRIVE_BYTES + 1), "perfil", { tamanoMaxBytes: TAMANO_MAX_IMAGEN_DRIVE_BYTES })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ErrorArchivoMuyGrande);
+      expect((error as ErrorArchivoMuyGrande).message).toContain("20 MB");
+    });
+
+    it("una foto grande de teléfono (más de 5 MB) sale igual como un WebP pequeño de 800 px", async () => {
+      const grande = await ruido(4000, 3000).jpeg({ quality: 100 }).toBuffer();
+      expect(grande.length).toBeGreaterThan(TAMANO_MAX_IMAGEN_BYTES);
+
+      const webp = await procesador.procesar(grande, "perfil", { tamanoMaxBytes: TAMANO_MAX_IMAGEN_DRIVE_BYTES });
+
+      const meta = await sharp(webp).metadata();
+      expect(meta.format).toBe("webp");
+      expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(LADO_MAX_PX.perfil);
+      expect(webp.length).toBeLessThan(TAMANO_MAX_IMAGEN_BYTES);
+    }, 30_000);
   });
 });

@@ -6,6 +6,7 @@ import type { IPasswordHasher } from "../domain/IPasswordHasher";
 import type { ITokenService } from "../domain/ITokenService";
 import type { Usuario } from "../domain/Usuario";
 import { LoggerFalso } from "../testing/dobles";
+import { SesionRepositoryEnMemoria } from "../testing/SesionRepositoryEnMemoria";
 import { UsuarioRepositoryEnMemoria } from "../testing/UsuarioRepositoryEnMemoria";
 import { ESPERAS_SEGUNDOS, LoginUseCase, TAMANO_TANDA_INTENTOS } from "./LoginUseCase";
 
@@ -35,10 +36,10 @@ const hasherFalso: IPasswordHasher = {
 };
 
 class TokensFalsos implements ITokenService {
-  emitidos: { id: string; tokenVersion: number; rol: string }[] = [];
-  async emitir(datos: { id: string; tokenVersion: number; rol: string }) {
+  emitidos: { id: string; tokenVersion: number; rol: string; sesionId: string }[] = [];
+  async emitir(datos: { id: string; tokenVersion: number; rol: string; sesionId: string }) {
     this.emitidos.push(datos);
-    return `token-de-${datos.id}`;
+    return `token-de-${datos.id}-${datos.sesionId}`;
   }
   verificar(): Promise<never> {
     throw new Error("no se usa en estas pruebas");
@@ -63,10 +64,11 @@ function construir(usuarios: Usuario[] = [usuario()], hasher: IPasswordHasher = 
   const repo = new UsuarioRepositoryEnMemoria(usuarios);
   const tokens = new TokensFalsos();
   const intentos = new IntentosLoginFalso();
+  const sesiones = new SesionRepositoryEnMemoria();
   const clock = new FakeClock(AHORA);
   const logger = new LoggerFalso();
-  const useCase = new LoginUseCase(repo, hasher, tokens, intentos, clock, logger);
-  return { useCase, tokens, intentos, clock, logger };
+  const useCase = new LoginUseCase(repo, hasher, tokens, intentos, sesiones, clock, logger);
+  return { useCase, tokens, intentos, sesiones, clock, logger };
 }
 
 async function fallarNVeces(useCase: LoginUseCase, n: number) {
@@ -79,10 +81,62 @@ describe("LoginUseCase", () => {
 
     const resultado = await useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA);
 
-    expect(resultado.token).toBe("token-de-usuario-1");
+    expect(resultado.token).toBe("token-de-usuario-1-sesion-1");
     expect(resultado.usuario.email).toBe("aaron@gmail.com");
-    expect(tokens.emitidos).toEqual([{ id: "usuario-1", tokenVersion: 3, rol: "Emprendedor" }]);
+    expect(tokens.emitidos).toEqual([{ id: "usuario-1", tokenVersion: 3, rol: "Emprendedor", sesionId: "sesion-1" }]);
     expect(intentos.filas).toHaveLength(0);
+  });
+
+  describe("sesiones del servidor (regla 5)", () => {
+    it("cada inicio de sesión crea una sesión nueva y un token nuevo, aunque sea la misma cuenta", async () => {
+      const { useCase, sesiones } = construir();
+
+      const primero = await useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA);
+      const segundo = await useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA);
+
+      expect(primero.token).not.toBe(segundo.token);
+      expect(sesiones.sesiones.map((s) => s.id)).toEqual(["sesion-1", "sesion-2"]);
+      expect(sesiones.sesiones.every((s) => s.usuarioId === "usuario-1")).toBe(true);
+    });
+
+    it("el token se emite con el id de la sesión recién creada", async () => {
+      const { useCase, tokens, sesiones } = construir();
+
+      await useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA);
+
+      expect(tokens.emitidos[0].sesionId).toBe(sesiones.sesiones[0].id);
+    });
+
+    it("la sesión de una Emprendedora no vence", async () => {
+      const { useCase, sesiones } = construir();
+
+      await useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA);
+
+      expect(sesiones.sesiones[0]).toMatchObject({ usuarioId: "usuario-1", creadaEn: AHORA, expiraEn: null });
+    });
+
+    it("la sesión de un Admin vence a las 4 horas de iniciarla", async () => {
+      const { useCase, sesiones } = construir([usuario({ id: "admin-1", rol: "Admin" })]);
+
+      await useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA);
+
+      expect(sesiones.sesiones[0].expiraEn).toEqual(new Date(AHORA.getTime() + 4 * 60 * 60 * 1000));
+    });
+
+    it("con credenciales incorrectas, cuenta inactiva o freno activo no se crea ninguna sesión", async () => {
+      const incorrecta = construir();
+      const inactiva = construir([usuario({ activo: false })]);
+      const bloqueada = construir();
+      await fallarNVeces(bloqueada.useCase, TAMANO_TANDA_INTENTOS);
+
+      await incorrecta.useCase.ejecutar("aaron@gmail.com", "clave-mala").catch(() => {});
+      await inactiva.useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA).catch(() => {});
+      await bloqueada.useCase.ejecutar("aaron@gmail.com", CLAVE_CORRECTA).catch(() => {});
+
+      expect(incorrecta.sesiones.sesiones).toHaveLength(0);
+      expect(inactiva.sesiones.sesiones).toHaveLength(0);
+      expect(bloqueada.sesiones.sesiones).toHaveLength(0);
+    });
   });
 
   it("da el mismo error para un correo inexistente y una contraseña incorrecta", async () => {

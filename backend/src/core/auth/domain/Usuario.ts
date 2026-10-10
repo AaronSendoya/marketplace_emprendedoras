@@ -32,12 +32,19 @@ export interface NuevoUsuario {
   creadoEn: Date;
 }
 
-// Regla 5: búsqueda por texto libre (nombres, apellidos o correo) y filtro por estado, para el
-// listado de cuentas del Admin.
+// Regla 5: búsqueda por texto libre (nombres, apellidos o correo) y filtros por estado, rol y perfil,
+// para el listado de cuentas del Admin (regla 18: la pantalla de Emprendimientos pide solo las cuentas
+// Emprendedor y las separa entre las que ya tienen perfil y las que no).
 export interface FiltrosUsuarios {
   q?: string;
   activo?: boolean;
+  rol?: NombreRol;
+  // `true`: solo las que tienen perfil; `false`: solo las que todavía no.
+  conPerfil?: boolean;
 }
+
+// Una cuenta del listado del Admin con el nombre de su negocio (regla 18); `perfil` es `null` si todavía no tiene.
+export type UsuarioConPerfil = UsuarioAutenticado & { perfil: { id: string; nombreNegocio: string } | null };
 
 // Regla 5: edición de cuenta por el Admin, sin OTP. Todos los campos son opcionales (solo se
 // actualiza lo presente); `emailVerificadoEn` lo decide el caso de uso, no quien llama al

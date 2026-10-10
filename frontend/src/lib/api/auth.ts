@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { enviarJson, obtenerJsonAutenticado } from "./cliente";
+import { enviarJson, enviarSinRespuestaAutenticado, obtenerJsonAutenticado } from "./cliente";
 import type { LoginRespuesta, Usuario } from "./tipos";
 
 // POST /auth/login: mismo error (401) ante correo inexistente, contraseña incorrecta o cuenta
@@ -7,6 +7,10 @@ import type { LoginRespuesta, Usuario } from "./tipos";
 // (regla 17). El mapeo a mensajes en español vive en lib/auth/acciones.ts, no aquí.
 export const iniciarSesion = (email: string, password: string) =>
   enviarJson<LoginRespuesta>("/auth/login", { email, password });
+
+// POST /auth/logout (204): cierra en el servidor la sesión del token de la cookie (regla 5, backend). Desde ese momento ese token
+// no vale, aunque alguien lo hubiera copiado. Falla (401) si el token ya no valía: quien llama lo ignora y borra la cookie igual.
+export const cerrarSesionEnServidor = () => enviarSinRespuestaAutenticado("/auth/logout");
 
 // GET /auth/me: el rol y `activo` siempre se leen de la base en esa misma petición (regla 5), así
 // que esto es lo único confiable para saber "quién sos" — la sola presencia de la cookie no

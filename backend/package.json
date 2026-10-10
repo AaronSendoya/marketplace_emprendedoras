@@ -15,20 +15,21 @@
     "openapi:export": "tsx scripts/export-openapi.ts",
     "r2:subir-defaults": "tsx scripts/subir-defaults-r2.ts",
     "db:backup": "tsx scripts/backup.ts",
-    "db:restaurar": "tsx scripts/restaurar-backup.ts"
+    "db:restaurar": "tsx scripts/restaurar-backup.ts",
+    "db:limpiar": "tsx scripts/limpiar-registros.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@aws-sdk/client-s3": "^3.1136.0",
-    "@next/env": "16.3.5",
+    "@next/env": "16.3.8",
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
     "jose": "^6.2.12",
     "mysql2": "^3.24.4",
-    "next": "16.3.5",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -36,7 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.5",
+    "eslint-config-next": "16.3.8",
     "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.1"

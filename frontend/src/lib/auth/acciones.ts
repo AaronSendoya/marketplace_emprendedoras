@@ -1,9 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { iniciarSesion } from "@/lib/api/auth";
+import { cerrarSesionEnServidor, iniciarSesion } from "@/lib/api/auth";
 import { ErrorApi } from "@/lib/api/cliente";
 import { cerrarCookieSesion, crearCookieSesion } from "@/lib/auth/sesion";
+import { clasificarError } from "@/lib/errores/clasificar";
+import { registrarErrorDelServidor } from "@/lib/errores/registro";
 
 export interface EstadoLogin {
   error?: string;
@@ -30,6 +32,11 @@ function mensajeDeError(error: ErrorApi): string {
   }
   if (error.status === 401) return "Correo o contraseña incorrectos.";
   if (error.status === 400) return "Revisa tu correo y tu contraseña.";
+  // Sin conexión con el servidor, tiempo agotado o base de datos fuera de servicio: se dice qué pasa, no «intenta de nuevo» a secas.
+  const clasificado = clasificarError(error);
+  if (clasificado.categoria === "sin_conexion" || clasificado.categoria === "tiempo_agotado" || clasificado.categoria === "servicio_no_disponible") {
+    return clasificado.mensaje;
+  }
   return "No pudimos iniciar sesión. Intenta de nuevo.";
 }
 
@@ -45,6 +52,8 @@ export async function iniciarSesionAction(_estadoPrevio: EstadoLogin, formData: 
   try {
     respuesta = await iniciarSesion(email, password);
   } catch (error) {
+    // Un 401 es «credenciales incorrectas» (no un fallo del sistema) y no se registra; lo demás sí.
+    if (!(error instanceof ErrorApi && (error.status === 401 || error.status === 400 || error.status === 429))) registrarErrorDelServidor("iniciarSesionAction", error);
     return { error: error instanceof ErrorApi ? mensajeDeError(error) : "No pudimos iniciar sesión. Intenta de nuevo." };
   }
 
@@ -54,7 +63,16 @@ export async function iniciarSesionAction(_estadoPrevio: EstadoLogin, formData: 
   redirect(respuesta.usuario.rol === "Admin" ? "/admin" : "/mi-negocio");
 }
 
+// Regla 5 (backend): primero se cierra la sesión en el servidor, con el token todavía en la cookie, y después se borra la cookie.
+// Si el servidor no responde o el token ya no valía, la cookie se borra igual: la persona queda fuera de este navegador, que es lo
+// que pidió. El único caso en que el token sigue valiendo en el servidor es que el backend esté caído justo en ese momento, y
+// entonces vale hasta que venza (4 horas en el Admin).
 export async function cerrarSesionAction(): Promise<void> {
+  try {
+    await cerrarSesionEnServidor();
+  } catch {
+    // Sin sesión que cerrar (token vencido o ya cerrado) o backend caído: no impide cerrar la sesión en este navegador.
+  }
   await cerrarCookieSesion();
   redirect("/");
 }

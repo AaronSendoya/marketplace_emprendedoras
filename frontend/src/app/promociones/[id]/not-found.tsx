@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { clasesBoton } from "@/components/atoms/Button";
+
+export const metadata: Metadata = { title: "Promoción no encontrada — Track de Mujeres" };
 
 export default function PromocionNoEncontrada() {
   return (

@@ -1,11 +1,12 @@
 import { actualizarJsonAutenticado, eliminarJsonAutenticado, enviarJsonAutenticado, obtenerJsonAutenticado } from "./cliente";
-import type { CuentaEliminada, FiltrosUsuarios, Pagina, Usuario, UsuarioCreado } from "./tipos";
+import type { CuentaEliminada, FiltrosUsuarios, Pagina, Usuario, UsuarioConPerfil, UsuarioCreado } from "./tipos";
 
-// GET /admin/usuarios: todas las cuentas (Admin y Emprendedor), paginadas, las más recientes
-// primero. Admite buscar por texto libre (nombres, apellidos y correo) y filtrar por estado
-// (regla 5).
+// GET /admin/usuarios: las cuentas (Admin y Emprendedor), paginadas, las más recientes primero.
+// Admite buscar por texto libre (nombres, apellidos y correo) y filtrar por estado (regla 5), por
+// rol y por si ya tienen perfil (regla 18). Cada cuenta trae su perfil (id y nombre del negocio, o
+// `null`), y el `total` cuenta solo lo filtrado: con `limite: 1` sirve para contar.
 export const listarUsuarios = (filtros: FiltrosUsuarios = {}) =>
-  obtenerJsonAutenticado<Pagina<Usuario>>("/admin/usuarios", { parametros: { ...filtros } });
+  obtenerJsonAutenticado<Pagina<UsuarioConPerfil>>("/admin/usuarios", { parametros: { ...filtros } });
 
 // GET /admin/usuarios/{id}: datos básicos de una cuenta. Base del módulo "Emprendimientos" (la
 // cabecera de /admin/emprendimientos/[usuarioId] necesita volver a pedirlos en cada carga de la

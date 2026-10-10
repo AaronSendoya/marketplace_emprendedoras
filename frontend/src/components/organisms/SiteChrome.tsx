@@ -14,8 +14,9 @@ interface PropsSiteChrome {
 }
 
 // Los dos paneles (el del Admin, con su sidebar, en src/app/admin/layout.tsx; el de la Emprendedora,
-// con su riel y su barra inferior, en src/app/mi-negocio/layout.tsx) y la pantalla de iniciar
-// sesión son vistas aparte: ninguna lleva el Navbar ni el Footer públicos (pedido explícito).
+// con su riel y su barra inferior, en src/app/mi-negocio/layout.tsx), la pantalla de iniciar
+// sesión y la ventana de conexión con Google (`/conexion-google`, regla 22) son vistas aparte: ninguna lleva el Navbar ni el
+// Footer públicos (pedido explícito).
 // Sacar esta decisión del layout raíz a un Client Component evita reorganizar todas las rutas
 // públicas en un grupo de Next solo para que estas no los hereden.
 export function SiteChrome({ sesion, children }: PropsSiteChrome) {
@@ -23,8 +24,9 @@ export function SiteChrome({ sesion, children }: PropsSiteChrome) {
   const esAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   const esNegocio = pathname === "/mi-negocio" || pathname.startsWith("/mi-negocio/");
   const esLogin = pathname === "/iniciar-sesion";
+  const esConexionGoogle = pathname === "/conexion-google";
 
-  if (esAdmin || esNegocio || esLogin) return <>{children}</>;
+  if (esAdmin || esNegocio || esLogin || esConexionGoogle) return <>{children}</>;
 
   return (
     <>

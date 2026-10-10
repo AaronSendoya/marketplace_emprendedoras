@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { EstadoVacio } from "@/components/molecules/EstadoVacio";
 import { EncabezadoPaginaAdmin } from "@/components/organisms/EncabezadoPaginaAdmin";
 import { EncabezadoSeccionAdmin } from "@/components/organisms/EncabezadoSeccionAdmin";
+import { LimiteDeError } from "@/components/organisms/LimiteDeError";
 import { GraficoInteraccion } from "@/components/organisms/dashboard/GraficoInteraccion";
 import { GraficoRubros } from "@/components/organisms/dashboard/GraficoRubros";
 import { ConcentracionClics } from "@/components/organisms/dashboard/ConcentracionClics";
@@ -25,7 +26,7 @@ import { obtenerIdentidades } from "@/lib/metricas/identidad";
 import { ETIQUETA_ORDEN, ORDEN_MAPA_CALOR_POR_DEFECTO, ORDENES_MAPA_CALOR, UNIDAD_POR_GRANULARIDAD } from "@/lib/metricas/mapaCalor";
 import { mesesParaMovimiento } from "@/lib/metricas/mes";
 import { calcularMovimiento, LIMITE_TOP_MENSUAL } from "@/lib/metricas/movimiento";
-import { etiquetaRangoCorto, hoyLaPaz, resolverRangoConAnterior, TOPE_RANKING_POR_DEFECTO } from "@/lib/metricas/rango";
+import { esFechaReal, etiquetaRangoCorto, hoyLaPaz, resolverRangoConAnterior, TOPE_RANKING_POR_DEFECTO } from "@/lib/metricas/rango";
 import { calcularTendencia } from "@/lib/metricas/tendencia";
 import type { OrdenMapaCalor } from "@/lib/api/tipos";
 
@@ -34,18 +35,16 @@ export const metadata: Metadata = {
 };
 
 const TOPES_RANKING_VALIDOS = [5, 10, 20];
-const SOLO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 function primerValor(valor: string | string[] | undefined): string {
   return (Array.isArray(valor) ? valor[0] : valor) ?? "";
 }
 
-// Solo valida el formato (igual que `estado` en /admin): un valor manualmente mal escrito en la
-// URL se ignora en vez de mandarse al backend. La semántica del rango (hasta >= desde, máximo 2
-// años) la valida el backend (regla 19); el formulario de SelectorPeriodo ya impide construir un
-// rango inválido desde la UI normal.
+// Una fecha mal escrita en la URL (o que no existe, como 2026-02-30) se ignora en vez de mandarse al
+// backend, igual que `estado` en /admin. El rango como tal (hasta >= desde, máximo 2 años, regla 19) lo
+// revisa `resolverRangoConAnterior`: uno inválido vuelve al período por defecto.
 function fechaDeParametro(valor: string): string | undefined {
-  return SOLO_FECHA.test(valor) ? valor : undefined;
+  return esFechaReal(valor) ? valor : undefined;
 }
 
 // `TarjetaKpi` es Client Component (por el sparkline): recibe el ícono ya renderizado, no la
@@ -85,8 +84,9 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
   let mapaDelMes: Awaited<ReturnType<typeof obtenerMapaCalorClics>> | null = null;
   let mapaDelMesAnterior: Awaited<ReturnType<typeof obtenerMapaCalorClics>> | null = null;
   try {
-    const [{ datos }, resumen, resumenPrevio, mapa, serieClics, serieClicsPrevia, clicsPorRubro, mapaMes, mapaMesAnterior] = await Promise.all([
-      listarUsuarios({ estado: "activo", pagina: 1, limite: 100 }),
+    const [activas, resumen, resumenPrevio, mapa, serieClics, serieClicsPrevia, clicsPorRubro, mapaMes, mapaMesAnterior] = await Promise.all([
+      // Solo interesa el total (regla 18): una fila basta, y no hay tope de cuentas.
+      listarUsuarios({ estado: "activo", rol: "Emprendedor", pagina: 1, limite: 1 }),
       obtenerResumenClics(actual),
       obtenerResumenClics(anterior),
       obtenerMapaCalorClics(top, actual, orden),
@@ -96,7 +96,7 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
       obtenerMapaCalorClics(LIMITE_TOP_MENSUAL, { desde: meses.mes.desde, hasta: meses.mes.hasta }, "total"),
       obtenerMapaCalorClics(LIMITE_TOP_MENSUAL, { desde: meses.anterior.desde, hasta: meses.anterior.hasta }, "total"),
     ]);
-    emprendedorasActivas = datos.filter((usuario) => usuario.rol === "Emprendedor").length;
+    emprendedorasActivas = activas.paginacion.total;
     resumenClics = resumen;
     resumenAnterior = resumenPrevio;
     mapaCalor = mapa;
@@ -134,35 +134,39 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
       <EncabezadoPaginaAdmin
         titulo="Dashboard"
         descripcion="Un vistazo general al catálogo."
-        acciones={<SelectorPeriodo hoy={hoy} etiquetaRango={etiquetaRangoCorto(actual.desde, actual.hasta)} />}
+        acciones={<SelectorPeriodo hoy={hoy} desde={actual.desde} hasta={actual.hasta} etiquetaRango={etiquetaRangoCorto(actual.desde, actual.hasta)} />}
       />
 
       {/* Los cuatro indicadores como un solo conjunto: un panel con divisiones de 1 px (`gap-px` sobre el
           color del borde) en vez de cuatro cajas sueltas. Dos columnas hasta `xl`, donde caben las cuatro. */}
       <section aria-label="Indicadores del período" className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-borde bg-borde xl:grid-cols-4">
         <TarjetaKpi etiqueta="Emprendedoras activas" valor={String(emprendedorasActivas)} tono="magenta" icono={<Store {...PROPS_ICONO_KPI} />} />
-        <TarjetaKpi
-          etiqueta="Clics a WhatsApp"
-          valor={String(resumenClics.whatsapp)}
-          tono="whatsapp"
-          icono={<MessageCircle {...PROPS_ICONO_KPI} />}
-          grafico={{
-            serie: serie.map((punto) => punto.whatsapp),
-            color: COLOR_ENFASIS,
-            tendencia: calcularTendencia(resumenClics.whatsapp, resumenAnterior.whatsapp),
-          }}
-        />
-        <TarjetaKpi
-          etiqueta="Clics a Instagram"
-          valor={String(resumenClics.instagram)}
-          tono="instagram"
-          icono={<AtSign {...PROPS_ICONO_KPI} />}
-          grafico={{
-            serie: serie.map((punto) => punto.instagram),
-            color: COLOR_SECUNDARIO,
-            tendencia: calcularTendencia(resumenClics.instagram, resumenAnterior.instagram),
-          }}
-        />
+        <LimiteDeError nombre="este indicador" compacto>
+          <TarjetaKpi
+            etiqueta="Clics a WhatsApp"
+            valor={String(resumenClics.whatsapp)}
+            tono="whatsapp"
+            icono={<MessageCircle {...PROPS_ICONO_KPI} />}
+            grafico={{
+              serie: serie.map((punto) => punto.whatsapp),
+              color: COLOR_ENFASIS,
+              tendencia: calcularTendencia(resumenClics.whatsapp, resumenAnterior.whatsapp),
+            }}
+          />
+        </LimiteDeError>
+        <LimiteDeError nombre="este indicador" compacto>
+          <TarjetaKpi
+            etiqueta="Clics a Instagram"
+            valor={String(resumenClics.instagram)}
+            tono="instagram"
+            icono={<AtSign {...PROPS_ICONO_KPI} />}
+            grafico={{
+              serie: serie.map((punto) => punto.instagram),
+              color: COLOR_SECUNDARIO,
+              tendencia: calcularTendencia(resumenClics.instagram, resumenAnterior.instagram),
+            }}
+          />
+        </LimiteDeError>
         <TarjetaKpi
           etiqueta="Clics totales"
           valor={String(resumenClics.whatsapp + resumenClics.instagram)}
@@ -186,7 +190,9 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
           <LeyendaCanales conAnterior={hayAnterior} />
         </div>
         <div className="mt-4">
-          <GraficoInteraccion serie={serie} serieAnterior={hayAnterior ? serieAnterior : null} />
+          <LimiteDeError nombre="el gráfico de interacción">
+            <GraficoInteraccion serie={serie} serieAnterior={hayAnterior ? serieAnterior : null} />
+          </LimiteDeError>
         </div>
       </section>
 
@@ -267,7 +273,9 @@ export default async function PaginaDashboard({ searchParams }: PageProps<"/admi
           {porRubro.length === 0 ? (
             <EstadoVacio icono={BarChart3} titulo="Todavía no hay datos" descripcion="Se mostrará acá en cuanto haya clics registrados." />
           ) : (
-            <GraficoRubros datos={porRubro} />
+            <LimiteDeError nombre="el gráfico de rubros">
+              <GraficoRubros datos={porRubro} />
+            </LimiteDeError>
           )}
         </section>
 

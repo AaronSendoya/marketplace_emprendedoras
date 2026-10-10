@@ -1,6 +1,7 @@
 import { Package, Shuffle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { clasesBoton } from "@/components/atoms/Button";
 import { AvisoResultadosSimilares } from "@/components/molecules/AvisoResultadosSimilares";
 import { EstadoVacio } from "@/components/molecules/EstadoVacio";
@@ -13,6 +14,7 @@ import { listarCiudades, listarRubros } from "@/lib/api/catalogos";
 import { listarProductos } from "@/lib/api/productos";
 import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
 import { crearSemilla, semillaDe } from "@/lib/inicio/semilla";
+import { idDeParametro, paginaDeParametro, ultimaPagina } from "@/lib/parametros";
 
 export const metadata: Metadata = {
   title: "Productos — Track de Mujeres",
@@ -36,9 +38,10 @@ export default async function PaginaProductos({ searchParams }: PageProps<"/prod
   // El backend acepta de 1 a 100 caracteres (regla 21): un texto más largo, escrito a mano en la URL, no debe llegar
   // a la API ni terminar en una página de error.
   const q = primerValor(parametros.q).trim().slice(0, 100);
-  const ciudadId = primerValor(parametros.ciudad_id);
-  const rubroId = primerValor(parametros.rubro_id);
-  const pagina = Number(primerValor(parametros.pagina)) || 1;
+  // Un id o una página que el backend rechazaría (400) se ignoran: el enlace sigue mostrando el catálogo.
+  const ciudadId = idDeParametro(primerValor(parametros.ciudad_id));
+  const rubroId = idDeParametro(primerValor(parametros.rubro_id));
+  const pagina = paginaDeParametro(primerValor(parametros.pagina));
   const hayFiltros = Boolean(q || ciudadId || rubroId);
   const alAzar = !q;
   const semilla = alAzar ? semillaDe(primerValor(parametros.semilla)) : undefined;
@@ -67,6 +70,10 @@ export default async function PaginaProductos({ searchParams }: PageProps<"/prod
     const query = parametrosUrl.toString();
     return query ? `/productos?${query}` : "/productos";
   }
+
+  // Una página que ya no existe lleva a la última (con la misma semilla), no a «aún no hay productos».
+  const ultima = ultimaPagina(paginacion.total, LIMITE);
+  if (pagina > ultima) redirect(hrefCon(semilla, ultima));
 
   return (
     <main className="flex-1">

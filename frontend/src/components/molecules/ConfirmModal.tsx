@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { clasesBoton, type VarianteBoton } from "@/components/atoms/Button";
+import { mensajeDeFallo, type ResultadoDeAccion } from "@/lib/errores/clasificar";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
 
 interface PropsConfirmModal {
   abierto: boolean;
@@ -10,7 +12,8 @@ interface PropsConfirmModal {
   textoConfirmar: string;
   variante?: VarianteBoton;
   onCerrar: () => void;
-  onConfirmar: () => Promise<void>;
+  // Si devuelve `{ error }` (o lanza), el modal se queda abierto y lo dice: nunca tira la pantalla entera a un error crítico.
+  onConfirmar: () => Promise<void | ResultadoDeAccion>;
 }
 
 // Confirmación genérica antes de una mutación (activar/desactivar una cuenta, por ahora). Mismo
@@ -19,6 +22,15 @@ interface PropsConfirmModal {
 export function ConfirmModal({ abierto, titulo, descripcion, textoConfirmar, variante = "primario", onCerrar, onConfirmar }: PropsConfirmModal) {
   const cancelarRef = useRef<HTMLButtonElement>(null);
   const [pendiente, iniciarTransicion] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  // Cerrar por cualquier vía (Cancelar, Escape, clic afuera) limpia el aviso: al volver a abrir no queda el de la vez anterior.
+  const cerrar = () => {
+    setError(null);
+    onCerrar();
+  };
+
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
 
   useEffect(() => {
     if (!abierto) return;
@@ -42,17 +54,29 @@ export function ConfirmModal({ abierto, titulo, descripcion, textoConfirmar, var
   function confirmar() {
     // Server Action fuera de un <form>: si redirige (ej. sesión vencida a mitad de la acción),
     // Next lo resuelve igual; si no, hay que cerrar el modal a mano al terminar.
+    setError(null);
     iniciarTransicion(async () => {
-      await onConfirmar();
+      try {
+        const resultado = await onConfirmar();
+        if (resultado && typeof resultado === "object" && resultado.error) {
+          setError(resultado.error);
+          return;
+        }
+      } catch (fallo) {
+        setError(mensajeDeFallo(fallo));
+        return;
+      }
       onCerrar();
     });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-texto/60 p-4" onClick={onCerrar}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-texto/60 p-4" onClick={cerrar}>
       <div
         role="alertdialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="confirmar-titulo"
         aria-describedby="confirmar-descripcion"
         onClick={(evento) => evento.stopPropagation()}
@@ -64,8 +88,13 @@ export function ConfirmModal({ abierto, titulo, descripcion, textoConfirmar, var
         <p id="confirmar-descripcion" className="font-cuerpo text-sm text-texto-secundario">
           {descripcion}
         </p>
+        {error && (
+          <p role="alert" className="rounded-md border border-error-borde bg-error-suave px-3 py-2 font-cuerpo text-sm text-texto">
+            {error}
+          </p>
+        )}
         <div className="flex justify-end gap-3 pt-2">
-          <button ref={cancelarRef} type="button" onClick={onCerrar} disabled={pendiente} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
+          <button ref={cancelarRef} type="button" onClick={cerrar} disabled={pendiente} className={clasesBoton("secundario", "min-h-11 lg:min-h-0")}>
             Cancelar
           </button>
           <button type="button" onClick={confirmar} disabled={pendiente} className={clasesBoton(variante, "min-h-11 lg:min-h-0")}>

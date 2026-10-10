@@ -12,6 +12,8 @@ const base = {
 };
 const produccion = {
   ...base,
+  // En producción el secreto debe ser largo y variado (regla 17).
+  JWT_SECRET: "Zq8vK2mX9pL4wR7tY1nB6cD3fG5hJ0sA8eU2iO4yT6rE9wQ",
   APP_ENV: "production",
   R2_ACCOUNT_ID: "a",
   R2_ACCESS_KEY_ID: "b",

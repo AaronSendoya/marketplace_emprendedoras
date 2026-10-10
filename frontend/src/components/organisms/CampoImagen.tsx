@@ -1,12 +1,14 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { ImagenR2 } from "@/components/atoms/ImagenR2";
-import { useActionState } from "react";
+
 import { Button } from "@/components/atoms/Button";
 import { EntradaArchivoImagen } from "@/components/atoms/EntradaArchivoImagen";
 import { MarcadorImagen } from "@/components/atoms/MarcadorImagen";
 import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 interface EstadoCampoImagen {
   error?: string;
@@ -28,8 +30,15 @@ const ESTADO_INICIAL: EstadoCampoImagen = {};
 // de texto del perfil o del producto. `textoPredeterminada` solo aplica a perfil (foto/logo tienen
 // imagen predeterminada, regla 11 backend; un producto no).
 export function CampoImagen({ titulo, urlActual, alt, accion, textoPredeterminada }: PropsCampoImagen) {
-  const [estado, ejecutar, pendiente] = useActionState(accion, ESTADO_INICIAL);
+  const { estado, alEnviar: ejecutar, pendiente } = useEnvioSinReinicio(accion, ESTADO_INICIAL);
   const usable = esUrlDeImagenUsable(urlActual);
+  const formulario = useRef<HTMLFormElement>(null);
+
+  // Con `onSubmit` el formulario ya no se reinicia solo (ver useEnvioSinReinicio): si la imagen se guardó, se vacía el campo; si falló,
+  // se conserva lo elegido para reintentar.
+  useEffect(() => {
+    if (estado.guardado) formulario.current?.reset();
+  }, [estado]);
 
   return (
     <div className="space-y-2">
@@ -43,8 +52,8 @@ export function CampoImagen({ titulo, urlActual, alt, accion, textoPredeterminad
           )}
         </div>
 
-        <form action={ejecutar} className="flex-1 space-y-2">
-          <EntradaArchivoImagen name="archivo" accept="image/jpeg,image/png,image/webp" disabled={pendiente} />
+        <form ref={formulario} onSubmit={ejecutar} className="flex-1 space-y-2">
+          <EntradaArchivoImagen name="archivo" etiqueta={`Elegir un archivo nuevo: ${titulo}`} accept="image/jpeg,image/png,image/webp" disabled={pendiente} />
 
           {textoPredeterminada && (
             <label className="flex items-center gap-2 font-cuerpo text-xs text-texto-secundario">

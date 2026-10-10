@@ -11,7 +11,10 @@ interface PropsResultado {
   // Filas elegidas que no llegaron a procesarse (se detuvo la importación o se cortó la conexión).
   pendientes: number;
   // Por qué se detuvo, si no fue a pedido del Admin.
-  fallo: { mensaje: string; sesionVencida: boolean } | null;
+  fallo: { mensaje: string; sesionVencida: boolean; conexionVencida?: boolean } | null;
+  // La conexión con Google venció a mitad de la importación y todavía no se volvió a conectar: continuar ahora dejaría las
+  // imágenes de las filas pendientes con la predeterminada.
+  esperaConexion?: boolean;
   detenida: boolean;
   credencialesDescargadas: boolean;
   onCredencialesDescargadas: (descargadas: boolean) => void;
@@ -30,6 +33,7 @@ export function ResultadoDeImportacion({
   resultados,
   pendientes,
   fallo,
+  esperaConexion = false,
   detenida,
   credencialesDescargadas,
   onCredencialesDescargadas,
@@ -44,6 +48,11 @@ export function ResultadoDeImportacion({
   const conError = lista.filter((resultado) => resultado.estado === "error");
   const conContrasena = cuentasConContrasena(resultados);
   const porRevisar = filasPorRevisar(filas, resultados).length;
+  // Lo que salió de Drive y lo que quedó con la imagen predeterminada (regla 11): el Admin sube esas a mano.
+  const conPerfil = lista.filter((resultado) => resultado.estado === "creada" && resultado.perfil_creado);
+  const fotosCargadas = conPerfil.filter((resultado) => resultado.foto_cargada).length;
+  const logosCargados = conPerfil.filter((resultado) => resultado.logo_cargado).length;
+  const conImagenPredeterminada = conPerfil.filter((resultado) => !resultado.foto_cargada || !resultado.logo_cargado).length;
 
   const titulo = creadas > 0 ? `Se importaron ${plural(creadas, "emprendedora", "emprendedoras")}` : "No se creó ninguna cuenta";
 
@@ -69,6 +78,16 @@ export function ResultadoDeImportacion({
                 <b className="font-semibold text-error">{conError.length}</b> con error
               </li>
             )}
+            {conPerfil.length > 0 && (
+              <>
+                <li>
+                  <b className="font-semibold text-texto">{fotosCargadas}</b> de {conPerfil.length} fotos cargadas desde Drive
+                </li>
+                <li>
+                  <b className="font-semibold text-texto">{logosCargados}</b> de {conPerfil.length} logos cargados desde Drive
+                </li>
+              </>
+            )}
           </ul>
         </div>
       </div>
@@ -87,6 +106,10 @@ export function ResultadoDeImportacion({
               <Link href="/iniciar-sesion" className={clasesBoton("secundario", "min-h-11 shrink-0 lg:min-h-0")}>
                 Iniciar sesión
               </Link>
+            ) : esperaConexion ? (
+              <button type="button" onClick={onReanudar} className={clasesBoton("contorno", "min-h-11 shrink-0 lg:min-h-0")}>
+                Continuar sin imágenes de Drive
+              </button>
             ) : (
               <button type="button" onClick={onReanudar} className={clasesBoton("primario", "min-h-11 shrink-0 lg:min-h-0")}>
                 Continuar con {plural(pendientes, "pendiente", "pendientes")}
@@ -129,7 +152,7 @@ export function ResultadoDeImportacion({
             <>
               <p className="font-cuerpo text-sm text-texto-secundario">
                 {plural(porRevisar, "emprendedora creada tiene", "emprendedoras creadas tienen")} algo que conviene mirar: separaciones de nombre supuestas, rubros
-                equivalentes dudosos y redes sociales que no se reconocieron.
+                equivalentes dudosos, redes sociales que no se reconocieron y fotos o logos de Drive que no se pudieron cargar.
               </p>
               <button type="button" onClick={onDescargarReporte} className={clasesBoton("secundario", "min-h-11 w-full lg:min-h-0")}>
                 <Download size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -166,9 +189,15 @@ export function ResultadoDeImportacion({
 
       <section className={`${CLASES_PANEL_ADMIN} flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="min-w-0">
-          <h3 className="font-titulo text-lg font-bold text-texto">Siguiente paso: fotos y logos</h3>
+          <h3 className="font-titulo text-lg font-bold text-texto">
+            {conImagenPredeterminada > 0 ? "Siguiente paso: las fotos y los logos que faltan" : "Siguiente paso"}
+          </h3>
           <p className="mt-1 font-cuerpo text-sm text-texto-secundario">
-            Mientras tanto, cada perfil usa la imagen predeterminada. Sube la foto y el logo desde el detalle de cada emprendimiento.
+            {conImagenPredeterminada > 0
+              ? `${plural(conImagenPredeterminada, "perfil tiene", "perfiles tienen")} la imagen predeterminada en la foto o en el logo; el reporte «por revisar» dice cuáles y por qué. Súbela desde el detalle de cada emprendimiento.`
+              : conPerfil.length > 0
+                ? "Las fotos y los logos ya están cargados. Revisa los perfiles desde Emprendimientos."
+                : "Revisa las cuentas creadas desde Emprendimientos."}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">

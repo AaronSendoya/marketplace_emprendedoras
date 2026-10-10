@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { requireAuth } from "@/api/middlewares/requireAuth";
 import { ErrorNoAutenticado, ErrorValidacion } from "@/shared/domain/errors";
+import { SystemClock } from "@/shared/infrastructure/SystemClock";
 import { FakeClock } from "@/shared/testing/FakeClock";
 import { JwtTokenService } from "../infrastructure/JwtTokenService";
 import { CorreoFalso, hasherFalso, LoggerFalso, usuarioDePrueba } from "../testing/dobles";
 import { OtpRepositoryEnMemoria } from "../testing/OtpRepositoryEnMemoria";
+import { emitirConSesion, SesionRepositoryEnMemoria } from "../testing/SesionRepositoryEnMemoria";
 import { UsuarioRepositoryEnMemoria } from "../testing/UsuarioRepositoryEnMemoria";
 import { RequestOtpUseCase } from "./RequestOtpUseCase";
 import { ResetPasswordUseCase } from "./ResetPasswordUseCase";
@@ -94,8 +96,9 @@ describe("ResetPasswordUseCase", () => {
   it("el token emitido antes de restablecer deja de valer (token_version, regla 5)", async () => {
     const { repoUsuarios, solicitar, restablecer } = construir();
     const tokens = new JwtTokenService("secreto-de-prueba-de-al-menos-32-caracteres");
-    const tokenAnterior = await tokens.emitir({ id: "usuario-1", tokenVersion: 3, rol: "Emprendedor" });
-    const protegida = requireAuth(() => new Response("ok"), { usuarios: repoUsuarios, tokens });
+    const sesiones = new SesionRepositoryEnMemoria();
+    const tokenAnterior = await emitirConSesion(tokens, sesiones, { id: "usuario-1", tokenVersion: 3, rol: "Emprendedor" });
+    const protegida = requireAuth(() => new Response("ok"), { usuarios: repoUsuarios, sesiones, tokens, clock: new SystemClock() });
     const peticion = () => new Request("http://localhost/x", { headers: { authorization: `Bearer ${tokenAnterior}` } });
     expect((await protegida(peticion(), undefined)).status).toBe(200);
 

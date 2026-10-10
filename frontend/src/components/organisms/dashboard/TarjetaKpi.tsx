@@ -77,7 +77,8 @@ export function TarjetaKpi({ etiqueta, valor, tono, icono, disponible = true, gr
         {conDatos && (
           <div className="h-9 w-24 shrink-0" aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={grafico.serie.map((punto, indice) => ({ indice, punto }))} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              {/* `accessibilityLayer={false}`: por defecto Recharts vuelve enfocable el gráfico, y este va dentro de un `aria-hidden` (es decorativo: la cifra y la tendencia ya están en texto). */}
+              <AreaChart accessibilityLayer={false} data={grafico.serie.map((punto, indice) => ({ indice, punto }))} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <Area
                   type="monotone"
                   dataKey="punto"

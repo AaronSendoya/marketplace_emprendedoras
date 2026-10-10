@@ -3,8 +3,10 @@ import type { IClock } from "@/shared/domain/IClock";
 import type { ILogger } from "@/shared/domain/ILogger";
 import type { IIntentosLoginRepository } from "../domain/IIntentosLoginRepository";
 import type { IPasswordHasher } from "../domain/IPasswordHasher";
+import type { ISesionRepository } from "../domain/ISesionRepository";
 import type { ITokenService } from "../domain/ITokenService";
 import type { IUsuarioRepository } from "../domain/IUsuarioRepository";
+import { expiracionDeSesion } from "../domain/Sesion";
 import type { Usuario } from "../domain/Usuario";
 
 // Regla 17: freno escalonado por correo. Cada tanda de intentos fallidos suma un escalón de
@@ -43,6 +45,7 @@ export class LoginUseCase {
     private readonly hasher: IPasswordHasher,
     private readonly tokens: ITokenService,
     private readonly intentos: IIntentosLoginRepository,
+    private readonly sesiones: ISesionRepository,
     private readonly clock: IClock,
     private readonly logger: ILogger,
   ) {}
@@ -68,8 +71,11 @@ export class LoginUseCase {
     }
 
     await this.intentos.limpiar(email);
+    // Regla 5: cada inicio de sesión crea una sesión nueva en el servidor y un token nuevo que lleva su id. Cerrarla (logout)
+    // invalida ese token al instante; las sesiones de la misma cuenta en otros dispositivos no se tocan.
+    const sesionId = await this.sesiones.crear(usuario.id, ahora, expiracionDeSesion(usuario.rol, ahora));
     this.logger.info("login_exitoso", { usuarioId: usuario.id });
-    const token = await this.tokens.emitir({ id: usuario.id, tokenVersion: usuario.tokenVersion, rol: usuario.rol });
+    const token = await this.tokens.emitir({ id: usuario.id, tokenVersion: usuario.tokenVersion, rol: usuario.rol, sesionId });
     return { token, usuario };
   }
 }

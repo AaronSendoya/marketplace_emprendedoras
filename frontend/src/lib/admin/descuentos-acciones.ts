@@ -8,7 +8,7 @@ import {
   quitarDescuento,
   type DatosEditarDescuento,
 } from "@/lib/api/descuentos";
-import { ErrorApi } from "@/lib/api/cliente";
+import { mensajeDeAccion, type ResultadoDeAccion } from "@/lib/errores/accion";
 
 // Un solo tipo de estado para alta y edición (DescuentoFormularioModal usa el mismo formulario y
 // el mismo useActionState para las dos acciones, según haya o no descuento).
@@ -49,8 +49,7 @@ export async function crearDescuentoAction(
       descripcion: descripcion || null,
     });
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos crear el descuento. Intenta de nuevo." };
+    return { error: mensajeDeAccion("crearDescuentoAction", error, "No pudimos crear el descuento. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -80,8 +79,7 @@ export async function editarDescuentoAction(
   try {
     await editarDescuentoAdmin(descuentoId, datos);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos guardar los cambios. Intenta de nuevo." };
+    return { error: mensajeDeAccion("editarDescuentoAction", error, "No pudimos guardar los cambios. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -90,12 +88,22 @@ export async function editarDescuentoAction(
 
 // Asignar y quitar, uno por uno (checklist de AsignarProductosModal): el backend no tiene un
 // "reemplazar todo", solo asignar (regla 9: 403 si el producto es de otro perfil) y quitar.
-export async function asignarDescuentoAction(descuentoId: string, productoId: string, usuarioId: string): Promise<void> {
-  await asignarDescuento(descuentoId, [productoId]);
+export async function asignarDescuentoAction(descuentoId: string, productoId: string, usuarioId: string): Promise<ResultadoDeAccion> {
+  try {
+    await asignarDescuento(descuentoId, [productoId]);
+  } catch (error) {
+    return { error: mensajeDeAccion("asignarDescuentoAction", error, "No pudimos asignar el descuento a ese producto. Intenta de nuevo.") };
+  }
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
+  return {};
 }
 
-export async function quitarDescuentoAction(descuentoId: string, productoId: string, usuarioId: string): Promise<void> {
-  await quitarDescuento(descuentoId, productoId);
+export async function quitarDescuentoAction(descuentoId: string, productoId: string, usuarioId: string): Promise<ResultadoDeAccion> {
+  try {
+    await quitarDescuento(descuentoId, productoId);
+  } catch (error) {
+    return { error: mensajeDeAccion("quitarDescuentoAction", error, "No pudimos quitar el descuento de ese producto. Intenta de nuevo.") };
+  }
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
+  return {};
 }

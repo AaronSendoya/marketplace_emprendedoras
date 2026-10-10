@@ -32,7 +32,7 @@ export async function SesionNavIcono() {
     const yo = await obtenerMe();
     rol = yo.rol;
   } catch {
-    // Cookie presente pero token inválido o vencido (ej. el Admin tras 24 h): se sigue mostrando
+    // Cookie presente pero token inválido o vencido (ej. el Admin tras 4 h): se sigue mostrando
     // el botón de cerrar sesión para poder limpiar la cookie, sin caerse toda la página por esto.
   }
 

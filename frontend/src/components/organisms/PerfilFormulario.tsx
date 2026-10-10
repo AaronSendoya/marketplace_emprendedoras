@@ -2,7 +2,7 @@
 
 import { CircleAlert } from "lucide-react";
 import Link from "next/link";
-import { useActionState } from "react";
+
 import { Button, clasesBoton } from "@/components/atoms/Button";
 import { EntradaArchivoImagen } from "@/components/atoms/EntradaArchivoImagen";
 import { Input } from "@/components/atoms/Input";
@@ -10,6 +10,7 @@ import { Select } from "@/components/atoms/Select";
 import { Textarea } from "@/components/atoms/Textarea";
 import { crearPerfilAction, editarPerfilAction, type EstadoFormularioPerfil } from "@/lib/admin/perfiles-acciones";
 import type { Perfil, ReferenciaCatalogo } from "@/lib/api/tipos";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 const ESTADO_INICIAL: EstadoFormularioPerfil = {};
 
@@ -40,10 +41,10 @@ export function PerfilFormulario({ usuarioId = "", perfil, ciudades, rubros, acc
   const perfilId = perfil?.id ?? "";
   const accionCrear = acciones?.crear ?? crearPerfilAction.bind(null, usuarioId);
   const accionEditar = acciones ? acciones.editar.bind(null, perfilId) : editarPerfilAction.bind(null, perfilId, usuarioId);
-  const [estado, accion, pendiente] = useActionState(perfil ? accionEditar : accionCrear, ESTADO_INICIAL);
+  const { estado, alEnviar, pendiente } = useEnvioSinReinicio(perfil ? accionEditar : accionCrear, ESTADO_INICIAL);
 
   return (
-    <form action={accion} className="space-y-4">
+    <form onSubmit={alEnviar} className="space-y-4">
       {!perfil && usuarioId && <input type="hidden" name="usuario_id" value={usuarioId} />}
 
       <div className="space-y-1">

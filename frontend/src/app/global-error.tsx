@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportarError } from "@/lib/errores/reportar";
 
 interface PropsGlobalError {
   error: Error & { digest?: string };
@@ -14,6 +15,7 @@ interface PropsGlobalError {
 export default function ErrorGlobalRaiz({ error, retry }: PropsGlobalError) {
   useEffect(() => {
     console.error(error);
+    reportarError("raiz", error, "app/global-error");
   }, [error]);
 
   return (
@@ -37,6 +39,7 @@ export default function ErrorGlobalRaiz({ error, retry }: PropsGlobalError) {
         <p style={{ maxWidth: "24rem", fontSize: "0.875rem", color: "#57534E", margin: 0 }}>
           Ocurrió un error inesperado. Intenta recargar la página.
         </p>
+        {error.digest && <p style={{ fontSize: "0.75rem", color: "#57534E", margin: 0 }}>Código de referencia: {error.digest}</p>}
         <button
           type="button"
           onClick={() => retry()}

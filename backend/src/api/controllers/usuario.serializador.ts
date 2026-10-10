@@ -1,4 +1,4 @@
-import { nombreCompleto, type Usuario, type UsuarioAutenticado } from "@/core/auth/domain/Usuario";
+import { nombreCompleto, type Usuario, type UsuarioAutenticado, type UsuarioConPerfil } from "@/core/auth/domain/Usuario";
 
 // Allow-list explícito: nunca se serializa el objeto completo (evita filtrar passwordHash si el
 // dominio agrega un campo sensible más adelante).
@@ -14,5 +14,13 @@ export function serializarUsuario(usuario: UsuarioAutenticado | Usuario) {
     activo: usuario.activo,
     email_verificado_en: usuario.emailVerificadoEn ? usuario.emailVerificadoEn.toISOString() : null,
     creado_en: usuario.creadoEn.toISOString(),
+  };
+}
+
+// Regla 18: la cuenta del listado del Admin con el nombre de su negocio (o `null` si todavía no tiene perfil).
+export function serializarUsuarioConPerfil(usuario: UsuarioConPerfil) {
+  return {
+    ...serializarUsuario(usuario),
+    perfil: usuario.perfil ? { id: usuario.perfil.id, nombre_negocio: usuario.perfil.nombreNegocio } : null,
   };
 }

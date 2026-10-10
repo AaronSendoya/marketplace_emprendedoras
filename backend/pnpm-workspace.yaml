@@ -2,3 +2,13 @@ allowBuilds:
   esbuild: false
   sharp: false
   unrs-resolver: false
+
+# Avisos de seguridad de dependencias transitivas (pnpm audit --prod, 2026-10-08).
+#   sharp y source-map-js: next 16.3.8 todavía acepta versiones anteriores y pnpm no las sube por sí solo.
+#   uuid: exceljs 4.4.0 (la última) fija uuid ^8; el fallo (límites de `buf` en v3, v5 y v6) no se alcanza porque exceljs solo usa
+#   v4 sin `buf`, pero se sube igual. uuid 11 conserva la API `v4` que exceljs usa: lo cubren las pruebas de la importación de Excel.
+# Retirar cada línea cuando la dependencia que la trae suba su propio mínimo.
+overrides:
+  sharp: ^0.35.5
+  source-map-js: ^1.2.2
+  uuid: ^11.1.1

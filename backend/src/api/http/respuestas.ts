@@ -7,6 +7,7 @@ import {
 } from "@/shared/domain/errors";
 import type { ILogger } from "@/shared/domain/ILogger";
 import type { Pagina, ParametrosPagina } from "@/shared/domain/Paginacion";
+import { esErrorDeNoDisponibilidad } from "./disponibilidad";
 import { errorDeValidacion } from "./validacion";
 
 export const ESTADO_HTTP: Record<CodigoError, number> = {
@@ -19,6 +20,10 @@ export const ESTADO_HTTP: Record<CodigoError, number> = {
   DEMASIADAS_SOLICITUDES: 429,
   ERROR_INTERNO: 500,
 };
+
+// Cuánto tarda un reintento razonable cuando la base de datos no está al alcance (segundos).
+const REINTENTO_SIN_SERVICIO_SEGUNDOS = 5;
+export const MENSAJE_SERVICIO_NO_DISPONIBLE = "El servicio no está disponible por el momento. Inténtalo de nuevo en unos minutos.";
 
 export interface CuerpoError {
   error: { codigo: CodigoError; mensaje: string; detalles?: DetalleError[] };
@@ -47,6 +52,20 @@ export function respuestaDeError(error: unknown, logger: ILogger): Response {
     return Response.json(cuerpoError(conocido.codigo, conocido.message, conocido.detalles), {
       status: ESTADO_HTTP[conocido.codigo],
       headers: reintento === undefined ? undefined : { "Retry-After": String(reintento) },
+    });
+  }
+
+  // La base de datos no está al alcance (conexión rechazada, cortada, agotada): no es un fallo de la aplicación. `503` con `Retry-After`
+  // para que el frontend ofrezca reintentar; el motivo real solo queda en el registro.
+  if (esErrorDeNoDisponibilidad(conocido)) {
+    try {
+      logger.warn("servicio_no_disponible", { error });
+    } catch {
+      // Un fallo del registro nunca debe impedir responder.
+    }
+    return Response.json(cuerpoError("ERROR_INTERNO", MENSAJE_SERVICIO_NO_DISPONIBLE), {
+      status: 503,
+      headers: { "Retry-After": String(REINTENTO_SIN_SERVICIO_SEGUNDOS) },
     });
   }
 

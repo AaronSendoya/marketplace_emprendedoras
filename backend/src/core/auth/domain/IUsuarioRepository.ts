@@ -1,13 +1,13 @@
 import type { Pagina, ParametrosPagina } from "@/shared/domain/Paginacion";
-import type { CambiosUsuario, FiltrosUsuarios, NuevoUsuario, Usuario, UsuarioAutenticado } from "./Usuario";
+import type { CambiosUsuario, FiltrosUsuarios, NuevoUsuario, Usuario, UsuarioConPerfil } from "./Usuario";
 
 export interface IUsuarioRepository {
   buscarPorEmail(email: string): Promise<Usuario | null>;
   buscarPorId(id: string): Promise<Usuario | null>;
   // Lanza ErrorConflicto si el correo ya tiene cuenta. El rol se busca por nombre.
   crear(datos: NuevoUsuario): Promise<Usuario>;
-  // Más recientes primero. Sin el hash de la contraseña: no hace falta para un listado.
-  listar(filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Pagina<UsuarioAutenticado>>;
+  // Más recientes primero. Sin el hash de la contraseña: no hace falta para un listado. Cada cuenta trae su perfil (o `null`).
+  listar(filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Pagina<UsuarioConPerfil>>;
   // Solo cambia `activo` (regla 5: desactivar revoca el acceso, no borra nada).
   cambiarEstado(id: string, activo: boolean): Promise<void>;
   // Regla 5: el Admin edita nombres/apellidos/correo sin OTP. Solo toca las columnas presentes.

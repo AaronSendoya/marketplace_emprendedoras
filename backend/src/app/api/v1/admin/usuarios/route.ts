@@ -7,8 +7,17 @@ import { EsquemaCrearUsuarioBody, EsquemaListarUsuariosQuery } from "@/api/opena
 
 export const GET = withErrorHandling(
   requireAdmin((request) => {
-    const { pagina, limite, q, estado } = leerConsulta(request, EsquemaListarUsuariosQuery);
-    return listarUsuarios(crearListUsuarios(), { q, activo: estado === undefined ? undefined : estado === "activo" }, { pagina, limite });
+    const { pagina, limite, q, estado, rol, perfil } = leerConsulta(request, EsquemaListarUsuariosQuery);
+    return listarUsuarios(
+      crearListUsuarios(),
+      {
+        q,
+        activo: estado === undefined ? undefined : estado === "activo",
+        rol,
+        conPerfil: perfil === undefined ? undefined : perfil === "con",
+      },
+      { pagina, limite },
+    );
   }),
 );
 

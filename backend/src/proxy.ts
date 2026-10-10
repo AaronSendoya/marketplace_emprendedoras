@@ -15,10 +15,10 @@ const METODOS_PERMITIDOS = "GET, POST, PATCH, PUT, DELETE, OPTIONS";
 const CABECERAS_PERMITIDAS = "Content-Type, Authorization";
 const MAX_AGE_PREFLIGHT = "86400"; // 24 horas: cuánto puede el navegador reutilizar el preflight.
 
-// Los códigos de un solo uso (regla 15), las respuestas de sesión y las de Admin (la creación de
-// cuentas devuelve una contraseña temporal) no deben quedar en la caché del navegador ni de un
-// proxy intermedio.
-const RUTAS_SIN_CACHE = /^\/api\/v1\/(auth|admin)(\/|$)/;
+// Los códigos de un solo uso (regla 15), las respuestas de sesión, las de Admin (la creación de
+// cuentas devuelve una contraseña temporal) y las de «mis» datos (el precio real de los productos
+// aunque esté oculto, regla 7) no deben quedar en la caché del navegador ni de un proxy intermedio.
+const RUTAS_SIN_CACHE = /^\/api\/v1\/(auth|admin|mis)(\/|$)/;
 
 function aplicarCabecerasCors(cabeceras: Headers, origin: string): void {
   cabeceras.set("Access-Control-Allow-Origin", origin);

@@ -71,7 +71,20 @@ export const EsquemaIdUsuario = z.object({
 export const EsquemaListarUsuariosQuery = esquemaPaginacion.extend({
   q: z.string().trim().min(1).max(100).optional().meta({ description: "Texto a buscar en nombres, apellidos y correo." }),
   estado: z.enum(["activo", "inactivo"]).optional().meta({ description: "Filtra por estado de la cuenta." }),
+  rol: z.enum(["Admin", "Emprendedor"]).optional().meta({ description: "Solo las cuentas de ese rol (regla 18: Emprendimientos pide `Emprendedor`)." }),
+  perfil: z.enum(["con", "sin"]).optional().meta({ description: "Solo las cuentas que ya tienen perfil (`con`) o que todavía no (`sin`)." }),
 });
+
+// Regla 18: la cuenta del listado con el nombre de su negocio; `perfil` es `null` si todavía no tiene.
+const EsquemaUsuarioDelListado = EsquemaUsuario.extend({
+  perfil: z
+    .object({
+      id: z.uuid().meta({ description: "Id del perfil." }),
+      nombre_negocio: z.string().meta({ description: "Nombre del emprendimiento.", example: "Dulces de Ana" }),
+    })
+    .nullable()
+    .meta({ description: "Su perfil de emprendedora; `null` si todavía no lo tiene." }),
+}).meta({ id: "UsuarioDelListado" });
 
 const EsquemaUsuarioCreado = z
   .object({
@@ -109,11 +122,12 @@ export function registrarAdminUsuarios(registro: OpenAPIRegistry): void {
     summary: "Listar cuentas",
     description:
       "Todas las cuentas (Admin y Emprendedor), las más recientes primero. Paginado; admite buscar por texto " +
-      "libre (`q`, sobre nombres, apellidos y correo, sin distinguir mayúsculas) y filtrar por estado (`estado`).",
+      "libre (`q`, sobre nombres, apellidos y correo, sin distinguir mayúsculas) y filtrar por estado (`estado`), por rol (`rol`) y " +
+      "por si ya tienen perfil (`perfil`). Cada cuenta trae su perfil (`id` y `nombre_negocio`, o `null`). El `total` cuenta solo lo filtrado.",
     security: AUTENTICADO,
     request: { query: EsquemaListarUsuariosQuery },
     responses: {
-      200: { description: "Página de cuentas.", content: { "application/json": { schema: esquemaPagina(EsquemaUsuario, "UsuariosPagina") } } },
+      200: { description: "Página de cuentas.", content: { "application/json": { schema: esquemaPagina(EsquemaUsuarioDelListado, "UsuariosPagina") } } },
       ...respuestasDeError("VALIDACION", "NO_AUTENTICADO", "PROHIBIDO"),
     },
   });

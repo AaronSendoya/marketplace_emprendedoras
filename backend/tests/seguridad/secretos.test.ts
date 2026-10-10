@@ -8,6 +8,8 @@ const PATRONES_DE_SECRETO: [string, RegExp][] = [
   ["JWT", /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/],
   ["hash bcrypt", /\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/],
   ["token de GitHub", /\bgh[pousr]_[A-Za-z0-9]{30,}\b/],
+  ["secreto de cliente de Google", /\bGOCSPX-[A-Za-z0-9_-]{20,}/],
+  ["token de acceso de Google", /\bya29\.[A-Za-z0-9_-]{20,}/],
   ["token de Slack o Stripe", /\b(xox[baprs]-[A-Za-z0-9-]{10,}|sk_(live|test)_[A-Za-z0-9]{16,})/],
   ["contraseña dentro de una URL de conexión", /mysql:\/\/[^:\s/]+:(?!clave\b|CLAVE|TU_CLAVE|p@|p\b|\$\{|\.\.\.)[^@\s/]{3,}@/],
 ];
@@ -35,7 +37,7 @@ describe("secretos (regla 17, caja blanca)", () => {
   });
 
   it(".env.example solo trae valores de ejemplo: las variables secretas van vacías o con un marcador", () => {
-    const secretas = ["JWT_SECRET", "R2_SECRET_ACCESS_KEY", "R2_ACCESS_KEY_ID", "SMTP_PASS", "SMTP_USER"];
+    const secretas = ["JWT_SECRET", "R2_SECRET_ACCESS_KEY", "R2_ACCESS_KEY_ID", "SMTP_PASS", "SMTP_USER", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
     for (const nombre of secretas) {
       const linea = leer(".env.example")
         .split("\n")

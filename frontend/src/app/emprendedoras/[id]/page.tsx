@@ -1,4 +1,6 @@
 import { MapPin } from "lucide-react";
+import type { Metadata } from "next";
+import { cache } from "react";
 import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/atoms/Badge";
@@ -8,18 +10,16 @@ import { SocialLinks } from "@/components/molecules/SocialLinks";
 import { ErrorApi } from "@/lib/api/cliente";
 import { obtenerPerfil } from "@/lib/api/perfiles";
 import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
+import { resumirTexto } from "@/lib/formato/resumen";
 import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
 
 // Detalle de una emprendedora (CLAUDE.md sección 6, regla 14): migas de pan, la portada con el logo superpuesto,
 // su nombre y etiquetas con los contactos a la derecha, y debajo "Acerca del negocio" junto a un panel de
 // contacto (WhatsApp, Instagram y otra red) que se queda a la vista al desplazarse en escritorio. La portada es
 // lo primero y más grande que se ve (el LCP): lleva `priority` y ni ella ni su contenedor se animan (regla 6).
-export default async function PaginaDetallePerfil({ params }: PageProps<"/emprendedoras/[id]">) {
-  const { id } = await params;
-
-  let perfil;
+const cargarPerfil = cache(async (id: string) => {
   try {
-    perfil = await obtenerPerfil(id);
+    return await obtenerPerfil(id);
   } catch (error) {
     // Formato de id inválido (400, regla 17 backend) o perfil inexistente (404): mismo
     // not-found.tsx de esta ruta. Cualquier otro error (backend caído, 500...) sigue de largo
@@ -29,6 +29,19 @@ export default async function PaginaDetallePerfil({ params }: PageProps<"/empren
     }
     throw error;
   }
+});
+
+// Cada negocio tiene su propio título y descripción (la pestaña, el historial y quien comparte el enlace los muestran): sin esto todas
+// las páginas de detalle se llamaban igual. El mismo `cargarPerfil` sirve a la página, así que no se pide dos veces.
+export async function generateMetadata({ params }: PageProps<"/emprendedoras/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const perfil = await cargarPerfil(id);
+  return { title: `${perfil.nombre_negocio} — Emprendedoras`, description: resumirTexto(perfil.descripcion) };
+}
+
+export default async function PaginaDetallePerfil({ params }: PageProps<"/emprendedoras/[id]">) {
+  const { id } = await params;
+  const perfil = await cargarPerfil(id);
 
   const fotoUsable = esUrlDeImagenUsable(perfil.foto_perfil_url);
   const logoUsable = esUrlDeImagenUsable(perfil.logo_url);
@@ -89,14 +102,15 @@ export default async function PaginaDetallePerfil({ params }: PageProps<"/empren
           </div>
         </article>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
+        {/* `grid-cols-1` (una columna `minmax(0, 1fr)`) y no la columna automática: con esta, un texto largo sin espacios (una dirección web, un nombre) ensanchaba la columna más que la pantalla en un teléfono. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
           <section className="animate-entrada rounded-superficie border border-borde bg-superficie p-6 shadow-tarjeta sm:p-7">
             <h2 className="font-titulo text-lg font-bold text-texto">Acerca del negocio</h2>
-            <p className="mt-3 font-cuerpo text-[0.9375rem] leading-relaxed whitespace-pre-line text-texto-secundario">{perfil.descripcion}</p>
+            <p className="mt-3 font-cuerpo text-[0.9375rem] leading-relaxed break-words whitespace-pre-line text-texto-secundario">{perfil.descripcion}</p>
           </section>
 
           <aside
-            className="animate-entrada rounded-superficie border border-borde bg-superficie p-6 shadow-tarjeta lg:sticky lg:top-24"
+            className="animate-entrada rounded-superficie border border-borde bg-superficie p-6 shadow-tarjeta max-[359px]:p-4 lg:sticky lg:top-24"
             style={{ animationDelay: "80ms" }}
           >
             <h2 className="mb-4 font-titulo text-lg font-bold text-texto">Contacto</h2>

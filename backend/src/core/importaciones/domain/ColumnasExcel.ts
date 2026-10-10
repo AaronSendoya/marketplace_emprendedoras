@@ -14,7 +14,9 @@ export type ClaveColumna =
   | "descripcion"
   | "rubro"
   | "instagram"
-  | "otraRed";
+  | "otraRed"
+  | "foto"
+  | "logo";
 
 export interface DefinicionColumna {
   clave: ClaveColumna;
@@ -109,6 +111,24 @@ export const COLUMNAS: readonly DefinicionColumna[] = [
     reconoce: (h) => empieza(h, "otrared", "otrasredes", "redsocial"),
     alias: alias("Otra red social", "Otras redes sociales", "Red social"),
   },
+  // Regla 22 (2026-10-09): enlaces de Drive de la foto de perfil y del logo, que se descargan al importar si hay una cuenta de Google
+  // conectada. Son opcionales: sin ellas (o sin cuenta conectada) el perfil queda con las imágenes predeterminadas.
+  {
+    clave: "foto",
+    encabezado: "Sube tu foto",
+    nombre: "Foto de perfil",
+    obligatoria: false,
+    reconoce: (h) => empieza(h, "subetufoto", "subelafoto", "subefoto", "fotodeperfil", "fotografia", "foto"),
+    alias: alias("Sube tu foto", "Foto de perfil", "Foto"),
+  },
+  {
+    clave: "logo",
+    encabezado: "Sube el logo de tu emprendimiento",
+    nombre: "Logo",
+    obligatoria: false,
+    reconoce: (h) => empieza(h, "subeellogo", "subelogo", "logo"),
+    alias: alias("Sube el logo de tu emprendimiento", "Logo de tu emprendimiento", "Logo"),
+  },
 ];
 
 export const COLUMNAS_OBLIGATORIAS = COLUMNAS.filter((columna) => columna.obligatoria);
@@ -132,10 +152,11 @@ export const ENCABEZADOS_DEL_FORMULARIO: readonly string[] = [
   "Cuéntanos sobre tu beneficio ",
 ];
 
-// Columnas que el formulario trae y la importación no usa a propósito (regla 22): las imágenes se suben a mano, y la pregunta
-// "¿Te gustaría ofrecer algo especial…?" con su "Cuéntanos sobre tu beneficio" no se registran en la base de datos.
-const esColumnaIgnorada = (h: string) => empieza(h, "sube", "marcatemporal") || h.includes("ofrecer") || h.includes("beneficio");
-const ALIAS_IGNORADOS = alias("Marca temporal", "Sube tu foto", "Sube el logo de tu emprendimiento", "Cuéntanos sobre tu beneficio");
+// Columnas que el formulario trae y la importación no usa a propósito (regla 22): la marca temporal, y la pregunta
+// "¿Te gustaría ofrecer algo especial…?" con su "Cuéntanos sobre tu beneficio", que no se registran en la base de datos. (La foto y el
+// logo ya no se ignoran: se leen como enlaces de Drive.)
+const esColumnaIgnorada = (h: string) => empieza(h, "marcatemporal") || h.includes("ofrecer") || h.includes("beneficio");
+const ALIAS_IGNORADOS = alias("Marca temporal", "Cuéntanos sobre tu beneficio");
 
 export interface EncabezadoAproximado {
   // Lo que decía el archivo.
@@ -147,7 +168,7 @@ export interface EncabezadoAproximado {
 export interface EncabezadosDetectados {
   // Índice de cada columna reconocida (0 = columna A).
   columnas: Partial<Record<ClaveColumna, number>>;
-  // Encabezados que se ignoran a propósito (fotos y logo, marca temporal, beneficio).
+  // Encabezados que se ignoran a propósito (marca temporal, beneficio).
   ignoradas: string[];
   // Encabezados que no son de ninguna columna conocida: no se usan.
   desconocidas: string[];

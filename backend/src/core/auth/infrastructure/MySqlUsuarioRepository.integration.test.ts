@@ -264,4 +264,67 @@ describe("MySqlUsuarioRepository (alta y listado)", () => {
 
     await repositorio.cambiarEstado(creadas[1], true);
   });
+
+  // Regla 18: la pantalla de Emprendimientos pide solo las cuentas de un rol, con su perfil y filtradas por «con» o «sin» perfil.
+  describe("listar con rol y perfil", () => {
+    const ciudadId = randomUUID();
+    const rubroId = randomUUID();
+    const perfilId = randomUUID();
+
+    beforeAll(async () => {
+      await cliente.ejecutar("INSERT INTO ciudades (id, nombre) VALUES (?, ?)", [ciudadId, `${prefijo} Ciudad`]);
+      await cliente.ejecutar("INSERT INTO rubros (id, nombre) VALUES (?, ?)", [rubroId, `${prefijo} Rubro`]);
+      await cliente.ejecutar(
+        `INSERT INTO perfiles_emprendedores
+           (id, usuario_id, nombre_negocio, descripcion, whatsapp, ciudad_id, rubro_id, foto_perfil_key, logo_key, creado_en, actualizado_en)
+         VALUES (?, ?, 'Dulces de Prueba', 'Descripción', '59171234567', ?, ?, 'defaults/foto-perfil-anonima.webp', 'defaults/logo-vacio.webp', NOW(), NOW())`,
+        [perfilId, creadas[0], ciudadId, rubroId],
+      );
+    });
+
+    afterAll(async () => {
+      await cliente.ejecutar("DELETE FROM perfiles_emprendedores WHERE id = ?", [perfilId]);
+      await cliente.ejecutar("DELETE FROM ciudades WHERE id = ?", [ciudadId]);
+      await cliente.ejecutar("DELETE FROM rubros WHERE id = ?", [rubroId]);
+    });
+
+    it("cada cuenta trae su perfil, o null si todavía no tiene", async () => {
+      const { datos } = await repositorio.listar({ q: `${prefijo}-` }, { pagina: 1, limite: 50 });
+
+      expect(datos.find((u) => u.id === creadas[0])?.perfil).toEqual({ id: perfilId, nombreNegocio: "Dulces de Prueba" });
+      expect(datos.find((u) => u.id === creadas[1])?.perfil).toBeNull();
+    });
+
+    it("filtra por perfil: con, sin, y el total cuenta solo lo filtrado", async () => {
+      const con = await repositorio.listar({ q: `${prefijo}-`, conPerfil: true }, { pagina: 1, limite: 50 });
+      const sin = await repositorio.listar({ q: `${prefijo}-`, conPerfil: false }, { pagina: 1, limite: 50 });
+
+      expect(con.datos.map((u) => u.id)).toEqual([creadas[0]]);
+      expect(con.total).toBe(1);
+      expect(sin.datos.map((u) => u.id)).toEqual([creadas[1]]);
+      expect(sin.total).toBe(1);
+    });
+
+    it("filtra por rol, y se combina con la búsqueda, el estado y el perfil", async () => {
+      const delRol = await repositorio.listar({ q: `${prefijo}-`, rol: `${prefijo}-rol` as never }, { pagina: 1, limite: 50 });
+      const deOtroRol = await repositorio.listar({ q: `${prefijo}-`, rol: "Admin" }, { pagina: 1, limite: 50 });
+      const combinado = await repositorio.listar({ q: `${prefijo}-`, rol: `${prefijo}-rol` as never, activo: true, conPerfil: false }, { pagina: 1, limite: 50 });
+
+      expect(delRol.datos.map((u) => u.id).sort()).toEqual([...creadas].sort());
+      expect(deOtroRol.datos).toEqual([]);
+      expect(deOtroRol.total).toBe(0);
+      expect(combinado.datos.map((u) => u.id)).toEqual([creadas[1]]);
+    });
+
+    it("pagina con el filtro de perfil: el total no depende de la página", async () => {
+      const primera = await repositorio.listar({ q: `${prefijo}-`, rol: `${prefijo}-rol` as never }, { pagina: 1, limite: 1 });
+      const segunda = await repositorio.listar({ q: `${prefijo}-`, rol: `${prefijo}-rol` as never }, { pagina: 2, limite: 1 });
+
+      expect(primera.total).toBe(2);
+      expect(segunda.total).toBe(2);
+      expect(primera.datos).toHaveLength(1);
+      expect(segunda.datos).toHaveLength(1);
+      expect(primera.datos[0].id).not.toBe(segunda.datos[0].id);
+    });
+  });
 });

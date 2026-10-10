@@ -46,7 +46,8 @@ export default async function PaginaEmprendimientoDetalle({ params, searchParams
     usuario = await obtenerUsuario(usuarioId);
   } catch (error) {
     if (error instanceof ErrorApi && error.status === 401) redirect("/iniciar-sesion");
-    if (error instanceof ErrorApi && error.status === 404) notFound();
+    // 404: no existe; 400: el id de la dirección no tiene forma de UUID (escrito a mano o enlace roto). Para quien lo ve es lo mismo.
+    if (error instanceof ErrorApi && (error.status === 404 || error.status === 400)) notFound();
     throw error;
   }
 

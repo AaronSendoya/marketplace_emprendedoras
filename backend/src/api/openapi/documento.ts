@@ -4,6 +4,7 @@ import { registrarComponentes } from "./componentes";
 import { registrarAdminUsuarios } from "./rutas/admin-usuarios";
 import { registrarAuth } from "./rutas/auth";
 import { registrarCatalogos } from "./rutas/catalogos";
+import { registrarGoogle } from "./rutas/google";
 import { registrarHealth } from "./rutas/health";
 import { registrarImportaciones } from "./rutas/importaciones";
 import { registrarDescuentos } from "./rutas/descuentos";
@@ -26,6 +27,7 @@ export function generarDocumento() {
   registrarPromociones(registro);
   registrarMetricas(registro);
   registrarImportaciones(registro);
+  registrarGoogle(registro);
 
   return new OpenApiGeneratorV31(registro.definitions).generateDocument({
     openapi: "3.1.0",

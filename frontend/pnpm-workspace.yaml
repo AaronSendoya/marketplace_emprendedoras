@@ -1,3 +1,9 @@
 allowBuilds:
   sharp: false
   unrs-resolver: false
+
+# Avisos de seguridad de dependencias transitivas de next (pnpm audit --prod, 2026-10-08): next 16.3.8 todavía acepta
+# versiones anteriores a estas y pnpm no las sube por sí solo. Retirar cuando next suba su propio mínimo.
+overrides:
+  sharp: ^0.35.5
+  source-map-js: ^1.2.2

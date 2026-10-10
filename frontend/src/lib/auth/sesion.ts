@@ -13,11 +13,12 @@ const MINUTO = 60 * SEGUNDO;
 const HORA = 60 * MINUTO;
 const DIA = 24 * HORA;
 
-// Duración inicial al iniciar sesión (regla 5, backend): el token de Admin expira a las 24 h, el
-// de Emprendedor no expira (sesión tipo red social). ~400 días es el máximo que aceptan los
-// navegadores para una cookie; a partir de ahí, src/middleware.ts la renueva en cada visita.
+// Duración inicial al iniciar sesión (regla 5, backend): el token de Admin expira a las 4 horas
+// (la cookie dura lo mismo y src/proxy.ts no la renueva), el de Emprendedor no expira (sesión tipo
+// red social). ~400 días es el máximo que aceptan los navegadores para una cookie; a partir de
+// ahí, src/proxy.ts la renueva en cada visita.
 function duracionSegundos(rol: Rol): number {
-  return rol === "Admin" ? 24 * HORA : 400 * DIA;
+  return rol === "Admin" ? 4 * HORA : 400 * DIA;
 }
 
 // Solo se llama desde una Server Function ('use server'), nunca durante el render de un Server

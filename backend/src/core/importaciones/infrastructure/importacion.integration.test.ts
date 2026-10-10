@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CreateUsuarioUseCase } from "@/core/auth/application/CreateUsuarioUseCase";
 import { generarPasswordTemporal } from "@/core/auth/infrastructure/generarPasswordTemporal";
@@ -17,6 +18,7 @@ import { urlDePruebas } from "../../../../tests/integration/support/conexion";
 import { AnalizarExcelEmprendedorasUseCase } from "../application/AnalizarExcelEmprendedoras";
 import { ImportarEmprendedorasUseCase, type FilaAImportar } from "../application/ImportarEmprendedoras";
 import { crearExcelDePrueba, filaDeFormulario } from "../testing/dobles";
+import { DriveFalso } from "../testing/DriveFalso";
 import { LectorExcelExceljs } from "./LectorExcelExceljs";
 
 // Regla 22 contra MySQL de verdad: analizar un .xlsx, importar y comprobar lo que quedó en la base. Todo lleva un prefijo propio y
@@ -143,4 +145,87 @@ describe("importación de emprendedoras contra MySQL (regla 22)", () => {
     expect(todo).not.toContain(prefijo);
     expect(todo).not.toMatch(/Temporal|María|Luisa|@/);
   });
+});
+
+// Regla 22 (2026-10-09), «Imágenes desde Drive»: del enlace del Excel al perfil con su imagen en R2, con el procesador de imágenes real
+// (sharp) y MySQL de verdad. Drive es el único doble.
+class AlmacenQueRecuerda extends ImageStorageEnMemoria {
+  readonly guardados = new Map<string, Buffer>();
+  async guardar(clave: string, contenido: Buffer): Promise<void> {
+    this.guardados.set(clave, contenido);
+    return super.guardar(clave, contenido);
+  }
+}
+
+describe("importación con imágenes de Drive contra MySQL (regla 22)", () => {
+  const ID_FOTO = "1FotoDeIntegracionDeLaImportacionAAAA";
+  const ID_LOGO = "1LogoDeIntegracionDeLaImportacionBBBB";
+  const ID_NO_IMAGEN = "1ArchivoQueNoEsUnaImagenDeIntegrCCCC";
+  const ID_AJENO = "1ArchivoSinAccesoDeIntegracionDDDDDDD";
+  const enlace = (id: string) => `https://drive.google.com/open?id=${id}`;
+
+  it("analiza los enlaces, descarga, procesa a WebP, sube a R2 y deja en el perfil las claves; lo que falla queda predeterminado con su aviso", async () => {
+    const foto = await sharp({ create: { width: 3000, height: 2000, channels: 3, background: { r: 200, g: 40, b: 40 } } }).jpeg().toBuffer();
+    const logo = await sharp({ create: { width: 1000, height: 1000, channels: 3, background: { r: 30, g: 60, b: 200 } } }).png().toBuffer();
+    const drive = new DriveFalso()
+      .agregar(ID_FOTO, { contenido: foto, tipoMime: "image/jpeg" })
+      .agregar(ID_LOGO, { contenido: logo, tipoMime: "image/png" })
+      .agregar(ID_NO_IMAGEN, { contenido: Buffer.from("esto no es una imagen") });
+    const almacen = new AlmacenQueRecuerda();
+    const procesador = new ImageProcessorService();
+    const importarConDrive = new ImportarEmprendedorasUseCase(
+      usuarios,
+      catalogos,
+      new CreateUsuarioUseCase(usuarios, hasherFalso, clock, logger, generarPasswordTemporal),
+      new CreatePerfilUseCase(perfiles, usuarios, procesador, almacen, clock, logger),
+      logger,
+      drive,
+      procesador,
+    );
+    const contenido = await crearExcelDePrueba({
+      filas: [
+        filaDeFormulario({ correo: correo("img-ok"), ciudad, rubro, emprendimiento: `${prefijo} ConImagenes`, foto: enlace(ID_FOTO), logo: enlace(ID_LOGO) }),
+        filaDeFormulario({ correo: correo("img-mal"), ciudad, rubro, emprendimiento: `${prefijo} ConProblemas`, foto: enlace(ID_NO_IMAGEN), logo: enlace(ID_AJENO) }),
+        filaDeFormulario({ correo: correo("img-sin"), ciudad, rubro, emprendimiento: `${prefijo} SinEnlaces`, foto: "", logo: "" }),
+      ],
+    });
+
+    const analisis = await analizar.ejecutar({ nombre: "emprendedoras.xlsx", contenido });
+    expect(analisis.filas.map((f) => [f.datos.fotoDriveId, f.datos.logoDriveId])).toEqual([
+      [ID_FOTO, ID_LOGO],
+      [ID_NO_IMAGEN, ID_AJENO],
+      ["", ""],
+    ]);
+
+    const resultados = await importarConDrive.ejecutar(admin, aImportar(analisis.filas), drive.tokenValido);
+
+    expect(resultados.map((r) => [r.estado, r.fotoCargada, r.logoCargado])).toEqual([
+      ["creada", true, true],
+      ["creada", false, false],
+      ["creada", false, false],
+    ]);
+    expect(resultados[0].avisos).toEqual([]);
+    expect(resultados[1].avisos.map((a) => a.codigo)).toEqual(["foto_no_es_imagen", "logo_sin_acceso"]);
+    expect(resultados[2].avisos).toEqual([]);
+
+    const claves = await cliente.consultar<{ nombre_negocio: string; foto: string; logo: string }>(
+      `SELECT nombre_negocio, foto_perfil_key AS foto, logo_key AS logo FROM perfiles_emprendedores WHERE nombre_negocio LIKE ? ORDER BY nombre_negocio`,
+      [`${prefijo} %`],
+    );
+    const por = Object.fromEntries(claves.map((c) => [c.nombre_negocio.replace(`${prefijo} `, ""), c]));
+    expect(por.ConImagenes.foto).toMatch(/^perfiles\/.+\.webp$/);
+    expect(por.ConImagenes.logo).toMatch(/^logos\/.+\.webp$/);
+    for (const sinCargar of [por.ConProblemas, por.SinEnlaces]) {
+      expect(sinCargar).toMatchObject({ foto: CLAVE_FOTO_PERFIL_PREDETERMINADA, logo: CLAVE_LOGO_PREDETERMINADO });
+    }
+
+    // Lo que quedó en R2: solo las dos imágenes buenas, ya en WebP y dentro de los límites de la regla 16.
+    expect([...almacen.guardados.keys()].sort()).toEqual([por.ConImagenes.foto, por.ConImagenes.logo].sort());
+    const fotoGuardada = await sharp(almacen.guardados.get(por.ConImagenes.foto)).metadata();
+    const logoGuardado = await sharp(almacen.guardados.get(por.ConImagenes.logo)).metadata();
+    expect(fotoGuardada.format).toBe("webp");
+    expect(Math.max(fotoGuardada.width ?? 0, fotoGuardada.height ?? 0)).toBe(800);
+    expect(logoGuardado.format).toBe("webp");
+    expect(Math.max(logoGuardado.width ?? 0, logoGuardado.height ?? 0)).toBe(512);
+  }, 30_000);
 });

@@ -263,10 +263,12 @@ export interface FiltrosPromociones extends ParametrosPagina {
 export type PaginaPromociones = Pagina<PromocionPublica>;
 
 // GET /admin/usuarios (regla 5): busca por texto libre en nombres, apellidos y correo, y filtra
-// por estado.
+// por estado, por rol y por si ya tiene perfil (regla 18, 2026-10-09).
 export interface FiltrosUsuarios extends ParametrosPagina {
   q?: string;
   estado?: "activo" | "inactivo";
+  rol?: Rol;
+  perfil?: "con" | "sin";
 }
 
 // POST /auth/login. El rol y `activo` siempre se leen de la base en cada petición autenticada
@@ -284,6 +286,11 @@ export interface Usuario {
   activo: boolean;
   email_verificado_en: string | null;
   creado_en: string;
+}
+
+// Una cuenta del listado del Admin con el nombre de su negocio (regla 18); `perfil` es `null` si todavía no tiene.
+export interface UsuarioConPerfil extends Usuario {
+  perfil: { id: string; nombre_negocio: string } | null;
 }
 
 // POST /admin/usuarios. `password_temporal` es `null` cuando el Admin definió la contraseña él
@@ -341,6 +348,9 @@ export interface DatosFilaImportacion {
   descripcion: string;
   instagram: string;
   otra_red_social: string;
+  // Id del archivo de Drive sacado del enlace del Excel (regla 22); vacío si la fila no trae imagen o el enlace no sirve.
+  foto_drive_id: string;
+  logo_drive_id: string;
 }
 
 export interface FilaAnalizadaImportacion {
@@ -359,7 +369,7 @@ export interface FilaAnalizadaImportacion {
 // columnas o traiga otras, y la vista previa lo dice.
 export interface ColumnasAnalisisImportacion {
   reconocidas: string[];
-  // Se ignoran a propósito: marca temporal, fotos, logo y beneficio.
+  // Se ignoran a propósito: marca temporal y beneficio (la foto y el logo se usan: enlaces de Drive, regla 22).
   ignoradas: string[];
   opcionales_ausentes: string[];
   // Obligatorias que el archivo no trae: cada fila queda con el error de ese dato y se completa en la vista previa.
@@ -400,4 +410,48 @@ export interface ResultadoFilaImportacion {
   password_temporal: string | null;
   avisos: AvisoImportacion[];
   mensaje: string | null;
+  // La imagen salió de Drive; si no, el perfil tiene la predeterminada (regla 11) y el aviso dice por qué.
+  foto_cargada: boolean;
+  logo_cargado: boolean;
+}
+
+// Cuenta de Google conectada para cargar las imágenes de Drive (reglas 17 y 22). El token nunca llega al navegador: vive en una
+// cookie httpOnly del frontend y el servidor lo reenvía al backend.
+export interface EstadoGoogle {
+  disponible: boolean;
+}
+
+export interface UrlGoogle {
+  url: string;
+}
+
+export interface ConexionGoogle {
+  access_token: string;
+  expira_en: number;
+  cuenta: string | null;
+}
+
+export type EstadoImagenVerificada = "sin_imagen" | "ok" | "problema" | "sin_comprobar";
+
+export interface ImagenVerificada {
+  estado: EstadoImagenVerificada;
+  aviso: AvisoImportacion | null;
+}
+
+export interface FilaImagenesVerificadas {
+  fila: number;
+  foto: ImagenVerificada;
+  logo: ImagenVerificada;
+}
+
+export interface VerificacionImagenes {
+  conexion: "ok" | "sin_conexion" | "vencida";
+  cuenta: string | null;
+  filas: FilaImagenesVerificadas[];
+}
+
+export interface FilaAVerificarImagenes {
+  fila: number;
+  foto_drive_id: string;
+  logo_drive_id: string;
 }

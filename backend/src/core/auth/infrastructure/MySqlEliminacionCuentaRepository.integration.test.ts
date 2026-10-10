@@ -63,6 +63,9 @@ async function crearCuentaCompleta(clave: string, opciones: { activo?: boolean }
   }
   await cliente.ejecutar("INSERT INTO otp_codigos (id, email, proposito, codigo_hash, expira_en) VALUES (?, ?, 'restablecer_password', 'h', '2030-01-01 00:00:00')", [randomUUID(), correo(clave)]);
   await cliente.ejecutar("INSERT INTO intentos_login (id, email) VALUES (?, ?)", [randomUUID(), correo(clave)]);
+  // Dos sesiones abiertas (dos dispositivos), una sin vencimiento y otra con él.
+  await cliente.ejecutar("INSERT INTO sesiones (id, usuario_id, expira_en) VALUES (?, ?, NULL)", [randomUUID(), usuarioId]);
+  await cliente.ejecutar("INSERT INTO sesiones (id, usuario_id, expira_en) VALUES (?, ?, '2030-01-01 00:00:00')", [randomUUID(), usuarioId]);
   return { usuarioId, perfilId, productoIds, descuentoIds };
 }
 
@@ -78,6 +81,7 @@ async function quedaDeLaCuenta(c: CuentaCreada, clave: string) {
     clics: await contar("SELECT COUNT(*) AS n FROM clics_contacto WHERE perfil_id = ?", [c.perfilId]),
     otp: await contar("SELECT COUNT(*) AS n FROM otp_codigos WHERE email = ?", [correo(clave)]),
     intentos: await contar("SELECT COUNT(*) AS n FROM intentos_login WHERE email = ?", [correo(clave)]),
+    sesiones: await contar("SELECT COUNT(*) AS n FROM sesiones WHERE usuario_id = ?", [c.usuarioId]),
   };
 }
 
@@ -95,6 +99,7 @@ afterAll(async () => {
   await cliente.ejecutar("DELETE FROM perfiles_emprendedores WHERE nombre_negocio LIKE ?", [`${prefijo}%`]);
   await cliente.ejecutar("DELETE FROM otp_codigos WHERE email LIKE ?", [`${prefijo}-%`]);
   await cliente.ejecutar("DELETE FROM intentos_login WHERE email LIKE ?", [`${prefijo}-%`]);
+  await cliente.ejecutar("DELETE FROM sesiones WHERE usuario_id IN (SELECT id FROM usuarios WHERE email LIKE ?)", [`${prefijo}-%`]);
   await cliente.ejecutar("DELETE FROM usuarios WHERE email LIKE ?", [`${prefijo}-%`]);
   await cliente.ejecutar("DELETE FROM ciudades WHERE id = ?", [ids.ciudad]);
   await cliente.ejecutar("DELETE FROM rubros WHERE id = ?", [ids.rubro]);
@@ -113,7 +118,7 @@ describe("MySqlEliminacionCuentaRepository", () => {
     expect(resumen.clavesImagenes.sort()).toEqual(
       ["perfiles/completa-foto.webp", "logos/completa-logo.webp", "productos/completa-1.webp", "productos/completa-2.webp", "productos/completa-3.webp"].sort(),
     );
-    expect(await quedaDeLaCuenta(cuenta, "completa")).toEqual({ usuario: 0, perfil: 0, productos: 0, descuentos: 0, asignaciones: 0, clics: 0, otp: 0, intentos: 0 });
+    expect(await quedaDeLaCuenta(cuenta, "completa")).toEqual({ usuario: 0, perfil: 0, productos: 0, descuentos: 0, asignaciones: 0, clics: 0, otp: 0, intentos: 0, sesiones: 0 });
   });
 
   it("no toca nada de las demás cuentas (ni sus clics, ni sus productos, ni sus códigos)", async () => {
@@ -122,7 +127,7 @@ describe("MySqlEliminacionCuentaRepository", () => {
 
     await repositorio.eliminar(eliminada.usuarioId);
 
-    expect(await quedaDeLaCuenta(vecina, "vecina")).toEqual({ usuario: 1, perfil: 1, productos: 3, descuentos: 2, asignaciones: 2, clics: 3, otp: 1, intentos: 1 });
+    expect(await quedaDeLaCuenta(vecina, "vecina")).toEqual({ usuario: 1, perfil: 1, productos: 3, descuentos: 2, asignaciones: 2, clics: 3, otp: 1, intentos: 1, sesiones: 2 });
   });
 
   it("una cuenta sin perfil se elimina igual y no devuelve imágenes", async () => {
@@ -141,7 +146,7 @@ describe("MySqlEliminacionCuentaRepository", () => {
 
     await expect(repositorio.eliminar(cuenta.usuarioId)).rejects.toBeInstanceOf(ErrorConflicto);
 
-    expect(await quedaDeLaCuenta(cuenta, "suspendida")).toEqual({ usuario: 1, perfil: 1, productos: 3, descuentos: 2, asignaciones: 2, clics: 3, otp: 1, intentos: 1 });
+    expect(await quedaDeLaCuenta(cuenta, "suspendida")).toEqual({ usuario: 1, perfil: 1, productos: 3, descuentos: 2, asignaciones: 2, clics: 3, otp: 1, intentos: 1, sesiones: 2 });
   });
 
   it("una cuenta de Admin no se elimina (409) aunque la pidan por su id", async () => {
@@ -176,6 +181,6 @@ describe("MySqlEliminacionCuentaRepository", () => {
 
     await expect(fallando.eliminar(cuenta.usuarioId)).rejects.toThrow("falla simulada al final");
 
-    expect(await quedaDeLaCuenta(cuenta, "a-medias")).toEqual({ usuario: 1, perfil: 1, productos: 3, descuentos: 2, asignaciones: 2, clics: 3, otp: 1, intentos: 1 });
+    expect(await quedaDeLaCuenta(cuenta, "a-medias")).toEqual({ usuario: 1, perfil: 1, productos: 3, descuentos: 2, asignaciones: 2, clics: 3, otp: 1, intentos: 1, sesiones: 2 });
   });
 });

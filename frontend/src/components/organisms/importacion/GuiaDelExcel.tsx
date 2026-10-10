@@ -14,17 +14,18 @@ type Condicion = "obligatoria" | "opcional" | "ignorada";
 // Los 14 encabezados del Excel de Google Forms, tal como salen y en su orden (el último termina en un espacio, como en el
 // formulario real; el orden real no importa al importar). Es lo mismo que lleva la fila 1 de la plantilla descargable
 // (`ENCABEZADOS_DEL_FORMULARIO`, backend). Las obligatorias no pueden faltar en cada fila; las opcionales se importan sin ese dato
-// si faltan; las ignoradas se leen y no se guardan (regla 22). En el ejemplo, una persona inventada.
+// si faltan; las ignoradas se leen y no se guardan (regla 22). La foto y el logo son enlaces de Drive: opcionales, y se cargan si
+// el Admin conecta una cuenta de Google con acceso a la carpeta. En el ejemplo, una persona inventada.
 const COLUMNAS: readonly { encabezado: string; condicion: Condicion; ejemplo: string; ancha?: boolean }[] = [
   { encabezado: "Marca temporal", condicion: "ignorada", ejemplo: "07/10/2026 14:32:10" },
   { encabezado: "Dirección de correo electrónico", condicion: "obligatoria", ejemplo: "ana.perez@ejemplo.com" },
   { encabezado: "Nombre Completo", condicion: "obligatoria", ejemplo: "Ana María Pérez Rojas" },
   { encabezado: "Número de WhatsApp", condicion: "obligatoria", ejemplo: "71234567" },
   { encabezado: "Ciudad", condicion: "obligatoria", ejemplo: "La Paz" },
-  { encabezado: "Sube tu foto", condicion: "ignorada", ejemplo: "" },
+  { encabezado: "Sube tu foto", condicion: "opcional", ejemplo: "https://drive.google.com/open?id=1aBcDeFgHiJkLmNoPqRs" },
   { encabezado: "Nombre de tu emprendimiento", condicion: "obligatoria", ejemplo: "Dulces de Ana" },
   { encabezado: "Breve descripción", condicion: "obligatoria", ejemplo: "Postres caseros y tortas por encargo." },
-  { encabezado: "Sube el logo de tu emprendimiento", condicion: "ignorada", ejemplo: "" },
+  { encabezado: "Sube el logo de tu emprendimiento", condicion: "opcional", ejemplo: "https://drive.google.com/open?id=1tUvWxYzAbCdEfGhIjKl" },
   { encabezado: "Rubro", condicion: "obligatoria", ejemplo: "Alimentos y bebidas" },
   { encabezado: "Instagram de tu emprendimiento", condicion: "opcional", ejemplo: "@dulcesdeana" },
   { encabezado: "Otra red social", condicion: "opcional", ejemplo: "https://www.facebook.com/dulcesdeana" },
@@ -48,6 +49,7 @@ const CONSEJOS = [
   "Escribe el nombre y los apellidos juntos: «Ana María Pérez Rojas».",
   "El WhatsApp de Bolivia tiene 8 dígitos y empieza con 6 o 7.",
   "Una cuenta con un correo que ya existe se omite: no se cambia nada de lo que ya tiene.",
+  "La foto y el logo son enlaces de Drive. Una imagen que no se pueda cargar (sin acceso, que no sea JPG, PNG o WebP, o de más de 20 MB) no detiene la fila: queda la imagen predeterminada y se avisa.",
   "Si al archivo le falta una columna o trae otras que no conocemos, igual se lee: en el paso siguiente te decimos cuáles son y completas lo que falte ahí.",
 ];
 
@@ -91,7 +93,7 @@ export function GuiaDelExcel() {
                 {COLUMNAS.map(({ encabezado, condicion, ancha }, indice) => (
                   <th key={indice} scope="col" className={`${ancha ? ANCHO_ANCHA : ANCHO_NORMAL} px-3 py-2.5 align-top font-semibold ${CONDICIONES[condicion].fondo}`}>
                     <span className="block leading-snug">{encabezado}</span>
-                    <span className="mt-1 block font-normal opacity-90">{CONDICIONES[condicion].etiqueta}</span>
+                    <span className="mt-1 block font-normal">{CONDICIONES[condicion].etiqueta}</span>
                   </th>
                 ))}
               </tr>
@@ -119,8 +121,8 @@ export function GuiaDelExcel() {
               <span>
                 <b className="font-semibold text-texto">{CONDICIONES[condicion].etiqueta}:</b>{" "}
                 {condicion === "obligatoria" && "no puede faltar en ninguna fila"}
-                {condicion === "opcional" && "si falta, la fila se importa sin ese dato"}
-                {condicion === "ignorada" && "se lee pero no se guarda (marca temporal, fotos, logo y beneficio)"}
+                {condicion === "opcional" && "si falta, la fila se importa sin ese dato (sin foto o logo, queda la imagen predeterminada)"}
+                {condicion === "ignorada" && "se lee pero no se guarda (marca temporal y beneficio)"}
               </span>
             </li>
           ))}
@@ -134,7 +136,8 @@ export function GuiaDelExcel() {
 
         <p className="flex items-start gap-2.5 rounded-md border border-aviso-borde bg-aviso-suave px-3 py-2.5 font-cuerpo text-sm text-aviso">
           <Info size={18} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0" />
-          Las fotos y los logos no se cargan aquí. Cada perfil usa la imagen predeterminada hasta que subas la suya desde su emprendimiento.
+          Las fotos y los logos se cargan desde Drive si conectas una cuenta de Google con acceso a esa carpeta (en esta misma pantalla). Sin ella,
+          cada perfil usa la imagen predeterminada hasta que subas la suya desde su emprendimiento.
         </p>
 
         <button type="button" onClick={descargarPlantilla} disabled={descargando} className={clasesBoton("secundario", "min-h-11 w-full sm:w-auto lg:min-h-0")}>

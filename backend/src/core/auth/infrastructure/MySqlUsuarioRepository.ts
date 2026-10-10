@@ -3,7 +3,7 @@ import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/dom
 import type { EjecutorSql } from "@/shared/infrastructure/MySqlClient";
 import type { IUsuarioRepository } from "../domain/IUsuarioRepository";
 import type { NombreRol } from "../domain/Rol";
-import type { CambiosUsuario, FiltrosUsuarios, NuevoUsuario, Usuario, UsuarioAutenticado } from "../domain/Usuario";
+import type { CambiosUsuario, FiltrosUsuarios, NuevoUsuario, Usuario, UsuarioAutenticado, UsuarioConPerfil } from "../domain/Usuario";
 
 // Igual patrón que CambiosPerfil (MySqlPerfilRepository): solo se arman las columnas presentes.
 const COLUMNAS_EDITABLES: Record<keyof CambiosUsuario, string> = {
@@ -97,7 +97,7 @@ export class MySqlUsuarioRepository implements IUsuarioRepository {
     return usuario;
   }
 
-  async listar(filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Pagina<UsuarioAutenticado>> {
+  async listar(filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Pagina<UsuarioConPerfil>> {
     const condiciones: string[] = [];
     const valores: unknown[] = [];
     if (filtros.q) {
@@ -109,21 +109,40 @@ export class MySqlUsuarioRepository implements IUsuarioRepository {
       condiciones.push("u.activo = ?");
       valores.push(filtros.activo);
     }
+    if (filtros.rol !== undefined) {
+      condiciones.push("r.nombre = ?");
+      valores.push(filtros.rol);
+    }
+    if (filtros.conPerfil === true) condiciones.push("p.id IS NOT NULL");
+    if (filtros.conPerfil === false) condiciones.push("p.id IS NULL");
     const donde = condiciones.length > 0 ? `WHERE ${condiciones.join(" AND ")}` : "";
+    // Un perfil por cuenta como máximo (regla 6, `usuario_id` único): la unión no multiplica filas.
 
     const [filas, totales] = await Promise.all([
-      this.db.consultar<FilaSinHash>(
-        `SELECT ${COLUMNAS_SIN_HASH}
+      this.db.consultar<FilaSinHash & { perfil_id: string | null; nombre_negocio: string | null }>(
+        `SELECT ${COLUMNAS_SIN_HASH}, p.id AS perfil_id, p.nombre_negocio
          FROM usuarios u
          JOIN roles r ON r.id = u.rol_id
+         LEFT JOIN perfiles_emprendedores p ON p.usuario_id = u.id
          ${donde}
          ORDER BY u.creado_en DESC, u.id
          LIMIT ? OFFSET ?`,
         [...valores, pagina.limite, desplazamiento(pagina)],
       ),
-      this.db.consultar<{ total: number }>(`SELECT COUNT(*) AS total FROM usuarios u ${donde}`, valores),
+      this.db.consultar<{ total: number }>(
+        `SELECT COUNT(*) AS total
+         FROM usuarios u
+         JOIN roles r ON r.id = u.rol_id
+         LEFT JOIN perfiles_emprendedores p ON p.usuario_id = u.id
+         ${donde}`,
+        valores,
+      ),
     ]);
-    return { datos: filas.map(mapearSinHash), total: Number(totales[0]?.total ?? 0) };
+    const datos: UsuarioConPerfil[] = filas.map((fila) => ({
+      ...mapearSinHash(fila),
+      perfil: fila.perfil_id !== null && fila.nombre_negocio !== null ? { id: fila.perfil_id, nombreNegocio: fila.nombre_negocio } : null,
+    }));
+    return { datos, total: Number(totales[0]?.total ?? 0) };
   }
 
   async cambiarEstado(id: string, activo: boolean): Promise<void> {

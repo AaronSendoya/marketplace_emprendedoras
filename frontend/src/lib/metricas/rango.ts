@@ -30,14 +30,42 @@ export interface RangoConAnterior {
   anterior: { desde: string; hasta: string };
 }
 
+// Lo máximo que acepta el backend para un período (regla 19): 2 años, que él mide como 2 × 366 días
+// entre el inicio de `desde` y el final de `hasta`, o sea 732 días contando los dos extremos.
+export const DIAS_MAXIMOS_PERIODO = 2 * 366;
+
+// Una fecha YYYY-MM-DD que existe en el calendario. Un `2026-02-30` pasa por un patrón de dígitos, pero
+// el backend lo rechaza (400), así que se descarta antes de mandarlo.
+export function esFechaReal(texto: string | undefined): texto is string {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto ?? "");
+  if (!partes) return false;
+  const [anio, mes, dia] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  return fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia;
+}
+
+// Si un período (de `desde` a `hasta`, ambos días incluidos) es de los que el backend acepta: `hasta` no
+// es anterior a `desde` y no pasa de 2 años. Lo usan la página, que ignora un período inválido de la
+// URL, y el formulario «Personalizado», que no deja aplicarlo.
+export function periodoValido(desde: string, hasta: string): boolean {
+  if (!esFechaReal(desde) || !esFechaReal(hasta)) return false;
+  const dias = diferenciaDias(desde, hasta);
+  return dias >= 1 && dias <= DIAS_MAXIMOS_PERIODO;
+}
+
 // El Dashboard entero refleja el período elegido (regla 19). Para la tendencia de las tarjetas KPI
 // hace falta comparar contra el período inmediatamente anterior de igual duración, no una ventana
 // fija de "7 días": sin `desde`/`hasta`, el período por defecto son los últimos 30 días, igual que
 // el backend sin esos parámetros. El rango se resuelve acá (no solo en el backend) porque el
 // período anterior necesita fechas concretas para poder restarles su propia duración.
+//
+// Un período que el backend rechazaría (fechas que no existen, `hasta` anterior a `desde`, más de 2 años)
+// no llega a pedirse: escrito a mano en la URL daba la pantalla de error en vez del Dashboard, así que
+// se ignora y se vuelve al período por defecto.
 export function resolverRangoConAnterior(desdeParametro?: string, hastaParametro?: string): RangoConAnterior {
-  const hasta = hastaParametro ?? hoyLaPaz();
-  const desde = desdeParametro ?? sumarDias(hasta, -29);
+  const hasta = esFechaReal(hastaParametro) ? hastaParametro : hoyLaPaz();
+  const desde = esFechaReal(desdeParametro) ? desdeParametro : sumarDias(hasta, -29);
+  if (!periodoValido(desde, hasta)) return resolverRangoConAnterior();
   const dias = diferenciaDias(desde, hasta);
   const hastaAnterior = sumarDias(desde, -1);
   const desdeAnterior = sumarDias(hastaAnterior, -(dias - 1));

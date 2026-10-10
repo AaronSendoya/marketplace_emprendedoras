@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ITokenService } from "@/core/auth/domain/ITokenService";
 import type { Usuario } from "@/core/auth/domain/Usuario";
 import { ErrorProhibido } from "@/shared/domain/errors";
+import { FakeClock } from "@/shared/testing/FakeClock";
 import { requireAdmin } from "./requireAdmin";
 import type { DependenciasAuth } from "./requireAuth";
 
@@ -21,7 +22,10 @@ const base: Omit<Usuario, "rol"> = {
 function deps(usuario: Usuario): DependenciasAuth {
   return {
     usuarios: { buscarPorId: async () => usuario },
-    tokens: { emitir: async () => "x", verificar: async () => ({ sub: usuario.id, tv: usuario.tokenVersion }) } as ITokenService,
+    // La sesión del token siempre está abierta: estas pruebas son del rol, no de las sesiones (las cubre requireAuth.test.ts).
+    sesiones: { estaVigente: async () => true },
+    tokens: { emitir: async () => "x", verificar: async () => ({ sub: usuario.id, tv: usuario.tokenVersion, jti: "sesion-1" }) } as ITokenService,
+    clock: new FakeClock(new Date("2026-10-08T12:00:00Z")),
   };
 }
 

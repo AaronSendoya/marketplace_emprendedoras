@@ -6,6 +6,7 @@ import { CreateUsuarioUseCase } from "@/core/auth/application/CreateUsuarioUseCa
 import { EliminarCuentaUseCase } from "@/core/auth/application/EliminarCuentaUseCase";
 import { GetUsuarioUseCase } from "@/core/auth/application/GetUsuarioUseCase";
 import { ListUsuariosUseCase } from "@/core/auth/application/ListUsuariosUseCase";
+import { LogoutUseCase } from "@/core/auth/application/LogoutUseCase";
 import { RequestOtpUseCase } from "@/core/auth/application/RequestOtpUseCase";
 import { ResetPasswordUseCase } from "@/core/auth/application/ResetPasswordUseCase";
 import { VerificadorOtp } from "@/core/auth/application/VerificadorOtp";
@@ -14,6 +15,7 @@ import { generarCodigoOtp } from "@/core/auth/infrastructure/generarCodigoOtp";
 import { generarPasswordTemporal } from "@/core/auth/infrastructure/generarPasswordTemporal";
 import { MySqlEliminacionCuentaRepository } from "@/core/auth/infrastructure/MySqlEliminacionCuentaRepository";
 import { MySqlOtpRepository } from "@/core/auth/infrastructure/MySqlOtpRepository";
+import { MySqlSesionRepository } from "@/core/auth/infrastructure/MySqlSesionRepository";
 import { MySqlUsuarioRepository } from "@/core/auth/infrastructure/MySqlUsuarioRepository";
 import { crearEmailSender } from "@/shared/infrastructure/crearEmailSender";
 import { crearCachePublica } from "@/shared/infrastructure/crearCachePublica";
@@ -30,6 +32,10 @@ function dependencias() {
   const usuarios = new MySqlUsuarioRepository(db);
   const otps = new MySqlOtpRepository(db);
   return { hasher, clock, usuarios, otps, verificador: new VerificadorOtp(otps, hasher, clock) };
+}
+
+export function crearLogout(): LogoutUseCase {
+  return new LogoutUseCase(new MySqlSesionRepository(getMySqlClient()), logger);
 }
 
 export function crearRequestOtp(): RequestOtpUseCase {

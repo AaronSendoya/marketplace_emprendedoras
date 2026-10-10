@@ -3,6 +3,9 @@ import type {
   DatosFilaImportacion,
   EstadoFilaImportacion,
   FilaAnalizadaImportacion,
+  FilaAVerificarImagenes,
+  FilaImagenesVerificadas,
+  ResultadoFilaImportacion,
   ValidacionFilaImportacion,
 } from "@/lib/api/tipos";
 
@@ -38,7 +41,17 @@ export interface FilaEditable {
   revisando: boolean;
   // Sube con cada edición: una respuesta del servidor que no es de la última edición se descarta.
   version: number;
+  // La comprobación en Drive (con la cuenta de Google conectada) dijo que ese archivo se puede cargar. Sin comprobar, `false`.
+  imagenesComprobadas: Record<CampoDeImagen, boolean>;
 }
+
+// La foto de perfil y el logo de una fila: dos archivos de Drive independientes (regla 22).
+export type CampoDeImagen = "foto" | "logo";
+export const CAMPOS_DE_IMAGEN: readonly CampoDeImagen[] = ["foto", "logo"];
+
+// Qué se sabe de la imagen de una fila: `sin_imagen` (la fila no trae enlace), `ok` (Drive confirmó que se puede cargar),
+// `problema` (hay un aviso que dice por qué no) y `sin_comprobar` (trae enlace y todavía no se comprobó).
+export type EstadoDeImagen = "sin_imagen" | "ok" | "problema" | "sin_comprobar";
 
 export type FiltroDeFilas = "todas" | "lista" | "revisar" | "error" | "omitidas" | "ocultas";
 
@@ -61,6 +74,7 @@ export function aFilaEditable(fila: FilaAnalizadaImportacion): FilaEditable {
     editada: false,
     revisando: false,
     version: 0,
+    imagenesComprobadas: { foto: false, logo: false },
   };
 }
 
@@ -132,6 +146,108 @@ export function aplicarValidacion(fila: FilaEditable, version: number, validacio
   };
 }
 
+// --- Imágenes de Drive (regla 22) ---------------------------------------------------------------------------------------------
+
+export const idDeDrive = (fila: Pick<FilaEditable, "datos">, campo: CampoDeImagen): string =>
+  campo === "foto" ? fila.datos.foto_drive_id : fila.datos.logo_drive_id;
+
+// Un aviso de la imagen de la fila (`campo` «foto» o «logo», tal como lo manda el backend): del análisis (el enlace no sirve) o de
+// la comprobación en Drive.
+const avisosDeImagen = (avisos: readonly AvisoImportacion[], campo: CampoDeImagen) => avisos.filter((aviso) => aviso.campo === campo);
+
+export function estadoDeImagen(fila: Pick<FilaEditable, "avisos" | "datos" | "imagenesComprobadas">, campo: CampoDeImagen): EstadoDeImagen {
+  if (avisosDeImagen(fila.avisos, campo).length > 0) return "problema";
+  if (!idDeDrive(fila, campo)) return "sin_imagen";
+  return fila.imagenesComprobadas[campo] ? "ok" : "sin_comprobar";
+}
+
+// Los avisos que pone la comprobación en Drive (y que se retiran al volver a comprobar). Los del análisis (`*_enlace_invalido`,
+// `*_es_carpeta`) vienen del texto del Excel y no cambian.
+const SUFIJOS_DE_COMPROBACION = ["sin_acceso", "no_es_imagen", "muy_grande", "no_se_comprobo"] as const;
+
+export const esAvisoDeComprobacion = (aviso: AvisoImportacion) =>
+  CAMPOS_DE_IMAGEN.some((campo) => aviso.campo === campo && SUFIJOS_DE_COMPROBACION.some((sufijo) => aviso.codigo === `${campo}_${sufijo}`));
+
+const esAvisoDeImagen = (aviso: AvisoImportacion) => CAMPOS_DE_IMAGEN.some((campo) => aviso.campo === campo);
+
+// Lo que el reporte «por revisar» dice de una fila creada: lo que supuso el análisis (con el enlace de imagen que no servía) y, de
+// las imágenes, lo que pasó de verdad al importar. La comprobación de la vista previa no se da por buena: el servidor volvió a
+// descargar cada archivo y su respuesta es la que vale (una imagen que fallaba en la vista previa puede haberse cargado, o al
+// revés). Solo entra lo que conviene mirar: una suposición dudosa (`revisar`) o un dato del Excel que no se guardó tal cual (`reporte`).
+export function avisosDelReporte(fila: Pick<FilaEditable, "avisos">, resultado: Pick<ResultadoFilaImportacion, "avisos">): AvisoImportacion[] {
+  const dePrevia = fila.avisos.filter((aviso) => !esAvisoDeComprobacion(aviso));
+  const alImportar = resultado.avisos.filter((aviso) => esAvisoDeImagen(aviso) && !dePrevia.some((previo) => previo.codigo === aviso.codigo));
+  return [...dePrevia, ...alImportar].filter((aviso) => aviso.severidad === "revisar" || aviso.reporte);
+}
+
+// Una fila que no se importa (ya tiene cuenta, o repite un correo) no carga imágenes: no se comprueba ni cuenta en los totales.
+const cuentaParaImagenes = (fila: FilaEditable) => esEditable(fila);
+
+export const tieneEnlaceDeDrive = (fila: Pick<FilaEditable, "datos">) => CAMPOS_DE_IMAGEN.some((campo) => idDeDrive(fila, campo) !== "");
+
+// Las filas que la comprobación en Drive tiene que mirar: las que no se omiten y traen al menos un enlace.
+export function filasPorVerificar(filas: readonly FilaEditable[]): FilaAVerificarImagenes[] {
+  return filas
+    .filter((fila) => cuentaParaImagenes(fila) && tieneEnlaceDeDrive(fila))
+    .map((fila) => ({ fila: fila.fila, foto_drive_id: fila.datos.foto_drive_id, logo_drive_id: fila.datos.logo_drive_id }));
+}
+
+function conAvisosDeImagen(fila: FilaEditable, avisosNuevos: AvisoImportacion[], comprobadas: Record<CampoDeImagen, boolean>): FilaEditable {
+  const avisos = ordenar([...fila.avisos.filter((aviso) => !esAvisoDeComprobacion(aviso)), ...avisosNuevos]);
+  return { ...fila, avisos, estado: estadoDeAvisos(avisos), imagenesComprobadas: comprobadas };
+}
+
+// Lo que Drive contestó para una fila: sus problemas pasan a ser advertencias de la fila (la dejan «Para revisar», nunca «Con error»)
+// y lo que está bien queda marcado. Una fila omitida no cambia.
+export function aplicarImagenesVerificadas(fila: FilaEditable, verificacion: FilaImagenesVerificadas): FilaEditable {
+  if (!cuentaParaImagenes(fila)) return fila;
+  const imagenes = { foto: verificacion.foto, logo: verificacion.logo };
+  const nuevos = CAMPOS_DE_IMAGEN.flatMap((campo) => {
+    const { estado, aviso } = imagenes[campo];
+    return estado === "problema" && aviso ? [aviso] : [];
+  });
+  return conAvisosDeImagen(fila, nuevos, { foto: imagenes.foto.estado === "ok", logo: imagenes.logo.estado === "ok" });
+}
+
+// Se desconectó la cuenta (o venció): lo que se había comprobado ya no vale y vuelve a «sin comprobar».
+export function olvidarComprobacionDeImagenes(fila: FilaEditable): FilaEditable {
+  if (!cuentaParaImagenes(fila)) return fila;
+  if (!fila.imagenesComprobadas.foto && !fila.imagenesComprobadas.logo && !fila.avisos.some(esAvisoDeComprobacion)) return fila;
+  return conAvisosDeImagen(fila, [], { foto: false, logo: false });
+}
+
+export interface ResumenDeImagenes {
+  // Filas que se importan y traen al menos un enlace de Drive.
+  filasConEnlace: number;
+  // Imágenes (fotos y logos) con enlace de Drive.
+  conEnlace: number;
+  ok: number;
+  sinComprobar: number;
+  // Con un aviso (enlace que no sirve, sin acceso, no es una imagen, pesa demasiado...). Se importan igual, con la predeterminada.
+  conProblema: number;
+  sinAcceso: number;
+}
+
+export function resumenDeImagenes(filas: readonly FilaEditable[]): ResumenDeImagenes {
+  const resumen: ResumenDeImagenes = { filasConEnlace: 0, conEnlace: 0, ok: 0, sinComprobar: 0, conProblema: 0, sinAcceso: 0 };
+  for (const fila of filas) {
+    if (!cuentaParaImagenes(fila)) continue;
+    let conEnlaceEnFila = false;
+    for (const campo of CAMPOS_DE_IMAGEN) {
+      const estado = estadoDeImagen(fila, campo);
+      if (estado === "sin_imagen") continue;
+      conEnlaceEnFila = true;
+      resumen.conEnlace++;
+      if (estado === "ok") resumen.ok++;
+      else if (estado === "sin_comprobar") resumen.sinComprobar++;
+      else resumen.conProblema++;
+      if (avisosDeImagen(fila.avisos, campo).some((aviso) => aviso.codigo === `${campo}_sin_acceso`)) resumen.sinAcceso++;
+    }
+    if (conEnlaceEnFila) resumen.filasConEnlace++;
+  }
+  return resumen;
+}
+
 export interface ResumenDeFilas {
   total: number;
   listas: number;
@@ -181,7 +297,9 @@ export type AccionFilas =
   | { tipo: "validada"; fila: number; version: number; validacion: ValidacionFilaImportacion }
   | { tipo: "revisionFallida"; filas: { fila: number; version: number }[] }
   | { tipo: "elegir"; fila: number; elegida: boolean }
-  | { tipo: "elegirTodas"; elegida: boolean };
+  | { tipo: "elegirTodas"; elegida: boolean }
+  | { tipo: "imagenesVerificadas"; filas: FilaImagenesVerificadas[] }
+  | { tipo: "imagenesSinComprobar" };
 
 const cambiarFila = (filas: FilaEditable[], numero: number, cambio: (fila: FilaEditable) => FilaEditable) =>
   filas.map((fila) => (fila.fila === numero ? cambio(fila) : fila));
@@ -201,6 +319,15 @@ export function reducirFilas(filas: FilaEditable[], accion: AccionFilas): FilaEd
       return cambiarFila(filas, accion.fila, (fila) => (esImportable(fila) ? { ...fila, elegida: accion.elegida } : fila));
     case "elegirTodas":
       return filas.map((fila) => (esImportable(fila) ? { ...fila, elegida: accion.elegida } : fila));
+    case "imagenesVerificadas": {
+      const porFila = new Map(accion.filas.map((verificacion) => [verificacion.fila, verificacion]));
+      return filas.map((fila) => {
+        const verificacion = porFila.get(fila.fila);
+        return verificacion ? aplicarImagenesVerificadas(fila, verificacion) : fila;
+      });
+    }
+    case "imagenesSinComprobar":
+      return filas.map(olvidarComprobacionDeImagenes);
   }
 }
 

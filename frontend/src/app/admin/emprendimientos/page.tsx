@@ -12,9 +12,9 @@ import { EmprendimientosToolbar } from "@/components/organisms/EmprendimientosTo
 import { filtroPerfilDeLaUrl, FiltroPerfilEmprendimiento, FILTROS_PERFIL, ETIQUETA_FILTRO_PERFIL, type FiltroPerfil } from "@/components/organisms/FiltroPerfilEmprendimiento";
 import { SelectorLimite } from "@/components/organisms/SelectorLimite";
 import { listarUsuarios } from "@/lib/api/admin";
-import { obtenerPerfilDeUsuario } from "@/lib/api/perfiles";
 import { CLASES_FOCO_ENLACE, CLASES_PANEL_ADMIN } from "@/lib/estilos";
 import { haySesion } from "@/lib/auth/sesion";
+import { paginaDeParametro, ultimaPagina } from "@/lib/parametros";
 
 export const metadata: Metadata = {
   title: "Emprendimientos — Panel del Admin",
@@ -22,9 +22,6 @@ export const metadata: Metadata = {
 
 const LIMITE_POR_DEFECTO = 10;
 const LIMITES_VALIDOS = [10, 50, 100];
-// Techo de cuentas Emprendedor activas que esta pantalla sabe manejar en una sola pasada (ver
-// comentario más abajo, sobre por qué la paginación se resuelve en memoria).
-const TOPE_CUENTAS_ACTIVAS = 100;
 
 function primerValor(valor: string | string[] | undefined): string {
   return (Array.isArray(valor) ? valor[0] : valor) ?? "";
@@ -34,42 +31,35 @@ export default async function PaginaEmprendimientos({ searchParams }: PageProps<
   if (!(await haySesion())) redirect("/iniciar-sesion");
 
   const parametros = await searchParams;
-  const q = primerValor(parametros.q);
-  const pagina = Number(primerValor(parametros.pagina)) || 1;
+  // El backend acepta de 1 a 100 caracteres sin contar los espacios de los extremos (ver /admin).
+  const q = primerValor(parametros.q).trim().slice(0, 100);
+  const pagina = paginaDeParametro(primerValor(parametros.pagina));
   const limiteParametro = Number(primerValor(parametros.limite));
   const limite = LIMITES_VALIDOS.includes(limiteParametro) ? limiteParametro : LIMITE_POR_DEFECTO;
   const filtroPerfil = filtroPerfilDeLaUrl(primerValor(parametros.perfil));
 
-  // El backend no filtra por rol en /admin/usuarios (regla 5: solo busca y filtra por estado), así
-  // que esta pantalla pide de una sola vez hasta TOPE_CUENTAS_ACTIVAS cuentas activas que calcen con
-  // `q` y se queda con las Emprendedor; la paginación de la tabla (pagina/limite de la URL) se
-  // resuelve después, en memoria, sobre esa lista ya filtrada — paginar en el backend antes de
-  // filtrar por rol daría un total inconsistente (una página podría traer menos Emprendedoras de
-  // las que caben, por las cuentas Admin que también cuenta ese total).
-  const { datos: cuentas } = await listarUsuarios({ q: q || undefined, estado: "activo", pagina: 1, limite: TOPE_CUENTAS_ACTIVAS });
-  const emprendedoras = cuentas.filter((usuario) => usuario.rol === "Emprendedor");
+  // Regla 18 (2026-10-09): el servidor filtra por rol y por perfil, pagina y cuenta, y cada cuenta trae el
+  // nombre de su negocio. Sin tope de cuentas y sin pedir un perfil por cuenta (antes: hasta 100 cuentas
+  // de golpe, filtradas y paginadas aquí, y un perfil por fila). Los números de los botones del filtro
+  // (todas, con perfil y sin perfil) salen de dos consultas de una sola fila dentro de la misma búsqueda:
+  // no cambian al elegir un filtro, y el filtro por perfil va antes de paginar, así que el total, las
+  // páginas y el «Mostrando x a y de z» cuentan solo lo filtrado.
+  const busqueda = { q: q || undefined, estado: "activo", rol: "Emprendedor" } as const;
+  const [{ datos: cuentas, paginacion }, conPerfil, sinPerfil] = await Promise.all([
+    listarUsuarios({ ...busqueda, perfil: filtroPerfil === "todas" ? undefined : filtroPerfil, pagina, limite }),
+    listarUsuarios({ ...busqueda, perfil: "con", pagina: 1, limite: 1 }),
+    listarUsuarios({ ...busqueda, perfil: "sin", pagina: 1, limite: 1 }),
+  ]);
+  const paginaDeFilas = cuentas.map((usuario) => ({ usuario, perfil: usuario.perfil }));
 
-  // N+1 deliberado: con el volumen de cuentas de este catálogo (decenas, no miles), traer el perfil
-  // de cada fila es más simple que inventar un endpoint de "perfiles por lote", y esta pantalla no
-  // se visita con la frecuencia del catálogo público.
-  const perfiles = await Promise.all(emprendedoras.map((usuario) => obtenerPerfilDeUsuario(usuario.id)));
-  const filas = emprendedoras.map((usuario, indice) => ({ usuario, perfil: perfiles[indice] }));
-
-  // Cuántas tienen y cuántas no tienen perfil, dentro de la búsqueda: salen antes de filtrar y de paginar,
-  // así los números de los botones no cambian al elegir uno.
   const cantidades: Record<FiltroPerfil, number> = {
-    todas: filas.length,
-    con: filas.filter((fila) => fila.perfil !== null).length,
-    sin: filas.filter((fila) => fila.perfil === null).length,
+    todas: conPerfil.paginacion.total + sinPerfil.paginacion.total,
+    con: conPerfil.paginacion.total,
+    sin: sinPerfil.paginacion.total,
   };
 
-  // El filtro por perfil va ANTES de paginar (como la búsqueda): el total, las páginas y el "Mostrando
-  // x a y de z" cuentan solo lo filtrado.
-  const filasFiltradas = filtroPerfil === "todas" ? filas : filas.filter((fila) => (filtroPerfil === "con") === (fila.perfil !== null));
-
-  const total = filasFiltradas.length;
+  const total = paginacion.total;
   const desde = total === 0 ? 0 : (pagina - 1) * limite;
-  const paginaDeFilas = filasFiltradas.slice(desde, desde + limite);
   const mostrandoDesde = total === 0 ? 0 : desde + 1;
   const mostrandoHasta = Math.min(desde + limite, total);
 
@@ -81,6 +71,10 @@ export default async function PaginaEmprendimientos({ searchParams }: PageProps<
     parametrosUrl.set("pagina", String(nuevaPagina));
     return `/admin/emprendimientos?${parametrosUrl.toString()}`;
   }
+
+  // Una página que ya no existe lleva a la última, no a una tabla vacía.
+  const ultima = ultimaPagina(total, limite);
+  if (pagina > ultima) redirect(crearHref(ultima));
 
   // Cambiar de filtro vuelve a la primera página: sin `pagina`.
   function crearHrefFiltro(filtro: FiltroPerfil): string {
@@ -180,7 +174,8 @@ export default async function PaginaEmprendimientos({ searchParams }: PageProps<
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto md:block">
+            {/* `relative`: ver la tabla de Cuentas. */}
+            <div className="relative hidden overflow-x-auto md:block" role="region" aria-label="Emprendimientos" tabIndex={0}>
               <table className="w-full text-left font-cuerpo text-sm">
                 <thead className="border-b border-borde bg-fondo">
                   <tr>

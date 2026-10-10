@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { MonitorDeErrores } from "@/components/organisms/MonitorDeErrores";
 import { SesionNavIcono } from "@/components/organisms/SesionNavIcono";
 import { SiteChrome } from "@/components/organisms/SiteChrome";
 import "./globals.css";
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={`${plusJakartaSans.variable} ${inter.variable} h-full`}>
       <body className="flex min-h-full flex-col font-cuerpo antialiased">
         <SiteChrome sesion={<SesionNavIcono />}>{children}</SiteChrome>
+        <MonitorDeErrores />
       </body>
     </html>
   );

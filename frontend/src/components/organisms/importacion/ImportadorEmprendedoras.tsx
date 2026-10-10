@@ -1,40 +1,53 @@
 "use client";
 
 import { FileSpreadsheet, LoaderCircle } from "lucide-react";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ConfirmModal } from "@/components/molecules/ConfirmModal";
 import {
   analizarExcelAction,
   importarFilasAction,
   validarFilasAction,
+  verificarImagenesAction,
   type FalloDeImportacion,
   type RespuestaDeImportacion,
 } from "@/lib/admin/importacion-acciones";
-import type { ReferenciaCatalogo, ResultadoFilaImportacion, ValidacionFilaImportacion } from "@/lib/api/tipos";
+import type { FilaAVerificarImagenes, ReferenciaCatalogo, ResultadoFilaImportacion, ValidacionFilaImportacion } from "@/lib/api/tipos";
 import { CLASES_PANEL_ADMIN } from "@/lib/estilos";
 import { descargarArchivo, fechaParaNombreDeArchivo, formatearTamano } from "@/lib/importacion/descarga";
 import {
+  aFilaEditable,
   esImportable,
   filasElegidas,
+  filasPorVerificar,
   motivoSinImportar,
   reducirFilas,
+  resumenDeImagenes,
+  tieneEnlaceDeDrive,
   trocear,
   type FilaEditable,
 } from "@/lib/importacion/filas";
 import { MENSAJES_IMPORTACION } from "@/lib/importacion/mensajes";
 import { csvDeCredenciales, csvPorRevisar, cuentasConContrasena, type ResultadosPorFila } from "@/lib/importacion/reportes";
 import { useAvisoAlSalir } from "@/lib/importacion/useAvisoAlSalir";
+import { useConexionGoogle, type EstadoConexionGoogle } from "@/lib/importacion/useConexionGoogle";
 import { AlertaDeArchivo } from "./AlertaDeArchivo";
+import { AvisoDeImagenes, type EstadoDeVerificacion } from "./AvisoDeImagenes";
 import { BarraDeAccionImportacion } from "./BarraDeAccionImportacion";
 import { GuiaDelExcel } from "./GuiaDelExcel";
 import { IndicadorDePasos, type PasoImportacion } from "./IndicadorDePasos";
 import { ProgresoDeImportacion, type TandaProcesada } from "./ProgresoDeImportacion";
 import { ResultadoDeImportacion } from "./ResultadoDeImportacion";
+import { TarjetaCuentaGoogle } from "./TarjetaCuentaGoogle";
 import { VistaPreviaImportacion, type DatosDelArchivo } from "./VistaPreviaImportacion";
 import { ZonaDeArchivo } from "./ZonaDeArchivo";
 
 // Regla 22 (backend): cuántas filas admite una petición de `importar` y de `validar`.
 const FILAS_POR_TANDA = 10;
+// Con la cuenta de Google conectada el servidor descarga las imágenes de Drive de cada fila (varios segundos por fila): la tanda
+// es la mitad de grande (regla 22).
+const FILAS_POR_TANDA_CON_IMAGENES = 5;
+// Cuántas filas comprueba en Drive una petición de verificación (el máximo que admite el backend).
+const FILAS_POR_VERIFICACION = 25;
 // Espera tras la última edición antes de pedirle al servidor que revise las filas cambiadas.
 const ESPERA_DE_REVISION_MS = 600;
 // Cuántas veces se reintenta una tanda rechazada por "demasiadas peticiones" antes de rendirse.
@@ -91,9 +104,22 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
   const [progreso, setProgreso] = useState<Progreso>(PROGRESO_INICIAL);
   const [deteniendo, setDeteniendo] = useState(false);
   const [detenida, setDetenida] = useState(false);
-  const [fallo, setFallo] = useState<{ mensaje: string; sesionVencida: boolean } | null>(null);
+  const [fallo, setFallo] = useState<{ mensaje: string; sesionVencida: boolean; conexionVencida: boolean } | null>(null);
   const [credencialesDescargadas, setCredencialesDescargadas] = useState(false);
-  const [confirmacion, setConfirmacion] = useState<"cambiar-archivo" | "importar-otro" | null>(null);
+  const [confirmacion, setConfirmacion] = useState<"cambiar-archivo" | "importar-otro" | "importar-sin-google" | null>(null);
+
+  // La cuenta de Google que da acceso a las imágenes de Drive (regla 22) y la comprobación de los archivos en la vista previa.
+  const conexion = useConexionGoogle(alCambiarLaConexion);
+  const conectada = conexion.estado.fase === "conectada";
+  const [verificacion, setVerificacion] = useState<EstadoDeVerificacion>({ fase: "inactiva" });
+  const [avisoDeConexion, setAvisoDeConexion] = useState<string | null>(null);
+  // Cada comprobación lleva un número; una respuesta que no es de la última (otra cuenta, otro archivo) se descarta.
+  const generacionDeVerificacion = useRef(0);
+  // Lo último que vio la pantalla, para los manejadores que corren después de una espera (la respuesta de Google, el archivo leído).
+  const ultimo = useRef({ filas, fase, conectada });
+  useEffect(() => {
+    ultimo.current = { filas, fase, conectada };
+  });
 
   const detenerSolicitado = useRef(false);
   const creadasHastaAhora = useRef(0);
@@ -147,7 +173,85 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
     return () => clearTimeout(temporizador);
   }, [filas, fase]);
 
+  // Comprobación de las fotos y los logos en Drive (regla 22): con la cuenta conectada, por lotes y sin descargar nada. Un
+  // problema de un archivo es una advertencia de su fila; solo la conexión (vencida o ausente) y la red detienen la comprobación.
+  async function pedirVerificacion(lote: FilaAVerificarImagenes[]) {
+    for (let intento = 0; ; intento++) {
+      let respuesta;
+      try {
+        respuesta = await verificarImagenesAction(lote);
+      } catch {
+        return { ok: false, error: MENSAJES_IMPORTACION.sinConexionAlComprobarImagenes } as FalloDeImportacion;
+      }
+      const segundos = !respuesta.ok ? respuesta.reintentarEn : undefined;
+      if (respuesta.ok || segundos === undefined || intento >= REINTENTOS_POR_LIMITE) return respuesta;
+      await dormir(segundos * 1000);
+    }
+  }
+
+  async function verificarImagenes(origen: readonly FilaEditable[]) {
+    const porVerificar = filasPorVerificar(origen);
+    const generacion = ++generacionDeVerificacion.current;
+    if (porVerificar.length === 0) {
+      setVerificacion({ fase: "lista" });
+      return;
+    }
+    setVerificacion({ fase: "comprobando", hechas: 0, total: porVerificar.length });
+
+    let hechas = 0;
+    for (const lote of trocear(porVerificar, FILAS_POR_VERIFICACION)) {
+      const respuesta = await pedirVerificacion(lote);
+      if (generacion !== generacionDeVerificacion.current) return;
+
+      if (!respuesta.ok) {
+        if (respuesta.conexionVencida) {
+          setAvisoDeConexion(respuesta.error);
+          dispatch({ tipo: "imagenesSinComprobar" });
+          setVerificacion({ fase: "inactiva" });
+          void conexion.refrescar();
+        } else {
+          setVerificacion({ fase: "fallida", mensaje: respuesta.error });
+        }
+        return;
+      }
+      if (respuesta.conexion !== "ok") {
+        // El servidor ya no ve la cuenta (venció o se desconectó): lo comprobado hasta ahora ya no vale.
+        if (respuesta.conexion === "vencida") setAvisoDeConexion(MENSAJES_IMPORTACION.conexionVencida);
+        dispatch({ tipo: "imagenesSinComprobar" });
+        setVerificacion({ fase: "inactiva" });
+        void conexion.refrescar();
+        return;
+      }
+      dispatch({ tipo: "imagenesVerificadas", filas: respuesta.filas });
+      hechas += lote.length;
+      setVerificacion({ fase: "comprobando", hechas, total: porVerificar.length });
+    }
+    setVerificacion({ fase: "lista" });
+  }
+
+  // El servidor dijo algo nuevo de la conexión con Google. Sin cuenta, lo comprobado deja de valer y las imágenes quedan «sin
+  // comprobar»; al conectar o cambiar de cuenta estando en la vista previa, se comprueba todo con la cuenta nueva. (Si todavía no
+  // hay archivo, se comprueba al leerlo, en `alAdjuntar`.)
+  function alCambiarLaConexion(anterior: EstadoConexionGoogle, nuevo: EstadoConexionGoogle) {
+    const cuentaDe = (estado: EstadoConexionGoogle) => (estado.fase === "conectada" ? (estado.cuenta ?? "") : null);
+    const antes = cuentaDe(anterior);
+    const ahora = cuentaDe(nuevo);
+    if (antes === ahora) return;
+
+    if (ahora === null) {
+      generacionDeVerificacion.current++;
+      setVerificacion({ fase: "inactiva" });
+      dispatch({ tipo: "imagenesSinComprobar" });
+      return;
+    }
+    setAvisoDeConexion(null);
+    if (ultimo.current.fase === "revisar") void verificarImagenes(ultimo.current.filas);
+  }
+
   function volverAlPrincipio() {
+    generacionDeVerificacion.current++;
+    setVerificacion({ fase: "inactiva" });
+    setAvisoDeConexion(null);
     setFase("subir");
     setRechazo(null);
     setArchivo(null);
@@ -196,6 +300,8 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
 
     const { analisis } = respuesta;
     dispatch({ tipo: "cargar", filas: analisis.filas });
+    // Con una cuenta conectada, la vista previa nace comprobando las fotos y los logos en Drive.
+    if (ultimo.current.conectada) void verificarImagenes(analisis.filas.map(aFilaEditable));
     setArchivo({
       nombre: adjunto.name,
       hoja: analisis.hoja,
@@ -233,7 +339,9 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
   }
 
   async function importar(aImportar: FilaEditable[]) {
-    const tandas = trocear(aImportar, FILAS_POR_TANDA);
+    // Con imágenes de Drive que descargar, tandas más chicas (el servidor rechaza las de más de 5 filas).
+    const conImagenes = conectada && aImportar.some(tieneEnlaceDeDrive);
+    const tandas = trocear(aImportar, conImagenes ? FILAS_POR_TANDA_CON_IMAGENES : FILAS_POR_TANDA);
     detenerSolicitado.current = false;
     setDeteniendo(false);
     setDetenida(false);
@@ -252,7 +360,10 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
       const tanda = tandas[i];
       const respuesta = await enviarTanda(tanda);
       if (!respuesta.ok) {
-        setFallo({ mensaje: respuesta.error, sesionVencida: respuesta.sesionVencida === true });
+        const conexionVencida = respuesta.conexionVencida === true;
+        setFallo({ mensaje: respuesta.error, sesionVencida: respuesta.sesionVencida === true, conexionVencida });
+        // La cookie de la conexión ya se borró en el servidor: la tarjeta se actualiza para ofrecer conectar de nuevo.
+        if (conexionVencida) void conexion.refrescar();
         break;
       }
 
@@ -286,6 +397,8 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
 
   // Las filas elegidas que todavía no tienen resultado: lo que falta si se detuvo o se cortó.
   const pendientes = filasElegidas(filas).filter((fila) => resultados[fila.fila] === undefined);
+  // Si la conexión venció y ya se volvió a conectar, el aviso deja de pedir que se conecte.
+  const falloVisible = fallo?.conexionVencida && conectada ? { ...fallo, mensaje: MENSAJES_IMPORTACION.conexionRestablecida } : fallo;
 
   function descargarCredenciales() {
     descargarArchivo(`credenciales-emprendedoras-${fechaParaNombreDeArchivo()}.csv`, csvDeCredenciales(filas, resultados), "text/csv;charset=utf-8");
@@ -307,7 +420,23 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
   }
 
   const elegidas = filasElegidas(filas);
-  const motivo = motivoSinImportar(filas);
+  const resumenImagenes = useMemo(() => resumenDeImagenes(filas), [filas]);
+  const comprobandoImagenes = verificacion.fase === "comprobando";
+  const motivo = motivoSinImportar(filas) ?? (comprobandoImagenes ? "Estamos comprobando las fotos y los logos en Drive. Un momento." : null);
+  const filasConEnlaceElegidas = elegidas.filter(tieneEnlaceDeDrive).length;
+
+  // La conexión dura una hora y su cookie desaparece sola: antes de importar se vuelve a preguntar al servidor. Si había enlaces de
+  // Drive y ya no hay cuenta, no se importa en silencio con las imágenes predeterminadas: se pregunta.
+  async function pedirImportar() {
+    if (filasConEnlaceElegidas > 0) {
+      const actual = await conexion.refrescar();
+      if (actual.fase !== "conectada") {
+        setConfirmacion("importar-sin-google");
+        return;
+      }
+    }
+    void importar(elegidas);
+  }
 
   const textoDeSalida = fase === "importando"
     ? "La importación sigue en curso. Si sales ahora se detiene: lo que ya se creó se conserva y puedes repetirla, porque las cuentas ya creadas se omiten solas."
@@ -351,6 +480,7 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
             ) : (
               <ZonaDeArchivo onArchivo={alAdjuntar} onRechazo={alRechazarEnElNavegador} />
             )}
+            <TarjetaCuentaGoogle conexion={conexion} avisoDeLaPantalla={conectada ? null : avisoDeConexion} />
           </div>
           <GuiaDelExcel />
         </div>
@@ -363,8 +493,15 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
               {avisoDeRevision}
             </p>
           )}
+          <TarjetaCuentaGoogle conexion={conexion} avisoDeLaPantalla={conectada ? null : avisoDeConexion} />
+          <AvisoDeImagenes
+            resumen={resumenImagenes}
+            conexion={conexion.estado}
+            verificacion={verificacion}
+            onVolverAComprobar={() => void verificarImagenes(filas)}
+          />
           <VistaPreviaImportacion archivo={archivo} filas={filas} ciudades={ciudades} rubros={rubros} dispatch={dispatch} onCambiarArchivo={pedirCambiarArchivo} />
-          <BarraDeAccionImportacion cantidad={elegidas.length} motivo={motivo} onImportar={() => importar(elegidas)} />
+          <BarraDeAccionImportacion cantidad={elegidas.length} motivo={motivo} conImagenes={conectada} onImportar={() => void pedirImportar()} />
         </>
       )}
 
@@ -381,12 +518,15 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
         />
       )}
 
+      {fase === "resultado" && fallo?.conexionVencida && pendientes.length > 0 && <TarjetaCuentaGoogle conexion={conexion} avisoDeLaPantalla={null} />}
+
       {fase === "resultado" && (
         <ResultadoDeImportacion
           filas={filas}
           resultados={resultados}
           pendientes={pendientes.length}
-          fallo={fallo}
+          fallo={falloVisible}
+          esperaConexion={fallo?.conexionVencida === true && !conectada}
           detenida={detenida}
           credencialesDescargadas={credencialesDescargadas}
           onCredencialesDescargadas={setCredencialesDescargadas}
@@ -408,16 +548,33 @@ export function ImportadorEmprendedoras({ ciudades, rubros }: PropsImportador) {
       />
       <ConfirmModal
         abierto={confirmacion !== null}
-        titulo={confirmacion === "cambiar-archivo" ? "¿Cambiar de archivo?" : "¿Importar otro archivo?"}
+        titulo={
+          confirmacion === "cambiar-archivo"
+            ? "¿Cambiar de archivo?"
+            : confirmacion === "importar-sin-google"
+              ? "No hay una cuenta de Google conectada"
+              : "¿Importar otro archivo?"
+        }
         descripcion={
           confirmacion === "cambiar-archivo"
             ? "Perderás los cambios que hiciste en la vista previa."
-            : "Todavía no descargaste las contraseñas temporales. Se muestran una sola vez: si empiezas de nuevo, no podrás recuperarlas."
+            : confirmacion === "importar-sin-google"
+              ? `${filasConEnlaceElegidas} ${filasConEnlaceElegidas === 1 ? "fila trae" : "filas traen"} enlaces de Drive, pero la conexión con Google no está activa (dura una hora). Si importas ahora, esas fotos y logos quedan con la imagen predeterminada y los subes a mano después. Para cargarlos, cancela y conecta la cuenta.`
+              : "Todavía no descargaste las contraseñas temporales. Se muestran una sola vez: si empiezas de nuevo, no podrás recuperarlas."
         }
-        textoConfirmar={confirmacion === "cambiar-archivo" ? "Cambiar de archivo" : "Empezar de nuevo"}
-        variante="peligro"
+        textoConfirmar={
+          confirmacion === "cambiar-archivo" ? "Cambiar de archivo" : confirmacion === "importar-sin-google" ? "Importar sin imágenes" : "Empezar de nuevo"
+        }
+        variante={confirmacion === "importar-sin-google" ? "primario" : "peligro"}
         onCerrar={() => setConfirmacion(null)}
-        onConfirmar={async () => volverAlPrincipio()}
+        onConfirmar={async () => {
+          if (confirmacion === "importar-sin-google") {
+            // No se espera: la importación dura minutos y el modal se cierra ya (la pantalla pasa al paso 3).
+            void importar(elegidas);
+            return;
+          }
+          volverAlPrincipio();
+        }}
       />
     </div>
   );

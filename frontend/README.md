@@ -24,7 +24,7 @@ pnpm dev      # http://localhost:3000
 
 En desarrollo el backend corre en `http://localhost:3001` (ver [../backend/README.md](../backend/README.md); necesita MySQL local, con `pnpm db:migrate` y `pnpm db:seed:dev` ya corridos). Los dos se levantan en paralelo y con puertos distintos para no chocar. Sin backend corriendo, las páginas que hacen fetch muestran la pantalla de error (`app/error.tsx`), no un crash.
 
-`.env.local` no se versiona; `.env.example` documenta cada variable (`BACKEND_URL`, `NEXT_PUBLIC_IMAGENES_HOST`). Mientras el backend no tenga R2 conectado, las fotos del catálogo se muestran como un marcador neutro (`MarcadorImagen`) en vez de romper `next/image`.
+`.env.local` no se versiona; `.env.example` documenta cada variable (`BACKEND_URL`, `NEXT_PUBLIC_IMAGENES_HOST`). En producción `BACKEND_URL` debe ser `https://`: si no, el servidor no arranca (excepción: `localhost` y `127.0.0.1`). Mientras el backend no tenga R2 conectado, las fotos del catálogo se muestran como un marcador neutro (`MarcadorImagen`) en vez de romper `next/image`.
 
 ## Scripts
 
@@ -34,6 +34,7 @@ En desarrollo el backend corre en `http://localhost:3001` (ver [../backend/READM
 | `pnpm build` / `pnpm start` | Compilación y servidor de producción |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | `next typegen` + `tsc --noEmit` |
+| `pnpm test` | Pruebas (`node --test`, sin dependencias): política CSP y cabeceras, destinos de retorno, validación de `BACKEND_URL`, renovación de la cookie de sesión, parámetros de la URL, mensajes de error del backend, resumen de textos y los cálculos del Dashboard (`src/lib/metricas/`) |
 
 ## Despliegue
 

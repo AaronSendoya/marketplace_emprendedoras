@@ -8,6 +8,7 @@ import {
   type EstadoFormularioProducto,
 } from "@/lib/admin/productos-acciones";
 import { obtenerMe } from "@/lib/api/auth";
+import type { ResultadoDeAccion } from "@/lib/errores/accion";
 import { refrescarNegocio } from "./refrescar";
 
 // Acciones del panel de la Emprendedora sobre sus propios productos: misma lógica que las del Admin
@@ -44,8 +45,9 @@ export async function reemplazarImagenProductoNegocioAction(
 }
 
 // Publicar u ocultar (`activo`): se llama directo desde el onConfirmar de un ConfirmModal.
-export async function cambiarEstadoProductoNegocioAction(productoId: string, activo: boolean): Promise<void> {
+export async function cambiarEstadoProductoNegocioAction(productoId: string, activo: boolean): Promise<ResultadoDeAccion> {
   const yo = await obtenerMe();
-  await cambiarEstadoProductoAction(productoId, activo, yo.id);
-  refrescarNegocio();
+  const resultado = await cambiarEstadoProductoAction(productoId, activo, yo.id);
+  if (!resultado.error) refrescarNegocio();
+  return resultado;
 }

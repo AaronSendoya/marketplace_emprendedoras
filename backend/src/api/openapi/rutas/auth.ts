@@ -100,6 +100,22 @@ export function registrarAuth(registro: OpenAPIRegistry): void {
   });
 
   registro.registerPath({
+    method: "post",
+    path: "/auth/logout",
+    tags: ["Autenticación"],
+    summary: "Cerrar sesión",
+    description:
+      "Cierra la sesión del token que hace la llamada: desde ese momento ese token deja de valer en el servidor, aunque " +
+      "alguien lo hubiera copiado antes. Las sesiones de la misma cuenta en otros dispositivos siguen abiertas; " +
+      "restablecer la contraseña las cierra todas. Cada inicio de sesión crea una sesión y un token nuevos (regla 5).",
+    security: AUTENTICADO,
+    responses: {
+      204: { description: "Sesión cerrada." },
+      ...respuestasDeError("NO_AUTENTICADO"),
+    },
+  });
+
+  registro.registerPath({
     method: "get",
     path: "/auth/me",
     tags: ["Autenticación"],

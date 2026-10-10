@@ -1,4 +1,6 @@
 import { MapPin } from "lucide-react";
+import type { Metadata } from "next";
+import { cache } from "react";
 import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -13,6 +15,7 @@ import { ErrorApi } from "@/lib/api/cliente";
 import { obtenerProducto } from "@/lib/api/productos";
 import { CLASES_FOCO_ENLACE, CONTENEDOR_PUBLICO } from "@/lib/estilos";
 import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
+import { resumirTexto } from "@/lib/formato/resumen";
 
 // Detalle de un producto (CLAUDE.md sección 6, regla 14): migas de pan, la foto (proporción 4:3, con la etiqueta de
 // descuento encima) y un panel con las etiquetas, el nombre, quién lo vende, el precio grande y los botones. El
@@ -20,12 +23,9 @@ import { esUrlDeImagenUsable } from "@/lib/formato/imagen";
 // a llamarse "Consultar precio". La foto y el panel de texto son lo que más pesa en la pintura (el LCP): la foto lleva
 // `priority` y ninguno de los dos se anima, porque una entrada con desvanecimiento retrasa ese texto unos 270 ms (medido,
 // regla 6).
-export default async function PaginaDetalleProducto({ params }: PageProps<"/productos/[id]">) {
-  const { id } = await params;
-
-  let producto;
+const cargarProducto = cache(async (id: string) => {
   try {
-    producto = await obtenerProducto(id);
+    return await obtenerProducto(id);
   } catch (error) {
     // Formato de id inválido (400, regla 17 backend) o producto inexistente (404): mismo
     // not-found.tsx de esta ruta. Cualquier otro error (backend caído, 500...) sigue de largo
@@ -35,6 +35,20 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
     }
     throw error;
   }
+});
+
+// Título y descripción propios de cada producto (antes todas las páginas de detalle se llamaban igual). El precio no entra en la
+// descripción: con el precio oculto no debe viajar (regla 7).
+export async function generateMetadata({ params }: PageProps<"/productos/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const producto = await cargarProducto(id);
+  const descripcion = producto.descripcion?.trim() || `Producto de ${producto.perfil.nombre_negocio}, en ${producto.perfil.ciudad.nombre}.`;
+  return { title: `${producto.nombre} — ${producto.perfil.nombre_negocio}`, description: resumirTexto(descripcion) };
+}
+
+export default async function PaginaDetalleProducto({ params }: PageProps<"/productos/[id]">) {
+  const { id } = await params;
+  const producto = await cargarProducto(id);
 
   const imagenUsable = esUrlDeImagenUsable(producto.imagen_url);
   const logoUsable = esUrlDeImagenUsable(producto.perfil.logo_url);
@@ -43,7 +57,8 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
     <main className={`mx-auto w-full ${CONTENEDOR_PUBLICO} flex-1 px-4 pb-16 sm:px-6 lg:px-8`}>
       <Migas items={[{ etiqueta: "Productos", href: "/productos" }, { etiqueta: producto.nombre }]} />
 
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start">
+      {/* `grid-cols-1`: ver el detalle de una emprendedora; sin ella la columna crecía más que un teléfono de 320 px. */}
+      <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start">
         <div className="relative aspect-[4/3] overflow-hidden rounded-superficie border border-borde bg-borde shadow-tarjeta">
           {imagenUsable ? (
             <ImagenR2
@@ -108,7 +123,7 @@ export default async function PaginaDetalleProducto({ params }: PageProps<"/prod
           </div>
 
           {producto.descripcion && (
-            <p className="font-cuerpo text-[0.9375rem] leading-relaxed whitespace-pre-line text-texto-secundario">{producto.descripcion}</p>
+            <p className="font-cuerpo text-[0.9375rem] leading-relaxed break-words whitespace-pre-line text-texto-secundario">{producto.descripcion}</p>
           )}
 
           <div className="grid gap-2.5 pt-1">

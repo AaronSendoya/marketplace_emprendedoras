@@ -51,6 +51,24 @@ describe("controlador de cuentas del Admin", () => {
     expect(JSON.stringify(cuerpo)).not.toContain("hash-secreto");
   });
 
+  it("listarUsuarios incluye el perfil de cada cuenta (o null si todavía no tiene)", async () => {
+    const usecase = {
+      ejecutar: async () => ({
+        datos: [
+          { ...conHash(), perfil: { id: "perfil-1", nombreNegocio: "Dulces de Ana" } },
+          { ...conHash({ id: "usuario-2" }), perfil: null },
+        ],
+        total: 2,
+      }),
+    } as unknown as ListUsuariosUseCase;
+
+    const cuerpo = await listarUsuarios(usecase, {}, { pagina: 1, limite: 10 }).then((r) => r.json());
+
+    expect(cuerpo.datos[0].perfil).toEqual({ id: "perfil-1", nombre_negocio: "Dulces de Ana" });
+    expect(cuerpo.datos[1].perfil).toBeNull();
+    expect(JSON.stringify(cuerpo)).not.toContain("hash-secreto");
+  });
+
   it("cambiarEstadoUsuario pasa los ids y el estado al caso de uso y responde la cuenta", async () => {
     let recibido: unknown[] = [];
     const usecase = {

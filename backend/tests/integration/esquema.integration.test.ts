@@ -418,6 +418,60 @@ describe("intentos_login (regla 17)", () => {
   });
 });
 
+describe("sesiones (regla 5, migración 0009)", () => {
+  it("una sesión de Emprendedora no vence (expira_en nulo) y creado_en toma la hora actual", async () => {
+    const usuarioId = await crearUsuario();
+    const id = await insertar("sesiones", { usuario_id: usuarioId });
+
+    const [filas] = await db.query<RowDataPacket[]>(
+      "SELECT expira_en, TIMESTAMPDIFF(SECOND, creado_en, UTC_TIMESTAMP(3)) AS segundos FROM sesiones WHERE id = ?",
+      [id],
+    );
+    expect(filas[0].expira_en).toBeNull();
+    expect(Math.abs(Number(filas[0].segundos))).toBeLessThan(5);
+  });
+
+  it("guarda la fecha de vencimiento de una sesión de Admin", async () => {
+    const usuarioId = await crearUsuario();
+    const vence = new Date("2030-01-01T04:00:00.000Z");
+    const id = await insertar("sesiones", { usuario_id: usuarioId, expira_en: vence });
+
+    const [filas] = await db.query<RowDataPacket[]>("SELECT expira_en FROM sesiones WHERE id = ?", [id]);
+    expect(new Date(filas[0].expira_en).getTime()).toBe(vence.getTime());
+  });
+
+  it("usuario_id es obligatorio y no tiene valor por defecto", async () => {
+    const error = await fallo(db.query("INSERT INTO sesiones (id) VALUES (?)", [randomUUID()]));
+
+    expect(error.errno).toBe(ERRNO.SIN_VALOR_POR_DEFECTO);
+    expect(columnaDeError(error)).toBe("usuario_id");
+  });
+
+  it("no admite una sesión de una cuenta que no existe", async () => {
+    const error = await fallo(insertar("sesiones", { usuario_id: randomUUID() }));
+
+    expect(error.errno).toBe(ERRNO.HIJO_SIN_PADRE);
+  });
+
+  it("una cuenta puede tener varias sesiones a la vez (varios dispositivos)", async () => {
+    const usuarioId = await crearUsuario();
+    for (let i = 0; i < 3; i++) await insertar("sesiones", { usuario_id: usuarioId });
+
+    const [[{ total }]] = await db.query<RowDataPacket[]>("SELECT COUNT(*) AS total FROM sesiones WHERE usuario_id = ?", [usuarioId]);
+    expect(Number(total)).toBe(3);
+  });
+
+  it("borrar la cuenta borra en cascada sus sesiones", async () => {
+    const usuarioId = await crearUsuario();
+    await insertar("sesiones", { usuario_id: usuarioId });
+
+    await db.query("DELETE FROM usuarios WHERE id = ?", [usuarioId]);
+
+    const [[{ total }]] = await db.query<RowDataPacket[]>("SELECT COUNT(*) AS total FROM sesiones WHERE usuario_id = ?", [usuarioId]);
+    expect(Number(total)).toBe(0);
+  });
+});
+
 describe("restricciones con mensaje propio (errorMySql)", () => {
   it("todas existen en la base con ese nombre", async () => {
     const { REGLAS_POR_RESTRICCION } = await import("../../src/shared/infrastructure/errorMySql");
@@ -430,7 +484,7 @@ describe("restricciones con mensaje propio (errorMySql)", () => {
   });
 });
 
-describe("índices explícitos (migraciones 0002, 0004, 0005 y 0007)", () => {
+describe("índices explícitos (migraciones 0002, 0004, 0005, 0007 y 0009)", () => {
   it("existen todos", async () => {
     const [filas] = await db.query<RowDataPacket[]>(
       "SELECT DISTINCT INDEX_NAME AS nombre FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND INDEX_NAME LIKE 'idx\\_%'",
@@ -445,6 +499,7 @@ describe("índices explícitos (migraciones 0002, 0004, 0005 y 0007)", () => {
       "idx_perfiles_rubro_id",
       "idx_producto_descuentos_descuento_id",
       "idx_productos_perfil_activo",
+      "idx_sesiones_usuario",
       "idx_usuarios_activo_creado_en",
     ]);
   });

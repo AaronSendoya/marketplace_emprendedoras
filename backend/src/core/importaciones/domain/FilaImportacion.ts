@@ -2,9 +2,10 @@ import { normalizarInstagram } from "@/core/perfiles/domain/Instagram";
 import { MAXIMO_OTRA_RED_SOCIAL } from "@/core/perfiles/domain/OtraRedSocial";
 import { normalizarWhatsapp } from "@/core/perfiles/domain/Whatsapp";
 import { ErrorValidacion } from "@/shared/domain/errors";
-import { AVISOS, type Aviso } from "./Avisos";
+import { AVISOS, type Aviso, type CampoDeImagen } from "./Avisos";
 import { resolverCiudad, resolverRubro, type Referencia } from "./CatalogoDeExcel";
 import type { ClaveColumna } from "./ColumnasExcel";
+import { interpretarEnlaceDeDrive } from "./EnlaceDrive";
 import { clasificarInstagram, clasificarOtraRed } from "./InstagramDeExcel";
 import { separarNombreCompleto } from "./NombreCompleto";
 
@@ -28,6 +29,10 @@ export interface DatosFila {
   // Usuario de Instagram sin arroba; vacío = sin Instagram.
   instagram: string;
   otraRedSocial: string;
+  // Id del archivo de Drive de la foto de perfil y del logo, sacado del enlace del Excel (regla 22, 2026-10-09). Vacío = sin imagen:
+  // queda la predeterminada (regla 11). Solo letras, números, guion y guion bajo (`ID_DE_DRIVE`): nunca una dirección.
+  fotoDriveId: string;
+  logoDriveId: string;
 }
 
 export interface ContextoCatalogos {
@@ -163,6 +168,16 @@ export function construirFila(celdas: CeldasDeFila, catalogos: ContextoCatalogos
     } else if (enlaceEnInstagram?.tipo === "otra_red_larga") avisos.push(AVISOS.otraRedLarga(enlaceEnInstagram.texto));
   }
 
+  // Fotos y logos: de cada enlace solo se toma el id. Un enlace que no sirve es una advertencia de la fila, no un error: la fila se importa
+  // igual y esa imagen queda como la predeterminada.
+  const idDeDrive = (campo: CampoDeImagen): string => {
+    const enlace = interpretarEnlaceDeDrive(texto(campo));
+    if (enlace.tipo === "archivo") return enlace.id;
+    if (enlace.tipo === "carpeta") avisos.push(AVISOS.imagenEsCarpeta(campo));
+    else if (enlace.tipo === "invalido") avisos.push(AVISOS.imagenEnlaceInvalido(campo, enlace.texto));
+    return "";
+  };
+
   const datos: DatosFila = {
     correo: normalizarCorreo(texto("correo")),
     nombres: nombre.nombres,
@@ -177,6 +192,8 @@ export function construirFila(celdas: CeldasDeFila, catalogos: ContextoCatalogos
     descripcion: texto("descripcion"),
     instagram,
     otraRedSocial,
+    fotoDriveId: idDeDrive("foto"),
+    logoDriveId: idDeDrive("logo"),
   };
 
   avisos.push(...validarDatosFila(datos, catalogos));

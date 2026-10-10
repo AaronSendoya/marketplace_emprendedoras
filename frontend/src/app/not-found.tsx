@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { clasesBoton } from "@/components/atoms/Button";
 
 // Cubre dos casos (docs/file-conventions/not-found.md): una URL que no coincide con ninguna
 // ruta, y cualquier notFound() de un segmento que no tenga su propio not-found.tsx.
+export const metadata: Metadata = { title: "Página no encontrada — Track de Mujeres" };
+
 export default function PaginaNoEncontrada() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">

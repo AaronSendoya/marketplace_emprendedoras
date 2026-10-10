@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { CLASES_FOCO_ENLACE } from "@/lib/estilos";
+import { periodoValido } from "@/lib/metricas/rango";
 
 function sumarDias(fecha: string, dias: number): string {
   const [anio, mes, dia] = fecha.split("-").map(Number);
@@ -32,7 +33,12 @@ interface PropsSelectorPeriodo {
   // calculara al renderizar, el servidor y el navegador podrían tener un "hoy" distinto y el HTML
   // no coincidiría al hidratar (el atajo activo cambiaría de uno a "Personalizado").
   hoy: string;
-  // El período que se está viendo, ya escrito ("6 sep – 5 oct 2026"), para que quede junto al control.
+  // El período que de verdad se está viendo (YYYY-MM-DD), el que resolvió la página: no el que dice la URL.
+  // Si la URL trae uno que el backend rechazaría, la página lo ignora y muestra los últimos 30 días; el
+  // selector debe marcar eso y no un «Personalizado» que no se está aplicando.
+  desde: string;
+  hasta: string;
+  // El mismo período ya escrito ("6 sep – 5 oct 2026"), para que quede junto al control.
   etiquetaRango: string;
 }
 
@@ -41,34 +47,30 @@ interface PropsSelectorPeriodo {
 // pedir resumen, ranking, serie y distribución por rubro con el rango elegido. Los atajos se
 // calculan con la fecha del navegador; quien valida e interpreta el rango como días de La Paz es
 // siempre el backend (regla 19), esto solo decide qué `desde`/`hasta` mandar.
-export function SelectorPeriodo({ hoy, etiquetaRango }: PropsSelectorPeriodo) {
+export function SelectorPeriodo({ hoy, desde, hasta, etiquetaRango }: PropsSelectorPeriodo) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const desde = searchParams.get("desde") ?? undefined;
-  const hasta = searchParams.get("hasta") ?? undefined;
 
-  const presetActivo =
-    !desde && !hasta
-      ? "30d"
-      : PRESETS.find((preset) => {
-          const calculado = preset.calcular(hoy);
-          return calculado.desde === desde && calculado.hasta === hasta;
-        })?.id;
+  // Sin `desde`/`hasta` en la URL el período son los últimos 30 días, que es justo el atajo «30 días».
+  const presetActivo = PRESETS.find((preset) => {
+    const calculado = preset.calcular(hoy);
+    return calculado.desde === desde && calculado.hasta === hasta;
+  })?.id;
 
   const [personalizarAbierto, setPersonalizarAbierto] = useState(!presetActivo);
-  const [desdeInput, setDesdeInput] = useState(desde ?? "");
-  const [hastaInput, setHastaInput] = useState(hasta ?? hoy);
+  const [desdeInput, setDesdeInput] = useState(desde);
+  const [hastaInput, setHastaInput] = useState(hasta);
 
-  // Si el rango de la URL cambia desde afuera (atrás/adelante del navegador, un enlace externo), el
-  // formulario personalizado se sincroniza durante el render (patrón "adjusting state when a prop
-  // changes" de React) en vez de un useEffect: evita un primer pintado con los valores viejos.
+  // Si el período cambia desde afuera (atrás/adelante del navegador, un enlace externo), el formulario
+  // personalizado se sincroniza durante el render (patrón "adjusting state when a prop changes" de
+  // React) en vez de un useEffect: evita un primer pintado con los valores viejos.
   const [rangoSincronizado, setRangoSincronizado] = useState({ desde, hasta });
   if (rangoSincronizado.desde !== desde || rangoSincronizado.hasta !== hasta) {
     setRangoSincronizado({ desde, hasta });
     setPersonalizarAbierto(!presetActivo);
-    setDesdeInput(desde ?? "");
-    setHastaInput(hasta ?? hoy);
+    setDesdeInput(desde);
+    setHastaInput(hasta);
   }
 
   function navegar(nuevoDesde: string | undefined, nuevoHasta: string | undefined) {
@@ -94,7 +96,11 @@ export function SelectorPeriodo({ hoy, etiquetaRango }: PropsSelectorPeriodo) {
     navegar(calculado.desde, calculado.hasta);
   }
 
-  const rangoInvalido = Boolean(desdeInput) && Boolean(hastaInput) && hastaInput < desdeInput;
+  // Con las dos fechas puestas, el período tiene que ser uno que el backend acepte (regla 19): "hasta" no
+  // anterior a "desde" y no más de 2 años. Si no, "Aplicar" queda desactivado y se dice por qué.
+  const hayRango = Boolean(desdeInput) && Boolean(hastaInput);
+  const rangoInvertido = hayRango && hastaInput < desdeInput;
+  const rangoDemasiadoLargo = hayRango && !rangoInvertido && !periodoValido(desdeInput, hastaInput);
 
   return (
     <div className="flex min-w-0 flex-col gap-3 sm:items-end">
@@ -138,10 +144,19 @@ export function SelectorPeriodo({ hoy, etiquetaRango }: PropsSelectorPeriodo) {
               className="w-auto"
             />
           </div>
-          <Button variante="secundario" disabled={!desdeInput || !hastaInput || rangoInvalido} onClick={() => navegar(desdeInput, hastaInput)}>
+          <Button variante="secundario" disabled={!hayRango || rangoInvertido || rangoDemasiadoLargo} onClick={() => navegar(desdeInput, hastaInput)}>
             Aplicar
           </Button>
-          {rangoInvalido && <p className="w-full font-cuerpo text-sm text-texto-secundario sm:text-right">“Hasta” debe ser igual o posterior a “desde”.</p>}
+          {rangoInvertido && (
+            <p role="alert" className="w-full font-cuerpo text-sm text-texto-secundario sm:text-right">
+              “Hasta” debe ser igual o posterior a “desde”.
+            </p>
+          )}
+          {rangoDemasiadoLargo && (
+            <p role="alert" className="w-full font-cuerpo text-sm text-texto-secundario sm:text-right">
+              El período no puede superar los 2 años.
+            </p>
+          )}
         </div>
       )}
     </div>

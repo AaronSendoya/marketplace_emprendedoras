@@ -4,7 +4,7 @@ import type { IGeneradorPlantilla } from "../domain/ILectorExcel";
 
 // Regla 22: el `.xlsx` de ejemplo que se descarga desde la pantalla de importación: los 14 encabezados tal como los trae el
 // formulario de Google Forms (con las columnas que la importación ignora) y dos filas inventadas (ninguna persona real) que
-// muestran el formato esperado. Se lee de vuelta por el mismo análisis, así que si cambia una columna, la plantilla cambia con ella.
+// muestran el formato esperado. Los enlaces de Drive de la foto y del logo son inventados: no abren ningún archivo. Se lee de vuelta por el mismo análisis, así que si cambia una columna, la plantilla cambia con ella.
 
 type FilaDeEjemplo = Record<ClaveColumna, string | number>;
 
@@ -20,6 +20,8 @@ const EJEMPLOS: FilaDeEjemplo[] = [
     rubro: "Alimentos y bebidas",
     instagram: "@dulcesdeana",
     otraRed: "https://www.facebook.com/dulcesdeana",
+    foto: "https://drive.google.com/open?id=EJEMPLO_foto_de_ana_perez_000000",
+    logo: "https://drive.google.com/open?id=EJEMPLO_logo_de_ana_perez_000000",
   },
   {
     correo: "lucia.vargas@ejemplo.com",
@@ -31,11 +33,14 @@ const EJEMPLOS: FilaDeEjemplo[] = [
     rubro: "Artesanías o productos hechos a mano",
     instagram: "No tengo",
     otraRed: "",
+    // Sin enlaces: el perfil quedará con las imágenes predeterminadas, sin ningún aviso.
+    foto: "",
+    logo: "",
   },
 ];
 
-// La marca temporal es lo único de las columnas que se ignoran que vale la pena mostrar; las demás (fotos, logo y beneficio) van
-// vacías para que quede claro que no se usan.
+// La marca temporal es lo único de las columnas que se ignoran que vale la pena mostrar; las del beneficio van vacías para que quede
+// claro que no se usan.
 const MARCAS_TEMPORALES = ["07/10/2026 14:32:10", "07/10/2026 15:05:41"];
 
 const ANCHOS: Record<ClaveColumna, number> = {
@@ -48,6 +53,8 @@ const ANCHOS: Record<ClaveColumna, number> = {
   rubro: 34,
   instagram: 26,
   otraRed: 30,
+  foto: 40,
+  logo: 40,
 };
 const ANCHO_DE_LAS_IGNORADAS = 22;
 

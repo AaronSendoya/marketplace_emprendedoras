@@ -33,6 +33,32 @@ const urlSinBarraFinal = z
   .url({ protocol: /^https?$/, error: "debe ser una URL http(s)" })
   .refine((valor) => !valor.endsWith("/"), "no debe terminar en barra");
 
+// Regla 17 (transporte cifrado): en producción las direcciones que el backend publica van por HTTPS. Misma excepción que la
+// regla de TLS hacia MySQL (opcionesMySql.ts): un host local, para probar el build de producción en el computador.
+const HOSTS_LOCALES = ["localhost", "127.0.0.1"];
+
+const esHttpsOLocal = (valor: string) => {
+  try {
+    const url = new URL(valor);
+    return url.protocol === "https:" || HOSTS_LOCALES.includes(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
+// 43 caracteres es lo que mide un secreto de 32 bytes en base64url (`randomBytes(32).toString("base64url")`); 16 caracteres
+// distintos descartan los valores repetidos o de ejemplo ("xxxx...", "cambia-esto-...").
+const JWT_SECRET_LONGITUD_PRODUCCION = 43;
+const JWT_SECRET_CARACTERES_DISTINTOS = 16;
+
+const sslSinVerificar = (cadena: string) => {
+  try {
+    return new URL(cadena).searchParams.get("ssl") === "no-verify";
+  } catch {
+    return false;
+  }
+};
+
 // Cadena mysql://usuario:clave@host:3306/base. El mensaje no incluye el valor recibido (puede
 // llevar la contraseña).
 const cadenaMySql = requerida().regex(
@@ -52,6 +78,10 @@ const R2_CLAVES = [
 const CLOUDFLARE_CLAVES = ["CLOUDFLARE_ZONE_ID", "CLOUDFLARE_API_TOKEN"] as const;
 
 const SMTP_CLAVES = ["EMAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"] as const;
+
+// Conexión con una cuenta de Google para importar las imágenes de Drive (regla 17 y regla 22, 2026-10-09). Van juntas o ninguna: sin
+// ellas la importación funciona como antes y no ofrece conectar Google.
+const GOOGLE_CLAVES = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"] as const;
 
 const envSchema = z
   .object({
@@ -85,6 +115,14 @@ const envSchema = z
 
     CLOUDFLARE_ZONE_ID: z.string().optional(),
     CLOUDFLARE_API_TOKEN: z.string().optional(),
+
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    // La dirección del frontend a la que Google devuelve a la persona (`/admin/google/callback`). Debe estar registrada en Google Cloud.
+    GOOGLE_REDIRECT_URI: z.url({ protocol: /^https?$/, error: "debe ser una URL http(s)" }).optional(),
+    // Solo desarrollo y pruebas: la dirección de un Google simulado que reemplaza a accounts.google.com, oauth2.googleapis.com y
+    // www.googleapis.com. Con APP_ENV=production es un error: la importación solo habla con los servidores de Google (regla 17).
+    GOOGLE_SIMULADO_URL: urlSinBarraFinal.optional(),
 
     EMAIL_DRIVER: z.enum(["console", "smtp"], { error: "debe ser console o smtp" }).default("console"),
     EMAIL_FROM: z.string().optional(),
@@ -120,6 +158,21 @@ const envSchema = z
       }
     }
 
+    // Configurada a medias, la conexión con Google no funcionaría y el error aparecería recién al usarla: se avisa al arrancar.
+    const googlePresentes = GOOGLE_CLAVES.filter((clave) => env[clave] !== undefined);
+    if (googlePresentes.length > 0 && googlePresentes.length < GOOGLE_CLAVES.length) {
+      for (const clave of GOOGLE_CLAVES.filter((c) => env[c] === undefined)) {
+        ctx.addIssue({ code: "custom", path: [clave], message: "es obligatoria (la conexión con Google se configura completa o no se configura)" });
+      }
+    }
+    if (env.GOOGLE_SIMULADO_URL !== undefined && env.APP_ENV === "production") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["GOOGLE_SIMULADO_URL"],
+        message: "no se admite con APP_ENV=production (en producción solo se habla con los servidores de Google)",
+      });
+    }
+
     // Swagger solo en desarrollo (regla 17): fuera de él, habilitarlo es un error de configuración.
     if (env.SWAGGER_ENABLED && env.APP_ENV !== "development") {
       ctx.addIssue({
@@ -127,6 +180,53 @@ const envSchema = z
         path: ["SWAGGER_ENABLED"],
         message: "solo puede ser true con APP_ENV=development (Swagger no se expone fuera de desarrollo)",
       });
+    }
+
+    // HTTPS de punta a punta (regla 17): un origen CORS con http:// en producción dejaría pasar tráfico con sesión sin cifrar, y
+    // una URL pública de R2 con http:// haría que las imágenes se carguen sin cifrar (o que el navegador las bloquee como
+    // contenido mixto). Los mensajes no incluyen el valor recibido.
+    if (env.APP_ENV === "production") {
+      if (!env.CORS_ALLOWED_ORIGINS.every(esHttpsOLocal)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["CORS_ALLOWED_ORIGINS"],
+          message: "en producción cada origen debe ser https:// (solo localhost y 127.0.0.1 pueden ser http://)",
+        });
+      }
+      if (env.R2_PUBLIC_URL !== undefined && !esHttpsOLocal(env.R2_PUBLIC_URL)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["R2_PUBLIC_URL"],
+          message: "en producción debe ser https:// (solo localhost y 127.0.0.1 pueden ser http://)",
+        });
+      }
+      if (env.GOOGLE_REDIRECT_URI !== undefined && !esHttpsOLocal(env.GOOGLE_REDIRECT_URI)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["GOOGLE_REDIRECT_URI"],
+          message: "en producción debe ser https:// (solo localhost y 127.0.0.1 pueden ser http://)",
+        });
+      }
+    }
+
+    // Regla 17 (secretos y transporte cifrado). En producción: (1) la cadena de la base no puede desactivar la verificación del
+    // certificado (?ssl=no-verify): sin verificarlo, el cifrado no protege de quien se interponga; (2) JWT_SECRET no puede ser un
+    // valor de ejemplo o repetido: quien lo conozca firma tokens de Admin. Los mensajes no incluyen el valor recibido.
+    if (env.APP_ENV === "production") {
+      if (sslSinVerificar(env.DATABASE_URL)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["DATABASE_URL"],
+          message: "en producción no admite ?ssl=no-verify: usa ?ssl=true para verificar el certificado de la base",
+        });
+      }
+      if (env.JWT_SECRET.length < JWT_SECRET_LONGITUD_PRODUCCION || new Set(env.JWT_SECRET).size < JWT_SECRET_CARACTERES_DISTINTOS) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["JWT_SECRET"],
+          message: `en producción debe tener al menos ${JWT_SECRET_LONGITUD_PRODUCCION} caracteres y ${JWT_SECRET_CARACTERES_DISTINTOS} distintos (genéralo con el comando de .env.example)`,
+        });
+      }
     }
 
     // El adaptador de consola escribiría los códigos OTP en los logs del servidor (regla 15).

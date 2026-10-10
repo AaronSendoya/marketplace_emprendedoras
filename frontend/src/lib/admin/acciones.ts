@@ -11,6 +11,11 @@ import {
   restablecerPasswordAdmin,
 } from "@/lib/api/admin";
 import { ErrorApi } from "@/lib/api/cliente";
+import { mensajeDeAccion } from "@/lib/errores/accion";
+import { registrarErrorDelServidor } from "@/lib/errores/registro";
+import { rutaDeRetorno } from "@/lib/seguridad/rutas";
+
+const RUTA_CUENTAS = "/admin";
 
 export interface CuentaCreada {
   nombreCompleto: string;
@@ -48,11 +53,8 @@ export async function crearCuentaAction(
   try {
     respuesta = await crearUsuario(datos);
   } catch (error) {
-    if (error instanceof ErrorApi) {
-      if (error.status === 409) return { error: "Ese correo ya tiene una cuenta." };
-      if (error.status === 400) return { error: error.message };
-    }
-    return { error: "No pudimos crear la cuenta. Intenta de nuevo." };
+    if (error instanceof ErrorApi && error.status === 409) return { error: "Ese correo ya tiene una cuenta." };
+    return { error: mensajeDeAccion("crearCuentaAction", error, "No pudimos crear la cuenta. Intenta de nuevo.") };
   }
 
   revalidatePath("/admin");
@@ -72,9 +74,12 @@ export async function crearCuentaAction(
 export async function cambiarEstadoAction(id: string, activo: boolean, volverA: string): Promise<void> {
   try {
     await cambiarEstadoUsuario(id, activo);
-  } catch {
-    const separador = volverA.includes("?") ? "&" : "?";
-    redirect(`${volverA}${separador}error=estado`);
+  } catch (error) {
+    registrarErrorDelServidor("cambiarEstadoAction", error);
+    // `volverA` llega del navegador: solo se usa si es una ruta del propio panel (rutaDeRetorno), nunca una dirección externa.
+    const destino = rutaDeRetorno(volverA, RUTA_CUENTAS);
+    const separador = destino.includes("?") ? "&" : "?";
+    redirect(`${destino}${separador}error=estado`);
   }
   revalidatePath("/admin");
 }
@@ -102,7 +107,7 @@ export async function eliminarCuentaAction(usuarioId: string, confirmacionEmail:
       // 403 y 409 traen su motivo en español (cuenta suspendida, de Admin, la propia, o que cambió mientras se eliminaba).
       if (error.status === 403 || error.status === 409) return { error: error.message };
     }
-    return { error: "No pudimos eliminar la cuenta. Intenta de nuevo." };
+    return { error: mensajeDeAccion("eliminarCuentaAction", error, "No pudimos eliminar la cuenta. Intenta de nuevo.") };
   }
 
   revalidatePath("/admin");
@@ -110,9 +115,10 @@ export async function eliminarCuentaAction(usuarioId: string, confirmacionEmail:
   for (const ruta of ["/", "/emprendedoras", "/productos", "/promociones"]) revalidatePath(ruta);
   revalidatePath("/emprendedoras/[id]", "page");
   revalidatePath("/productos/[id]", "page");
-  const separador = volverA.includes("?") ? "&" : "?";
+  const destino = rutaDeRetorno(volverA, RUTA_CUENTAS);
+  const separador = destino.includes("?") ? "&" : "?";
   redirect(
-    `${volverA}${separador}eliminada=1&p=${eliminado.perfiles}&pr=${eliminado.productos}&d=${eliminado.descuentos}&c=${eliminado.clics}&i=${eliminado.imagenes}`,
+    `${destino}${separador}eliminada=1&p=${eliminado.perfiles}&pr=${eliminado.productos}&d=${eliminado.descuentos}&c=${eliminado.clics}&i=${eliminado.imagenes}`,
   );
 }
 
@@ -145,11 +151,8 @@ export async function editarCuentaAction(
       apellido_materno: apellidoMaterno || null,
     });
   } catch (error) {
-    if (error instanceof ErrorApi) {
-      if (error.status === 409) return { error: "Ese correo ya tiene otra cuenta." };
-      if (error.status === 400) return { error: error.message };
-    }
-    return { error: "No pudimos guardar los cambios. Intenta de nuevo." };
+    if (error instanceof ErrorApi && error.status === 409) return { error: "Ese correo ya tiene otra cuenta." };
+    return { error: mensajeDeAccion("editarCuentaAction", error, "No pudimos guardar los cambios. Intenta de nuevo.") };
   }
 
   revalidatePath("/admin");
@@ -175,8 +178,7 @@ export async function restablecerPasswordAction(
   try {
     respuesta = await restablecerPasswordAdmin(usuarioId, password || undefined);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos restablecer la contraseña. Intenta de nuevo." };
+    return { error: mensajeDeAccion("restablecerPasswordAction", error, "No pudimos restablecer la contraseña. Intenta de nuevo.") };
   }
 
   revalidatePath("/admin");

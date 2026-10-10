@@ -81,8 +81,16 @@ describe("manejarCors", () => {
     }
   });
 
-  it.each(["/api/v1/auth/login", "/api/v1/auth/password/restablecer", "/api/v1/admin/usuarios", "/api/v1/admin/usuarios/abc/estado"])(
-    "agrega Cache-Control: no-store en las rutas de autenticación y de Admin (%s)",
+  it.each([
+    "/api/v1/auth/login",
+    "/api/v1/auth/password/restablecer",
+    "/api/v1/admin/usuarios",
+    "/api/v1/admin/usuarios/abc/estado",
+    "/api/v1/mis/productos",
+    "/api/v1/mis/perfil",
+    "/api/v1/mis/descuentos",
+  ])(
+    "agrega Cache-Control: no-store en las rutas de autenticación, de Admin y de «mis» datos (%s)",
     (ruta) => {
       const respuesta = manejarCors(peticion(ruta), [FRONTEND]);
 
@@ -90,7 +98,7 @@ describe("manejarCors", () => {
     },
   );
 
-  it.each(["/api/v1/health", "/api/v1/administrador", "/api/v1/authx"])("no agrega Cache-Control en %s", (ruta) => {
+  it.each(["/api/v1/health", "/api/v1/administrador", "/api/v1/authx", "/api/v1/misterio", "/api/v1/marketplace/productos"])("no agrega Cache-Control en %s", (ruta) => {
     const respuesta = manejarCors(peticion(ruta), [FRONTEND]);
 
     expect(respuesta.headers.get("Cache-Control")).toBeNull();

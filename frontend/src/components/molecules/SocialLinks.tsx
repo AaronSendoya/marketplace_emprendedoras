@@ -144,7 +144,8 @@ export function SocialLinks({ perfilId, whatsapp, instagramUsername, otraRedSoci
             <Logo clave={c.clave} className="h-4 w-4" />
           </span>
         )}
-        <span className="truncate">{texto}</span>
+        {/* `min-w-0`: sin él, el texto largo de un contacto (`Instagram @usuario`) no se acorta y ensancha el botón más que su panel en un teléfono de 320 px. */}
+        <span className="min-w-0 truncate">{texto}</span>
       </>,
     );
 
@@ -160,7 +161,7 @@ export function SocialLinks({ perfilId, whatsapp, instagramUsername, otraRedSoci
   }
 
   return (
-    <ul className={`grid gap-2.5 ${className}`.trim()}>
+    <ul className={`grid grid-cols-1 gap-2.5 ${className}`.trim()}>
       {contactos.map((c) => {
         const texto = c.clave === "whatsapp" ? "Escribir por WhatsApp" : c.clave === "instagram" ? `Instagram ${c.texto}` : c.clave === "web" ? "Sitio web" : `Ver en ${c.texto}`;
         return <li key={c.clave}>{boton(c, "w-full", texto)}</li>;

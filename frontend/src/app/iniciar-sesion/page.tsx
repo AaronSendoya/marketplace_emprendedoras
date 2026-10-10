@@ -43,7 +43,17 @@ export default function PaginaIniciarSesion() {
       </div>
 
       <div className="hidden flex-1 flex-col items-center justify-center gap-6 bg-fondo-profundo p-12 lg:flex">
-        <Image src="/Portada 1.png" alt="" width={2732} height={590} className="w-full max-w-xl rounded-xl" />
+        {/* Es lo más grande de la pantalla en escritorio (el LCP): `loading="eager"` y un `sizes` que pide el tamaño que
+            de verdad se ve (36 rem), no la tira de 2732 px. Debajo de `lg` el contenedor está oculto. */}
+        <Image
+          src="/Portada 1.png"
+          alt=""
+          width={2732}
+          height={590}
+          loading="eager"
+          sizes="(min-width: 1024px) 36rem, 1px"
+          className="w-full max-w-xl rounded-xl"
+        />
         <p className="max-w-md text-center font-cuerpo text-sm text-texto-secundario">
           Una comunidad de emprendedoras que impulsa sus negocios en todo el país.
         </p>

@@ -25,6 +25,8 @@ describe("construirFila: una fila completa y limpia", () => {
       descripcion: "Postres caseros y tortas por encargo.",
       instagram: "dulcesdeana",
       otraRedSocial: "",
+      fotoDriveId: "",
+      logoDriveId: "",
     });
   });
 

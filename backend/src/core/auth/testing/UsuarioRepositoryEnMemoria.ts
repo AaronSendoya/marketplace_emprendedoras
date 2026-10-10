@@ -1,10 +1,13 @@
 import { desplazamiento, type Pagina, type ParametrosPagina } from "@/shared/domain/Paginacion";
 import { ErrorConflicto } from "@/shared/domain/errors";
 import type { IUsuarioRepository } from "../domain/IUsuarioRepository";
-import type { CambiosUsuario, FiltrosUsuarios, NuevoUsuario, Usuario, UsuarioAutenticado } from "../domain/Usuario";
+import type { CambiosUsuario, FiltrosUsuarios, NuevoUsuario, Usuario, UsuarioConPerfil } from "../domain/Usuario";
 
 // Doble de prueba: replica lo que hace el SQL real (token_version, correo verificado, correo único).
 export class UsuarioRepositoryEnMemoria implements IUsuarioRepository {
+  // Perfiles por id de cuenta (`{ id, nombreNegocio }`), para probar el listado con y sin perfil.
+  readonly perfiles = new Map<string, { id: string; nombreNegocio: string }>();
+
   constructor(readonly usuarios: Usuario[] = []) {}
 
   async buscarPorEmail(email: string) {
@@ -22,16 +25,20 @@ export class UsuarioRepositoryEnMemoria implements IUsuarioRepository {
     return { ...usuario };
   }
 
-  async listar(filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Pagina<UsuarioAutenticado>> {
+  async listar(filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Pagina<UsuarioConPerfil>> {
     const q = filtros.q?.toLowerCase();
     const filtrados = this.usuarios.filter((u) => {
       if (filtros.activo !== undefined && u.activo !== filtros.activo) return false;
+      if (filtros.rol !== undefined && u.rol !== filtros.rol) return false;
+      if (filtros.conPerfil !== undefined && this.perfiles.has(u.id) !== filtros.conPerfil) return false;
       if (q && ![u.nombres, u.apellidoPaterno, u.apellidoMaterno, u.email].some((campo) => campo?.toLowerCase().includes(q))) return false;
       return true;
     });
     const recientes = filtrados.sort((a, b) => b.creadoEn.getTime() - a.creadoEn.getTime());
     // El real no trae el hash; el doble devuelve el usuario entero y el serializador lo omite igual.
-    const datos = recientes.slice(desplazamiento(pagina), desplazamiento(pagina) + pagina.limite);
+    const datos = recientes
+      .slice(desplazamiento(pagina), desplazamiento(pagina) + pagina.limite)
+      .map((u) => ({ ...u, perfil: this.perfiles.get(u.id) ?? null }));
     return { datos, total: filtrados.length };
   }
 

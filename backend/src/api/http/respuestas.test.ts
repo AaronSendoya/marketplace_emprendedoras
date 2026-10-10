@@ -42,6 +42,28 @@ describe("respuestaDeError", () => {
     expect((await respuestaDeError(new ErrorConflicto("x"), logger).json()).error).not.toHaveProperty("detalles");
   });
 
+  it("una base de datos fuera de alcance responde 503 con Retry-After y sin el motivo real", async () => {
+    const registrado: string[] = [];
+    const loggerConAviso: ILogger = { info: () => {}, error: () => {}, warn: (evento) => registrado.push(evento) };
+    const error = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:3306 (usuario=root)"), { code: "ECONNREFUSED" });
+
+    const respuesta = respuestaDeError(error, loggerConAviso);
+    const texto = await respuesta.text();
+
+    expect(respuesta.status).toBe(503);
+    expect(respuesta.headers.get("Retry-After")).toBe("5");
+    expect(JSON.parse(texto).error).toEqual({ codigo: "ERROR_INTERNO", mensaje: "El servicio no está disponible por el momento. Inténtalo de nuevo en unos minutos." });
+    expect(texto).not.toMatch(/ECONNREFUSED|127\.0\.0\.1|root/);
+    expect(registrado).toEqual(["servicio_no_disponible"]);
+  });
+
+  it("un error de la consulta (no de conexión) sigue siendo un 500 sin Retry-After", async () => {
+    const respuesta = respuestaDeError(Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" }), logger);
+
+    expect(respuesta.status).toBe(500);
+    expect(respuesta.headers.has("Retry-After")).toBe(false);
+  });
+
   it("agrega Retry-After cuando se conoce el tiempo de espera", () => {
     expect(respuestaDeError(new ErrorDemasiadasSolicitudes("x", 60), logger).headers.get("Retry-After")).toBe("60");
     expect(respuestaDeError(new ErrorDemasiadasSolicitudes(), logger).headers.has("Retry-After")).toBe(false);

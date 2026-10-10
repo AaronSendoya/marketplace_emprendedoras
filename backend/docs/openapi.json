@@ -316,7 +316,7 @@
           "datos": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Usuario"
+              "$ref": "#/components/schemas/UsuarioDelListado"
             }
           },
           "paginacion": {
@@ -326,6 +326,97 @@
         "required": [
           "datos",
           "paginacion"
+        ]
+      },
+      "UsuarioDelListado": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f7d3b6a-1111-4a2b-8c3d-9e0f1a2b3c4d"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "admin@gmail.com"
+          },
+          "nombres": {
+            "type": "string",
+            "example": "Administrador"
+          },
+          "apellido_paterno": {
+            "type": "string",
+            "example": "General"
+          },
+          "apellido_materno": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": null
+          },
+          "nombre_completo": {
+            "type": "string",
+            "description": "Derivado; no se guarda en la base (regla 10).",
+            "example": "Administrador General"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "Admin",
+              "Emprendedor"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "email_verificado_en": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "perfil": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Id del perfil."
+              },
+              "nombre_negocio": {
+                "type": "string",
+                "description": "Nombre del emprendimiento.",
+                "example": "Dulces de Ana"
+              }
+            },
+            "required": [
+              "id",
+              "nombre_negocio"
+            ],
+            "description": "Su perfil de emprendedora; `null` si todavía no lo tiene."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "nombres",
+          "apellido_paterno",
+          "apellido_materno",
+          "nombre_completo",
+          "rol",
+          "activo",
+          "email_verificado_en",
+          "creado_en",
+          "perfil"
         ]
       },
       "CuentaEliminada": {
@@ -1180,7 +1271,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Encabezados que se ignoran a propósito (fotos, logo, marca temporal y el beneficio, que no se registra)."
+                "description": "Encabezados que se ignoran a propósito (marca temporal y el beneficio, que no se registra)."
               },
               "opcionales_ausentes": {
                 "type": "array",
@@ -1392,6 +1483,12 @@
           },
           "otra_red_social": {
             "type": "string"
+          },
+          "foto_drive_id": {
+            "type": "string"
+          },
+          "logo_drive_id": {
+            "type": "string"
           }
         },
         "required": [
@@ -1407,7 +1504,9 @@
           "nombre_negocio",
           "descripcion",
           "instagram",
-          "otra_red_social"
+          "otra_red_social",
+          "foto_drive_id",
+          "logo_drive_id"
         ]
       },
       "AvisoImportacion": {
@@ -1519,6 +1618,14 @@
                 "perfil_creado": {
                   "type": "boolean"
                 },
+                "foto_cargada": {
+                  "type": "boolean",
+                  "description": "La foto salió de Drive; si no, el perfil tiene la imagen predeterminada (regla 11)."
+                },
+                "logo_cargado": {
+                  "type": "boolean",
+                  "description": "El logo salió de Drive; si no, el perfil tiene la imagen predeterminada (regla 11)."
+                },
                 "password_temporal": {
                   "type": [
                     "string",
@@ -1545,6 +1652,8 @@
                 "estado",
                 "cuenta_creada",
                 "perfil_creado",
+                "foto_cargada",
+                "logo_cargado",
                 "password_temporal",
                 "avisos",
                 "mensaje"
@@ -1554,6 +1663,161 @@
         },
         "required": [
           "resultados"
+        ]
+      },
+      "VerificacionImagenes": {
+        "type": "object",
+        "properties": {
+          "conexion": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "sin_conexion",
+              "vencida"
+            ],
+            "description": "`sin_conexion`: no llegó el token de Google; `vencida`: Google lo rechazó (hay que volver a conectar)."
+          },
+          "cuenta": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "El correo de la cuenta conectada."
+          },
+          "filas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fila": {
+                  "type": "integer"
+                },
+                "foto": {
+                  "type": "object",
+                  "properties": {
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "sin_imagen",
+                        "ok",
+                        "problema",
+                        "sin_comprobar"
+                      ],
+                      "description": "`sin_imagen`: la fila no trae enlace; `ok`: se puede cargar; `problema`: el aviso dice por qué no; `sin_comprobar`: no hay conexión con Google."
+                    },
+                    "aviso": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AvisoImportacion"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "estado",
+                    "aviso"
+                  ]
+                },
+                "logo": {
+                  "type": "object",
+                  "properties": {
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "sin_imagen",
+                        "ok",
+                        "problema",
+                        "sin_comprobar"
+                      ],
+                      "description": "`sin_imagen`: la fila no trae enlace; `ok`: se puede cargar; `problema`: el aviso dice por qué no; `sin_comprobar`: no hay conexión con Google."
+                    },
+                    "aviso": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AvisoImportacion"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "estado",
+                    "aviso"
+                  ]
+                }
+              },
+              "required": [
+                "fila",
+                "foto",
+                "logo"
+              ]
+            }
+          }
+        },
+        "required": [
+          "conexion",
+          "cuenta",
+          "filas"
+        ]
+      },
+      "EstadoGoogle": {
+        "type": "object",
+        "properties": {
+          "disponible": {
+            "type": "boolean",
+            "description": "`false` si el servidor no tiene las variables `GOOGLE_*`: el importador funciona sin imágenes de Drive."
+          }
+        },
+        "required": [
+          "disponible"
+        ]
+      },
+      "UrlGoogle": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "La dirección de Google a la que se manda a la persona para elegir su cuenta."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "ConexionGoogle": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Token de acceso de solo lectura de Drive. Vale una hora y no se guarda en el servidor."
+          },
+          "expira_en": {
+            "type": "integer",
+            "description": "Segundos que le quedan al token (máximo 3600)."
+          },
+          "cuenta": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "El correo de la cuenta conectada, para que el Admin vea con cuál trabaja."
+          }
+        },
+        "required": [
+          "access_token",
+          "expira_en",
+          "cuenta"
         ]
       }
     },
@@ -1731,6 +1995,35 @@
           },
           "429": {
             "description": "Demasiadas solicitudes; revisa la cabecera Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Cerrar sesión",
+        "description": "Cierra la sesión del token que hace la llamada: desde ese momento ese token deja de valer en el servidor, aunque alguien lo hubiera copiado antes. Las sesiones de la misma cuenta en otros dispositivos siguen abiertas; restablecer la contraseña las cierra todas. Cada inicio de sesión crea una sesión y un token nuevos (regla 5).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sesión cerrada."
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2193,7 +2486,7 @@
           "Admin"
         ],
         "summary": "Listar cuentas",
-        "description": "Todas las cuentas (Admin y Emprendedor), las más recientes primero. Paginado; admite buscar por texto libre (`q`, sobre nombres, apellidos y correo, sin distinguir mayúsculas) y filtrar por estado (`estado`).",
+        "description": "Todas las cuentas (Admin y Emprendedor), las más recientes primero. Paginado; admite buscar por texto libre (`q`, sobre nombres, apellidos y correo, sin distinguir mayúsculas) y filtrar por estado (`estado`), por rol (`rol`) y por si ya tienen perfil (`perfil`). Cada cuenta trae su perfil (`id` y `nombre_negocio`, o `null`). El `total` cuenta solo lo filtrado.",
         "security": [
           {
             "bearerAuth": []
@@ -2246,6 +2539,34 @@
             "required": false,
             "description": "Filtra por estado de la cuenta.",
             "name": "estado",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Admin",
+                "Emprendedor"
+              ],
+              "description": "Solo las cuentas de ese rol (regla 18: Emprendimientos pide `Emprendedor`)."
+            },
+            "required": false,
+            "description": "Solo las cuentas de ese rol (regla 18: Emprendimientos pide `Emprendedor`).",
+            "name": "rol",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "con",
+                "sin"
+              ],
+              "description": "Solo las cuentas que ya tienen perfil (`con`) o que todavía no (`sin`)."
+            },
+            "required": false,
+            "description": "Solo las cuentas que ya tienen perfil (`con`) o que todavía no (`sin`).",
+            "name": "perfil",
             "in": "query"
           }
         ],
@@ -5731,7 +6052,7 @@
           "Importaciones"
         ],
         "summary": "Analizar el Excel de emprendedoras (no escribe nada)",
-        "description": "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, 500 filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden; el archivo se acepta aunque le falten columnas (se avisa cuáles) siempre que se reconozcan al menos 4. Las columnas de fotos, logo y beneficio se ignoran. No crea nada. El archivo no se guarda.",
+        "description": "Solo Admin (regla 22). `multipart/form-data` con el campo `archivo`: un `.xlsx` sin macros de hasta 2 MB, 500 filas y 20 MB descomprimidos. Devuelve cada fila normalizada, con su estado y sus avisos, para la vista previa. Los encabezados se reconocen por su texto, en la fila 1, sin importar el orden; el archivo se acepta aunque le falten columnas (se avisa cuáles) siempre que se reconozcan al menos 4. Las columnas de foto y logo son enlaces de Drive: de cada uno se devuelve el id del archivo (`foto_drive_id`, `logo_drive_id`) y un enlace que no sirve es una advertencia de la fila. La marca temporal y el beneficio se ignoran. No crea nada. El archivo no se guarda.",
         "security": [
           {
             "bearerAuth": []
@@ -5898,6 +6219,20 @@
                             "otra_red_social": {
                               "type": "string",
                               "maxLength": 300
+                            },
+                            "foto_drive_id": {
+                              "type": "string",
+                              "maxLength": 128,
+                              "pattern": "^[A-Za-z0-9_-]*$",
+                              "default": "",
+                              "description": "Id del archivo de Drive de la foto de perfil, sacado del enlace del Excel. Vacío si la fila no trae foto."
+                            },
+                            "logo_drive_id": {
+                              "type": "string",
+                              "maxLength": 128,
+                              "pattern": "^[A-Za-z0-9_-]*$",
+                              "default": "",
+                              "description": "Id del archivo de Drive del logo. Vacío si la fila no trae logo."
                             }
                           },
                           "required": [
@@ -5984,10 +6319,22 @@
           "Importaciones"
         ],
         "summary": "Importar emprendedoras",
-        "description": "Solo Admin (regla 22). Hasta 10 filas por petición. Por cada fila crea la cuenta (rol Emprendedor, correo sin verificar, contraseña temporal aleatoria), el perfil con las imágenes predeterminadas (regla 11); no crea descuentos. Vuelve a validar todo: la vista previa no se da por buena. Una cuenta cuyo correo ya existe se omite. Una fila que falla no detiene a las demás. La contraseña temporal solo sale en esta respuesta.",
+        "description": "Solo Admin (regla 22). Hasta 10 filas por petición. Por cada fila crea la cuenta (rol Emprendedor, correo sin verificar, contraseña temporal aleatoria) y el perfil; no crea descuentos. Con la cabecera `X-Google-Access-Token` descarga de Drive la foto y el logo de cada fila (regla 22; con imágenes, hasta 5 filas por petición) y los procesa como cualquier imagen (regla 16, con hasta 20 MB de entrada). Una imagen que falla deja la predeterminada (regla 11) y un aviso en la fila: nunca la detiene. Si Google rechaza el token, 409 con el campo `google` y no se crea nada. Vuelve a validar todo: la vista previa no se da por buena. Una cuenta cuyo correo ya existe se omite. Una fila que falla no detiene a las demás. La contraseña temporal solo sale en esta respuesta.",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "El token de la cuenta de Google conectada (regla 17). Sin él, las imágenes quedan predeterminadas. Nunca se registra ni se guarda."
+            },
+            "required": false,
+            "description": "El token de la cuenta de Google conectada (regla 17). Sin él, las imágenes quedan predeterminadas. Nunca se registra ni se guarda.",
+            "name": "x-google-access-token",
+            "in": "header"
           }
         ],
         "requestBody": {
@@ -6066,6 +6413,20 @@
                             "otra_red_social": {
                               "type": "string",
                               "maxLength": 300
+                            },
+                            "foto_drive_id": {
+                              "type": "string",
+                              "maxLength": 128,
+                              "pattern": "^[A-Za-z0-9_-]*$",
+                              "default": "",
+                              "description": "Id del archivo de Drive de la foto de perfil, sacado del enlace del Excel. Vacío si la fila no trae foto."
+                            },
+                            "logo_drive_id": {
+                              "type": "string",
+                              "maxLength": 128,
+                              "pattern": "^[A-Za-z0-9_-]*$",
+                              "default": "",
+                              "description": "Id del archivo de Drive del logo. Vacío si la fila no trae logo."
                             }
                           },
                           "required": [
@@ -6142,6 +6503,132 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/importaciones/emprendedoras/imagenes/verificar": {
+      "post": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Comprobar en Drive las fotos y logos de la vista previa (no escribe nada)",
+        "description": "Solo Admin (regla 22). Hasta 25 filas. Con la cuenta de Google conectada (cabecera `X-Google-Access-Token`), consulta en Drive los metadatos de cada archivo (no descarga nada) y dice, por fila, si la foto y el logo se pueden cargar. Un problema (sin acceso, no es una imagen JPG, PNG o WebP, pesa más de 20 MB, no se pudo comprobar) es una advertencia con su mensaje, nunca un error. Sin token responde `conexion: sin_conexion`; con un token que Google rechaza, `conexion: vencida`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "El token de la cuenta de Google conectada (regla 17). Sin él, las imágenes quedan predeterminadas. Nunca se registra ni se guarda."
+            },
+            "required": false,
+            "description": "El token de la cuenta de Google conectada (regla 17). Sin él, las imágenes quedan predeterminadas. Nunca se registra ni se guarda.",
+            "name": "x-google-access-token",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filas": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "fila": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1048576
+                        },
+                        "foto_drive_id": {
+                          "type": "string",
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9_-]*$",
+                          "default": "",
+                          "description": "Id del archivo de Drive de la foto; vacío si no trae."
+                        },
+                        "logo_drive_id": {
+                          "type": "string",
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9_-]*$",
+                          "default": "",
+                          "description": "Id del archivo de Drive del logo; vacío si no trae."
+                        }
+                      },
+                      "required": [
+                        "fila"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 25
+                  }
+                },
+                "required": [
+                  "filas"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estado de la foto y del logo de cada fila.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificacionImagenes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -6182,6 +6669,234 @@
           },
           "403": {
             "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/google/estado": {
+      "get": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "¿Está configurada la conexión con Google?",
+        "description": "Solo Admin (regla 22). Dice si el servidor tiene configurada la conexión con Google (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_REDIRECT_URI`). Sin ella, el importador no ofrece conectar.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado de la configuración.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoGoogle"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/google/autorizacion": {
+      "get": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Dirección de Google para conectar una cuenta",
+        "description": "Solo Admin (regla 17). Arma la dirección de autorización de Google (permiso `drive.readonly`, sin acceso sin conexión, eligiendo la cuenta) con el `state` y el desafío PKCE que generó el frontend. La dirección a la que Google devuelve a la persona sale de la configuración del servidor, nunca de la petición. `409` si Google no está configurado.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._~-]{16,128}$",
+              "description": "Valor aleatorio que el frontend vuelve a comprobar al regresar de Google (contra la falsificación de peticiones)."
+            },
+            "required": true,
+            "description": "Valor aleatorio que el frontend vuelve a comprobar al regresar de Google (contra la falsificación de peticiones).",
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43,128}$",
+              "description": "Desafío PKCE (S256) del verificador que el frontend guarda; Google solo lo canjea con ese verificador."
+            },
+            "required": true,
+            "description": "Desafío PKCE (S256) del verificador que el frontend guarda; Google solo lo canjea con ese verificador.",
+            "name": "code_challenge",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dirección de autorización.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UrlGoogle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/google/conexion": {
+      "post": {
+        "tags": [
+          "Importaciones"
+        ],
+        "summary": "Cambiar el código de Google por un token de lectura",
+        "description": "Solo Admin (regla 17). Cambia el código de autorización por un token de acceso de solo lectura que vale una hora, y devuelve también el correo de la cuenta. No guarda nada: el token solo vive en la cookie `httpOnly` del frontend y vuelve en la cabecera `X-Google-Access-Token` de las peticiones del importador. La respuesta no se guarda en caché. Si Google rechaza el código, `400` con un mensaje genérico (nunca el de Google).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "codigo": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._~/+=-]{10,2048}$",
+                    "description": "El código de autorización que devolvió Google."
+                  },
+                  "code_verifier": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+                    "description": "El verificador PKCE cuyo desafío se mandó a Google."
+                  }
+                },
+                "required": [
+                  "codigo",
+                  "code_verifier"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cuenta conectada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConexionGoogle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tienes permiso para esta acción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operación entra en conflicto con el estado actual.",
             "content": {
               "application/json": {
                 "schema": {

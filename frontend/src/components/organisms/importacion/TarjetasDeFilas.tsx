@@ -6,6 +6,7 @@ import type { ReferenciaCatalogo } from "@/lib/api/tipos";
 import { esEditable, esImportable, nombreCompleto, type AccionFilas, type FilaEditable } from "@/lib/importacion/filas";
 import { AvisosDeFila } from "./AvisosDeFila";
 import { CampoDeLista, CampoDeTexto } from "./CamposDeFila";
+import { EstadoDeImagenes } from "./EstadoDeImagenes";
 import { InsigniaDeEstado } from "./InsigniaDeEstado";
 
 interface PropsTarjeta {
@@ -72,6 +73,8 @@ const TarjetaDeFila = memo(function TarjetaDeFila({ fila, ciudades, rubros, disp
         <dt className="text-xs text-texto-secundario">Descripción</dt>
         <dd className="line-clamp-3 break-words">{datos.descripcion || <span className="text-error">Falta</span>}</dd>
       </dl>
+
+      <EstadoDeImagenes fila={fila} />
 
       {fila.revisando && (
         <p role="status" className="flex items-center gap-1.5 font-cuerpo text-xs text-texto-secundario">

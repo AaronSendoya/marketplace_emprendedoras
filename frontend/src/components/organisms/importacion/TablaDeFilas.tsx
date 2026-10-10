@@ -6,6 +6,7 @@ import type { ReferenciaCatalogo } from "@/lib/api/tipos";
 import { esEditable, esImportable, type AccionFilas, type FilaEditable } from "@/lib/importacion/filas";
 import { AvisosDeFila } from "./AvisosDeFila";
 import { CampoDeLista, CampoDeTexto } from "./CamposDeFila";
+import { EstadoDeImagenes } from "./EstadoDeImagenes";
 import { InsigniaDeEstado } from "./InsigniaDeEstado";
 
 interface PropsFila {
@@ -88,6 +89,7 @@ const FilaDeTabla = memo(function FilaDeTabla({ fila, ciudades, rubros, dispatch
             <CampoDeTexto fila={fila} campo="nombre_negocio" etiqueta="Emprendimiento" dispatch={dispatch} visible />
             <CampoDeTexto fila={fila} campo="descripcion" etiqueta="Descripción" dispatch={dispatch} visible multilinea filas={2} />
           </div>
+          <EstadoDeImagenes fila={fila} />
           <AvisosDeFila avisos={fila.avisos} id={idDeAvisos} />
         </td>
       </tr>

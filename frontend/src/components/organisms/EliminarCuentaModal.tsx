@@ -1,11 +1,12 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent, useRef } from "react";
 import { clasesBoton } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { eliminarCuentaAction } from "@/lib/admin/acciones";
 import type { Usuario } from "@/lib/api/tipos";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
 
 interface PropsEliminarCuentaModal {
   usuario: Usuario;
@@ -28,6 +29,9 @@ function ContenidoEliminarCuenta({ usuario, onCerrar, volverA }: Omit<PropsElimi
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciarTransicion] = useTransition();
   const coincide = texto.trim().toLowerCase() === usuario.email.toLowerCase();
+
+  const dialogoRef = useRef<HTMLFormElement>(null);
+  useTrampaDeFoco(dialogoRef, true);
 
   useEffect(() => {
     const overflowPrevio = document.body.style.overflow;
@@ -61,6 +65,8 @@ function ContenidoEliminarCuenta({ usuario, onCerrar, volverA }: Omit<PropsElimi
       <form
         role="alertdialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="eliminar-titulo"
         aria-describedby="eliminar-descripcion"
         onSubmit={confirmar}

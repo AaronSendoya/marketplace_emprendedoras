@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ErrorApi } from "@/lib/api/cliente";
+import { mensajeDeAccion } from "@/lib/errores/accion";
 import {
   crearPerfilAdmin,
   editarPerfilAdmin,
@@ -24,11 +25,8 @@ export async function crearPerfilAction(usuarioId: string, _estadoPrevio: Estado
   try {
     await crearPerfilAdmin(formData);
   } catch (error) {
-    if (error instanceof ErrorApi) {
-      if (error.status === 409) return { error: "Esta cuenta ya tiene un perfil." };
-      if (error.status === 400) return { error: error.message };
-    }
-    return { error: "No pudimos crear el perfil. Intenta de nuevo." };
+    if (error instanceof ErrorApi && error.status === 409) return { error: "Esta cuenta ya tiene un perfil." };
+    return { error: mensajeDeAccion("crearPerfilAction", error, "No pudimos crear el perfil. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -69,8 +67,7 @@ export async function editarPerfilAction(
   try {
     await editarPerfilAdmin(perfilId, datos);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos guardar los cambios. Intenta de nuevo." };
+    return { error: mensajeDeAccion("editarPerfilAction", error, "No pudimos guardar los cambios. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -90,8 +87,7 @@ export async function reemplazarFotoPerfilAction(
   try {
     await reemplazarFotoPerfil(perfilId, formData);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos reemplazar la foto de perfil. Intenta de nuevo." };
+    return { error: mensajeDeAccion("reemplazarFotoPerfilAction", error, "No pudimos reemplazar la foto de perfil. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -107,8 +103,7 @@ export async function reemplazarLogoAction(
   try {
     await reemplazarLogo(perfilId, formData);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos reemplazar el logo. Intenta de nuevo." };
+    return { error: mensajeDeAccion("reemplazarLogoAction", error, "No pudimos reemplazar el logo. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);

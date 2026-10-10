@@ -46,7 +46,7 @@ export function FiltroPerfilEmprendimiento({ activo, opciones }: PropsFiltroPerf
             className={clasesChip(activa)}
           >
             {ETIQUETA_FILTRO_PERFIL[filtro]}
-            <span className={`tabular-nums ${activa ? "text-white/80" : "text-texto-secundario/80"}`}>({cantidad})</span>
+            <span className={`tabular-nums ${activa ? "text-white/90" : "text-texto-secundario/80"}`}>({cantidad})</span>
           </Link>
         );
       })}

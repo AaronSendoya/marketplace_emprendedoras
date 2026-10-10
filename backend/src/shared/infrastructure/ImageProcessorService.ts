@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { ErrorArchivoMuyGrande, ErrorDeDominio, ErrorValidacion } from "@/shared/domain/errors";
-import type { IImageProcessor } from "@/shared/domain/IImageProcessor";
+import type { IImageProcessor, OpcionesDeProcesado } from "@/shared/domain/IImageProcessor";
 import { CALIDAD_WEBP, LADO_MAX_PX, TAMANO_MAX_IMAGEN_BYTES, type TipoImagen } from "@/shared/domain/imagenes";
 
 const FORMATOS_ACEPTADOS = new Set(["jpeg", "png", "webp"]);
@@ -9,8 +9,9 @@ const MENSAJE_FORMATO = "El archivo debe ser una imagen JPEG, PNG o WebP válida
 const MAX_PIXELES_ENTRADA = 50_000_000;
 
 export class ImageProcessorService implements IImageProcessor {
-  async procesar(entrada: Buffer, tipo: TipoImagen): Promise<Buffer> {
-    if (entrada.length > TAMANO_MAX_IMAGEN_BYTES) throw new ErrorArchivoMuyGrande();
+  async procesar(entrada: Buffer, tipo: TipoImagen, opciones: OpcionesDeProcesado = {}): Promise<Buffer> {
+    const maximo = opciones.tamanoMaxBytes ?? TAMANO_MAX_IMAGEN_BYTES;
+    if (entrada.length > maximo) throw new ErrorArchivoMuyGrande(`El archivo supera el tamaño máximo permitido (${Math.round(maximo / (1024 * 1024))} MB).`);
     if (entrada.length === 0) throw new ErrorValidacion(MENSAJE_FORMATO);
 
     try {

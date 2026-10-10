@@ -12,14 +12,16 @@ describe("normalizarEncabezado", () => {
 describe("detectarEncabezados con los encabezados reales de Google Forms", () => {
   const deteccion = detectarEncabezados(ENCABEZADOS_DE_GOOGLE_FORMS);
 
-  it("reconoce las 9 columnas que se usan, cada una en su posición", () => {
+  it("reconoce las 11 columnas que se usan (con la foto y el logo), cada una en su posición", () => {
     expect(deteccion.columnas).toEqual({
       correo: 1,
       nombreCompleto: 2,
       whatsapp: 3,
       ciudad: 4,
+      foto: 5,
       emprendimiento: 6,
       descripcion: 7,
+      logo: 8,
       rubro: 9,
       instagram: 10,
       otraRed: 11,
@@ -36,11 +38,9 @@ describe("detectarEncabezados con los encabezados reales de Google Forms", () =>
     expect(deteccion.aproximadas).toEqual([]);
   });
 
-  it("ignora a propósito la marca temporal, las fotos, el logo y el beneficio, y no deja nada sin explicar", () => {
+  it("ignora a propósito la marca temporal y el beneficio (la foto y el logo ya se leen), y no deja nada sin explicar", () => {
     expect(deteccion.ignoradas).toEqual([
       "Marca temporal",
-      "Sube tu foto",
-      "Sube el logo de tu emprendimiento",
       "¿Te gustaría ofrecer algo especial a las emprendedoras del Track de Mujeres 2026?",
       "Cuéntanos sobre tu beneficio",
     ]);
@@ -105,8 +105,8 @@ describe("columnas obligatorias", () => {
     expect(faltantes(deteccion).map((c) => c.nombre)).toEqual(["Nombre completo", "Número de WhatsApp", "Nombre de tu emprendimiento", "Breve descripción"]);
   });
 
-  it("solo Instagram y otra red social son opcionales", () => {
-    expect(COLUMNAS.filter((c) => !c.obligatoria).map((c) => c.clave)).toEqual(["instagram", "otraRed"]);
+  it("solo Instagram, otra red social, la foto y el logo son opcionales", () => {
+    expect(COLUMNAS.filter((c) => !c.obligatoria).map((c) => c.clave)).toEqual(["instagram", "otraRed", "foto", "logo"]);
   });
 });
 
@@ -159,9 +159,20 @@ describe("detectarEncabezados perdona erratas, y lo dice", () => {
   });
 
   it("una errata en una columna que se ignora a propósito sigue siendo una columna ignorada, no una desconocida", () => {
-    const deteccion = detectarEncabezados(["Marca temporl", "Sube tu fotto"]);
+    const deteccion = detectarEncabezados(["Marca temporl", "Cuéntanos sobre tu benefcio"]);
 
-    expect([...deteccion.ignoradas].sort()).toEqual(["Marca temporl", "Sube tu fotto"]);
+    expect([...deteccion.ignoradas].sort()).toEqual(["Cuéntanos sobre tu benefcio", "Marca temporl"]);
     expect(deteccion.desconocidas).toEqual([]);
+  });
+
+  it("«Sube tu foto» y «Sube el logo…» son columnas reales (foto y logo), también con una errata", () => {
+    const exacto = detectarEncabezados(["Sube tu foto", "Sube el logo de tu emprendimiento"]);
+    expect(exacto.columnas).toEqual({ foto: 0, logo: 1 });
+    expect(exacto.ignoradas).toEqual([]);
+
+    const conErrata = detectarEncabezados(["Sube tu fotto", "Sube el logo de tu emprendimeinto"]);
+    expect(conErrata.columnas).toEqual({ foto: 0, logo: 1 });
+    // El logo se reconoce por su comienzo («Sube el logo»); solo la errata en lo que decide la columna se anota para confirmar.
+    expect(conErrata.aproximadas.map((a) => a.columna)).toEqual(["Foto de perfil"]);
   });
 });

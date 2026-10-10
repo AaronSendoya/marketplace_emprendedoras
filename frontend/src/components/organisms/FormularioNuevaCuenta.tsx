@@ -2,12 +2,14 @@
 
 import { CircleAlert, CircleCheck } from "lucide-react";
 import Link from "next/link";
-import { useActionState } from "react";
+
 import { Button, clasesBoton } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
+import { ContrasenaTemporal } from "@/components/molecules/ContrasenaTemporal";
 import { CampoPassword } from "@/components/molecules/CampoPassword";
 import { crearCuentaAction, type EstadoCrearCuenta } from "@/lib/admin/acciones";
 import { CLASES_PANEL_ADMIN } from "@/lib/estilos";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 const ESTADO_INICIAL: EstadoCrearCuenta = {};
 
@@ -26,7 +28,7 @@ function MensajeError({ mensaje }: { mensaje: string }) {
 // primer paso de pedir un código al correo de la emprendedora. El correo queda sin verificar hasta
 // el primer OTP que esa cuenta complete (regla 15).
 export function FormularioNuevaCuenta() {
-  const [estado, accion, pendiente] = useActionState(crearCuentaAction, ESTADO_INICIAL);
+  const { estado, alEnviar, pendiente } = useEnvioSinReinicio(crearCuentaAction, ESTADO_INICIAL);
 
   if (estado.creada) {
     return (
@@ -44,7 +46,7 @@ export function FormularioNuevaCuenta() {
             <p className="font-cuerpo text-xs font-medium text-enfasis">
               Contraseña temporal — se muestra una sola vez, cópiala ahora:
             </p>
-            <p className="font-titulo text-base font-bold text-texto select-all">{estado.creada.passwordTemporal}</p>
+            <ContrasenaTemporal valor={estado.creada.passwordTemporal} />
           </div>
         )}
 
@@ -56,7 +58,7 @@ export function FormularioNuevaCuenta() {
   }
 
   return (
-    <form action={accion} className={`${CLASES_PANEL_ADMIN} max-w-lg space-y-5 p-5 sm:p-7`}>
+    <form onSubmit={alEnviar} className={`${CLASES_PANEL_ADMIN} max-w-lg space-y-5 p-5 sm:p-7`}>
       <div className="space-y-1">
         <label htmlFor="email" className={CLASES_LABEL}>
           Correo de la emprendedora
@@ -89,7 +91,7 @@ export function FormularioNuevaCuenta() {
         <label htmlFor="password" className={CLASES_LABEL}>
           Contraseña inicial (opcional)
         </label>
-        <CampoPassword id="password" name="password" minLength={8} disabled={pendiente} />
+        <CampoPassword id="password" name="password" autoComplete="new-password" minLength={8} disabled={pendiente} />
         <p className="font-cuerpo text-xs text-texto-secundario">Si la dejas vacía, el sistema genera una temporal.</p>
       </div>
 

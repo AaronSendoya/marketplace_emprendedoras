@@ -16,6 +16,7 @@ import { obtenerMe } from "@/lib/api/auth";
 import { ErrorApi } from "@/lib/api/cliente";
 import { haySesion } from "@/lib/auth/sesion";
 import { CLASES_PANEL_ADMIN } from "@/lib/estilos";
+import { paginaDeParametro, ultimaPagina } from "@/lib/parametros";
 
 export const metadata: Metadata = {
   title: "Cuentas — Panel del Admin",
@@ -58,9 +59,11 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
   if (!(await haySesion())) redirect("/iniciar-sesion");
 
   const parametros = await searchParams;
-  const q = primerValor(parametros.q);
+  // El backend acepta de 1 a 100 caracteres sin contar los espacios de los extremos: un texto más largo o de puros espacios,
+  // escrito en la URL o en el buscador, no debe llegar a la API ni terminar en una página de error.
+  const q = primerValor(parametros.q).trim().slice(0, 100);
   const estado = primerValor(parametros.estado);
-  const pagina = Number(primerValor(parametros.pagina)) || 1;
+  const pagina = paginaDeParametro(primerValor(parametros.pagina));
   const limiteParametro = Number(primerValor(parametros.limite));
   const limite = LIMITES_VALIDOS.includes(limiteParametro) ? limiteParametro : LIMITE_POR_DEFECTO;
   const conError = primerValor(parametros.error) === "estado";
@@ -105,6 +108,10 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
     parametrosUrl.set("pagina", String(nuevaPagina));
     return `/admin?${parametrosUrl.toString()}`;
   }
+
+  // Una página que ya no existe (se eliminaron cuentas desde que se guardó el enlace) lleva a la última, no a una tabla vacía.
+  const ultima = ultimaPagina(paginacion.total, paginacion.limite);
+  if (paginacion.pagina > ultima) redirect(crearHref(ultima));
 
   return (
     <div className="space-y-8">
@@ -171,7 +178,8 @@ export default async function PaginaAdminCuentas({ searchParams }: PageProps<"/a
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto md:block">
+            {/* `relative`: el texto `sr-only` de la tabla es de posición absoluta y, sin un contenedor posicionado, escapa del `overflow-x-auto` y ensancha la página entera cuando la tabla no cabe (a 1024 px). Con `tabIndex` el teclado puede desplazarla. */}
+            <div className="relative hidden overflow-x-auto md:block" role="region" aria-label="Cuentas" tabIndex={0}>
               <table className="w-full text-left font-cuerpo text-sm">
                 <thead className="border-b border-borde bg-fondo">
                   <tr>

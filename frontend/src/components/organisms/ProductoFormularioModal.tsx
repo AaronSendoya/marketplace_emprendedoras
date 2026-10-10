@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, clasesBoton } from "@/components/atoms/Button";
 import { EntradaArchivoImagen } from "@/components/atoms/EntradaArchivoImagen";
 import { Input } from "@/components/atoms/Input";
@@ -11,6 +11,8 @@ import { CampoImagen } from "@/components/organisms/CampoImagen";
 import { crearProductoAction, editarProductoAction, reemplazarImagenProductoAction, type EstadoFormularioProducto } from "@/lib/admin/productos-acciones";
 import type { ProductoPropio } from "@/lib/api/tipos";
 import { errorDescripcionProducto, errorNombreProducto } from "@/lib/validacion/producto";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 // Las tres escrituras del formulario de producto. Por defecto son las del Admin (revalidan
 // /admin/emprendimientos/{usuarioId}); el panel de la Emprendedora pasa las suyas (revalidan
@@ -49,7 +51,7 @@ export function ProductoFormularioModal({ perfilId, usuarioId = "", producto, ab
   const productoId = producto?.id ?? "";
   const accionCrear = acciones?.crear ?? crearProductoAction.bind(null, usuarioId);
   const accionEditar = acciones ? acciones.editar.bind(null, productoId) : editarProductoAction.bind(null, productoId, usuarioId);
-  const [estado, accion, pendiente] = useActionState(producto ? accionEditar : accionCrear, ESTADO_INICIAL);
+  const { estado, alEnviar, pendiente } = useEnvioSinReinicio(producto ? accionEditar : accionCrear, ESTADO_INICIAL);
   const accionImagen = acciones
     ? acciones.reemplazarImagen.bind(null, productoId)
     : reemplazarImagenProductoAction.bind(null, productoId, usuarioId);
@@ -73,6 +75,9 @@ export function ProductoFormularioModal({ perfilId, usuarioId = "", producto, ab
   // actualizan en su propio efecto (nunca durante el render).
   const sinGuardarRef = useRef(sinGuardar);
   const onCerrarRef = useRef(onCerrar);
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
+
   useEffect(() => {
     sinGuardarRef.current = sinGuardar;
     onCerrarRef.current = onCerrar;
@@ -140,6 +145,8 @@ export function ProductoFormularioModal({ perfilId, usuarioId = "", producto, ab
         <div
           role="dialog"
           aria-modal="true"
+          ref={dialogoRef}
+          tabIndex={-1}
           aria-labelledby="producto-formulario-titulo"
           onClick={(evento) => evento.stopPropagation()}
           className="max-h-[calc(100dvh-2rem)] w-full max-w-md space-y-5 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
@@ -148,7 +155,7 @@ export function ProductoFormularioModal({ perfilId, usuarioId = "", producto, ab
             {producto ? "Editar producto" : "Agregar producto"}
           </h2>
 
-          <form action={accion} onChange={alCambiarFormulario} className="space-y-4">
+          <form onSubmit={alEnviar} onChange={alCambiarFormulario} className="space-y-4">
             {!producto && perfilId && <input type="hidden" name="perfil_id" value={perfilId} />}
 
             <div className="space-y-1">

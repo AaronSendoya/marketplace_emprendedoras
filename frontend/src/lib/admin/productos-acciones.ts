@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ErrorApi } from "@/lib/api/cliente";
+import { mensajeDeAccion, type ResultadoDeAccion } from "@/lib/errores/accion";
 import {
   crearProductoAdmin,
   editarProductoAdmin,
@@ -27,8 +27,7 @@ export async function crearProductoAction(
   try {
     await crearProductoAdmin(formData);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos crear el producto. Intenta de nuevo." };
+    return { error: mensajeDeAccion("crearProductoAction", error, "No pudimos crear el producto. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -58,8 +57,7 @@ export async function editarProductoAction(
   try {
     await editarProductoAdmin(productoId, datos);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos guardar los cambios. Intenta de nuevo." };
+    return { error: mensajeDeAccion("editarProductoAction", error, "No pudimos guardar los cambios. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
@@ -68,9 +66,14 @@ export async function editarProductoAction(
 
 // Activar o desactivar un producto desde la tabla (mismo patrón que cambiarEstadoAction de
 // Cuentas): sin useActionState, se llama directo desde el onConfirmar de un ConfirmModal.
-export async function cambiarEstadoProductoAction(productoId: string, activo: boolean, usuarioId: string): Promise<void> {
-  await editarProductoAdmin(productoId, { activo });
+export async function cambiarEstadoProductoAction(productoId: string, activo: boolean, usuarioId: string): Promise<ResultadoDeAccion> {
+  try {
+    await editarProductoAdmin(productoId, { activo });
+  } catch (error) {
+    return { error: mensajeDeAccion("cambiarEstadoProductoAction", error, "No pudimos cambiar el estado del producto. Intenta de nuevo.") };
+  }
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);
+  return {};
 }
 
 export async function reemplazarImagenProductoAction(
@@ -82,8 +85,7 @@ export async function reemplazarImagenProductoAction(
   try {
     await reemplazarImagenProducto(productoId, formData);
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 400) return { error: error.message };
-    return { error: "No pudimos reemplazar la imagen. Intenta de nuevo." };
+    return { error: mensajeDeAccion("reemplazarImagenProductoAction", error, "No pudimos reemplazar la imagen. Intenta de nuevo.") };
   }
 
   revalidatePath(`/admin/emprendimientos/${usuarioId}`);

@@ -1,6 +1,6 @@
 import type { ResultadoFilaImportacion } from "@/lib/api/tipos";
 import { aCsv, neutralizarFormula } from "./csv";
-import { nombreCompleto, type FilaEditable } from "./filas";
+import { avisosDelReporte, nombreCompleto, type FilaEditable } from "./filas";
 
 // Regla 22: los dos CSV que se descargan al terminar. Se arman en el navegador con lo que ya tiene la pantalla: ni las
 // contraseñas ni los reportes pasan por el servidor ni se guardan en ningún sitio.
@@ -15,11 +15,8 @@ function creadas(filas: readonly FilaEditable[], resultados: ResultadosPorFila) 
   });
 }
 
-// Una fila va al reporte si el sistema supuso algo dudoso (`revisar`) o si algo del Excel no se guardó tal cual (`reporte`).
-const merecePasarPorRevision = (fila: FilaEditable) => fila.avisos.some((aviso) => aviso.severidad === "revisar" || aviso.reporte);
-
 export const filasPorRevisar = (filas: readonly FilaEditable[], resultados: ResultadosPorFila) =>
-  creadas(filas, resultados).filter(({ fila }) => merecePasarPorRevision(fila));
+  creadas(filas, resultados).filter(({ fila, resultado }) => avisosDelReporte(fila, resultado).length > 0);
 
 export const cuentasConContrasena = (resultados: ResultadosPorFila) =>
   Object.values(resultados).filter((resultado) => resultado.password_temporal !== null).length;
@@ -44,8 +41,8 @@ export function csvDeCredenciales(filas: readonly FilaEditable[], resultados: Re
 // de Instagram y de «otra red social» cuando es de eso.
 export function csvPorRevisar(filas: readonly FilaEditable[], resultados: ResultadosPorFila): string {
   const encabezado = ["Fila del Excel", "Nombre", "Correo", "Emprendimiento", "Qué revisar", "Instagram que decía el Excel", "Otra red social que decía el Excel"];
-  const cuerpo = filasPorRevisar(filas, resultados).map(({ fila }) => {
-    const avisos = fila.avisos.filter((aviso) => aviso.severidad === "revisar" || aviso.reporte);
+  const cuerpo = filasPorRevisar(filas, resultados).map(({ fila, resultado }) => {
+    const avisos = avisosDelReporte(fila, resultado);
     const deInstagram = avisos.some((aviso) => aviso.campo === "instagram");
     const deOtraRed = avisos.some((aviso) => aviso.campo === "otra_red_social");
     return [

@@ -8,6 +8,7 @@ import {
   type EstadoFormularioDescuento,
 } from "@/lib/admin/descuentos-acciones";
 import { obtenerMe } from "@/lib/api/auth";
+import type { ResultadoDeAccion } from "@/lib/errores/accion";
 import { refrescarNegocio } from "./refrescar";
 
 // Acciones del panel de la Emprendedora sobre sus promociones (los "descuentos" del backend): misma
@@ -35,14 +36,16 @@ export async function editarDescuentoNegocioAction(
   return estado;
 }
 
-export async function asignarDescuentoNegocioAction(descuentoId: string, productoId: string): Promise<void> {
+export async function asignarDescuentoNegocioAction(descuentoId: string, productoId: string): Promise<ResultadoDeAccion> {
   const yo = await obtenerMe();
-  await asignarDescuentoAction(descuentoId, productoId, yo.id);
-  refrescarNegocio();
+  const resultado = await asignarDescuentoAction(descuentoId, productoId, yo.id);
+  if (!resultado.error) refrescarNegocio();
+  return resultado;
 }
 
-export async function quitarDescuentoNegocioAction(descuentoId: string, productoId: string): Promise<void> {
+export async function quitarDescuentoNegocioAction(descuentoId: string, productoId: string): Promise<ResultadoDeAccion> {
   const yo = await obtenerMe();
-  await quitarDescuentoAction(descuentoId, productoId, yo.id);
-  refrescarNegocio();
+  const resultado = await quitarDescuentoAction(descuentoId, productoId, yo.id);
+  if (!resultado.error) refrescarNegocio();
+  return resultado;
 }

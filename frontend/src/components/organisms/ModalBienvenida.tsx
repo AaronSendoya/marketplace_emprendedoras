@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { clasesBoton } from "@/components/atoms/Button";
 import { CLASES_FOCO_CONTROL } from "@/lib/estilos";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
 
 const CARACTERISTICAS = [
   { Icono: Users, verbo: "Conoce", sustantivo: "emprendedoras" },
@@ -52,6 +53,9 @@ export function ModalBienvenida() {
 
   // Marca la sesión como "ya visto" apenas se muestra, no solo al cerrarlo: así cuenta como visto
   // aunque se navegue lejos por el CTA en vez de cerrarlo con la X.
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
+
   useEffect(() => {
     if (!abierto) return;
     try {
@@ -87,6 +91,8 @@ export function ModalBienvenida() {
       <div
         role="dialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="titulo-bienvenida"
         onClick={(evento) => evento.stopPropagation()}
         className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md animate-modal space-y-6 overflow-y-auto rounded-2xl border border-borde bg-superficie px-6 pt-9 pb-7 text-center shadow-modal sm:max-w-[30rem] sm:px-8"

@@ -1,6 +1,7 @@
-import { ok } from "@/api/http/respuestas";
+import { ok, sinContenido } from "@/api/http/respuestas";
 import type { CambiarEmailUseCase } from "@/core/auth/application/CambiarEmailUseCase";
 import type { LoginUseCase } from "@/core/auth/application/LoginUseCase";
+import type { LogoutUseCase } from "@/core/auth/application/LogoutUseCase";
 import type { RequestOtpUseCase } from "@/core/auth/application/RequestOtpUseCase";
 import type { ResetPasswordUseCase } from "@/core/auth/application/ResetPasswordUseCase";
 import type { UsuarioAutenticado } from "@/core/auth/domain/Usuario";
@@ -9,6 +10,12 @@ import { serializarUsuario } from "./usuario.serializador";
 export async function login(usecase: LoginUseCase, email: string, password: string): Promise<Response> {
   const { token, usuario } = await usecase.ejecutar(email, password);
   return ok({ token, usuario: serializarUsuario(usuario) });
+}
+
+// Regla 5: borra la sesión del token que hace la llamada (204). Ese token deja de valer al instante.
+export async function logout(usecase: LogoutUseCase, usuarioId: string, sesionId: string): Promise<Response> {
+  await usecase.ejecutar(usuarioId, sesionId);
+  return sinContenido();
 }
 
 export function obtenerMe(usuario: UsuarioAutenticado): Response {

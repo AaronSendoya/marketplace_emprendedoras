@@ -34,4 +34,10 @@ export const MENSAJES_IMPORTACION = {
       : "No pudimos comunicarnos con el servidor. No se importó ninguna fila todavía. Revisa tu conexión y vuelve a intentarlo.",
   sinConexionAlLeer: "No pudimos comunicarnos con el servidor para leer el archivo. Revisa tu conexión y vuelve a intentarlo.",
   sinConexionAlRevisar: "No pudimos revisar tus cambios porque no hay conexión con el servidor. Se revisarán al importar, pero conviene volver a intentarlo.",
+  // Cuenta de Google (reglas 17 y 22).
+  conexionVencida:
+    "La conexión con Google venció (dura una hora). Conecta la cuenta de nuevo para seguir cargando las imágenes; lo que ya se importó se conserva.",
+  conexionRestablecida: "La cuenta de Google volvió a conectarse: las imágenes se cargarán con ella.",
+  noSePudoConsultarGoogle: "No pudimos consultar el estado de la cuenta de Google. Las imágenes de Drive no se cargarán hasta que se resuelva; puedes importar igual.",
+  sinConexionAlComprobarImagenes: "No pudimos comprobar las imágenes de Drive porque no hay conexión con el servidor. Puedes volver a intentarlo.",
 };

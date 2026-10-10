@@ -8,9 +8,9 @@ interface PropsPerfilNegocioVista {
   perfil: Perfil;
 }
 
-function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
+function Dato({ etiqueta, children, className }: { etiqueta: string; children: ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="font-cuerpo text-xs font-semibold tracking-wider text-texto-secundario uppercase">{etiqueta}</dt>
       <dd className="mt-1 font-cuerpo text-[15px] break-words text-texto">{children}</dd>
     </div>
@@ -27,11 +27,10 @@ export function PerfilNegocioVista({ perfil }: PropsPerfilNegocioVista) {
       </h2>
 
       <dl className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Dato etiqueta="Descripción">
-            <span className="whitespace-pre-line">{perfil.descripcion}</span>
-          </Dato>
-        </div>
+        {/* `dl > div > dt + dd`: un `div` de más alrededor de `Dato` rompe la estructura de la lista de definiciones. */}
+        <Dato etiqueta="Descripción" className="sm:col-span-2">
+          <span className="whitespace-pre-line">{perfil.descripcion}</span>
+        </Dato>
         <Dato etiqueta="Rubro">{perfil.rubro.nombre}</Dato>
         <Dato etiqueta="Ciudad">{perfil.ciudad.nombre}</Dato>
         <Dato etiqueta="WhatsApp">{formatearWhatsapp(perfil.whatsapp)}</Dato>

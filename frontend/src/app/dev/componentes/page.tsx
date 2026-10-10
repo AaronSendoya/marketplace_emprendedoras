@@ -2,6 +2,7 @@ import { MapPin } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/atoms/Badge";
 import { Button } from "@/components/atoms/Button";
+import { ImagenR2 } from "@/components/atoms/ImagenR2";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { EmprendedoraCard } from "@/components/molecules/EmprendedoraCard";
@@ -212,6 +213,22 @@ export default function PaginaComponentes() {
         <div className="w-full max-w-[26rem]">
           <ProductoCard producto={{ ...PRODUCTO_CONSULTAR_PRECIO, id: "10000000-0000-0000-0000-000000000004", perfil: { ...PERFIL_RESUMEN_EJEMPLO, whatsapp: "" } }} />
         </div>
+      </Seccion>
+
+      <Seccion titulo="ImagenR2 — una imagen que no abre nunca deja el icono de imagen rota (control de errores)">
+        {[
+          { id: "abre", etiqueta: "Abre", src: "/logo/pista8-logo.png" },
+          { id: "no-existe", etiqueta: "Un 404 del bucket", src: "/imagen-que-no-existe.webp" },
+          { id: "memoria", etiqueta: "memoria:// (sin R2)", src: "memoria://desarrollo-sin-r2" },
+          { id: "vacia", etiqueta: "Dirección vacía", src: "" },
+        ].map(({ id, etiqueta, src }) => (
+          <figure key={id} className="space-y-2" data-prueba-imagen={id}>
+            <div className="relative h-32 w-32 overflow-hidden rounded-lg border border-borde bg-superficie">
+              <ImagenR2 src={src} alt={etiqueta} fill sizes="128px" className="object-contain" />
+            </div>
+            <figcaption className="font-cuerpo text-xs text-texto-secundario">{etiqueta}</figcaption>
+          </figure>
+        ))}
       </Seccion>
 
       <Seccion titulo="TarjetaEsqueleto (paso 9, estado de carga)">

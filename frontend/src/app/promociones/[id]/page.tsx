@@ -1,7 +1,7 @@
 import { Clock, MapPin, Store } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/atoms/Badge";
 import { clasesBoton } from "@/components/atoms/Button";
 import { Migas } from "@/components/molecules/Migas";
@@ -15,6 +15,7 @@ import { obtenerPromocion } from "@/lib/api/promociones";
 import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
 import { formatearPorcentaje } from "@/lib/formato/precio";
 import { describirVigencia } from "@/lib/formato/vigencia";
+import { paginaDeParametro, ultimaPagina } from "@/lib/parametros";
 
 const LIMITE = 12;
 
@@ -41,10 +42,13 @@ export async function generateMetadata({ params }: PageProps<"/promociones/[id]"
 export default async function PaginaPromocion({ params, searchParams }: PageProps<"/promociones/[id]">) {
   const { id } = await params;
   const parametros = await searchParams;
-  const pagina = Number((Array.isArray(parametros.pagina) ? parametros.pagina[0] : parametros.pagina) ?? "") || 1;
+  const pagina = paginaDeParametro((Array.isArray(parametros.pagina) ? parametros.pagina[0] : parametros.pagina) ?? "");
 
   const promocion = await cargarPromocion(id);
   const { datos: productos, paginacion } = await listarProductos({ descuento_id: id, pagina, limite: LIMITE });
+  // Una página que ya no existe lleva a la última, no a una lista vacía.
+  const ultima = ultimaPagina(paginacion.total, LIMITE);
+  if (pagina > ultima) redirect(`/promociones/${id}?pagina=${ultima}`);
 
   const porcentaje = formatearPorcentaje(promocion.porcentaje);
   const vigencia = describirVigencia(promocion.fecha_fin);

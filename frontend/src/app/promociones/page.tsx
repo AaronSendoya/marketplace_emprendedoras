@@ -1,5 +1,6 @@
 import { Percent } from "lucide-react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { EstadoVacio } from "@/components/molecules/EstadoVacio";
 import { Paginador } from "@/components/molecules/Paginador";
 import { PromocionCard } from "@/components/molecules/PromocionCard";
@@ -13,6 +14,7 @@ import { listarPromociones } from "@/lib/api/promociones";
 import type { OrdenPromociones } from "@/lib/api/tipos";
 import { CONTENEDOR_PUBLICO } from "@/lib/estilos";
 import { semillaDe } from "@/lib/inicio/semilla";
+import { idDeParametro, paginaDeParametro, ultimaPagina } from "@/lib/parametros";
 
 export const metadata: Metadata = {
   title: "Promociones — Track de Mujeres",
@@ -35,9 +37,10 @@ export default async function PaginaPromociones({ searchParams }: PageProps<"/pr
   const parametros = await searchParams;
   // El backend acepta de 1 a 100 caracteres: un texto más largo, escrito a mano en la URL, no debe llegar a la API ni terminar en una página de error.
   const q = primerValor(parametros.q).trim().slice(0, 100);
-  const ciudadId = primerValor(parametros.ciudad_id);
-  const rubroId = primerValor(parametros.rubro_id);
-  const pagina = Number(primerValor(parametros.pagina)) || 1;
+  // Un id o una página que el backend rechazaría (400) se ignoran: el enlace sigue mostrando las promociones.
+  const ciudadId = idDeParametro(primerValor(parametros.ciudad_id));
+  const rubroId = idDeParametro(primerValor(parametros.rubro_id));
+  const pagina = paginaDeParametro(primerValor(parametros.pagina));
   const pedido = primerValor(parametros.orden);
   const orden = (ORDENES as readonly string[]).includes(pedido) ? (pedido as OrdenPromociones) : "aleatorio";
   const semilla = orden === "aleatorio" ? semillaDe(primerValor(parametros.semilla)) : undefined;
@@ -67,6 +70,10 @@ export default async function PaginaPromociones({ searchParams }: PageProps<"/pr
     parametrosUrl.set("pagina", String(nuevaPagina));
     return `/promociones?${parametrosUrl.toString()}`;
   }
+
+  // Una página que ya no existe lleva a la última (con la misma semilla), no a «aún no hay promociones».
+  const ultima = ultimaPagina(paginacion.total, LIMITE);
+  if (pagina > ultima) redirect(crearHref(ultima));
 
   return (
     <main className="flex-1">

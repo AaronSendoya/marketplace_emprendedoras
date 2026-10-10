@@ -8,7 +8,7 @@ import type { GetUsuarioUseCase } from "@/core/auth/application/GetUsuarioUseCas
 import type { ListUsuariosUseCase } from "@/core/auth/application/ListUsuariosUseCase";
 import type { CambiosUsuario, FiltrosUsuarios } from "@/core/auth/domain/Usuario";
 import type { ParametrosPagina } from "@/shared/domain/Paginacion";
-import { serializarUsuario } from "./usuario.serializador";
+import { serializarUsuario, serializarUsuarioConPerfil } from "./usuario.serializador";
 
 export async function crearUsuario(usecase: CreateUsuarioUseCase, adminId: string, datos: DatosNuevaCuenta): Promise<Response> {
   const { usuario, passwordTemporal } = await usecase.ejecutar(adminId, datos);
@@ -17,7 +17,7 @@ export async function crearUsuario(usecase: CreateUsuarioUseCase, adminId: strin
 
 export async function listarUsuarios(usecase: ListUsuariosUseCase, filtros: FiltrosUsuarios, pagina: ParametrosPagina): Promise<Response> {
   const { datos, total } = await usecase.ejecutar(filtros, pagina);
-  return paginado({ datos: datos.map(serializarUsuario), total }, pagina);
+  return paginado({ datos: datos.map(serializarUsuarioConPerfil), total }, pagina);
 }
 
 export async function obtenerUsuario(usecase: GetUsuarioUseCase, id: string): Promise<Response> {

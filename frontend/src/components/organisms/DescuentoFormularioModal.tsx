@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, clasesBoton } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
@@ -10,6 +10,8 @@ import { crearDescuentoAction, editarDescuentoAction, type EstadoFormularioDescu
 import type { Descuento } from "@/lib/api/tipos";
 import { fechaParaInputLaPaz } from "@/lib/formato/fecha";
 import { errorPorcentajeDescuento, LIMITES_DESCUENTO } from "@/lib/validacion/producto";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 // Alta y edición de un descuento. Por defecto son las acciones del Admin; el panel de la
 // Emprendedora pasa las suyas (mismo formulario y mismas validaciones, otra ruta a revalidar).
@@ -49,7 +51,7 @@ export function DescuentoFormularioModal({
   const descuentoId = descuento?.id ?? "";
   const accionCrear = acciones?.crear ?? crearDescuentoAction.bind(null, perfilId, usuarioId);
   const accionEditar = acciones ? acciones.editar.bind(null, descuentoId) : editarDescuentoAction.bind(null, descuentoId, usuarioId);
-  const [estado, accion, pendiente] = useActionState(descuento ? accionEditar : accionCrear, ESTADO_INICIAL);
+  const { estado, alEnviar, pendiente } = useEnvioSinReinicio(descuento ? accionEditar : accionCrear, ESTADO_INICIAL);
   const cerrarRef = useRef<HTMLButtonElement>(null);
 
   // Validación en vivo (onBlur): solo feedback anticipado, la fuente de verdad sigue siendo el
@@ -71,6 +73,9 @@ export function DescuentoFormularioModal({
   // `sinGuardar`/`onCerrar` mientras el modal sigue abierto. Se actualizan en su propio efecto.
   const sinGuardarRef = useRef(sinGuardar);
   const onCerrarRef = useRef(onCerrar);
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
+
   useEffect(() => {
     sinGuardarRef.current = sinGuardar;
     onCerrarRef.current = onCerrar;
@@ -138,6 +143,8 @@ export function DescuentoFormularioModal({
         <div
           role="dialog"
           aria-modal="true"
+          ref={dialogoRef}
+          tabIndex={-1}
           aria-labelledby="descuento-formulario-titulo"
           onClick={(evento) => evento.stopPropagation()}
           className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
@@ -146,7 +153,7 @@ export function DescuentoFormularioModal({
             {descuento ? `Editar ${etiqueta}` : `Crear ${etiqueta}`}
           </h2>
 
-          <form action={accion} onChange={alCambiarFormulario} className="space-y-4">
+          <form onSubmit={alEnviar} onChange={alCambiarFormulario} className="space-y-4">
             <div className="space-y-1">
               <label htmlFor="porcentaje" className={CLASES_LABEL}>
                 Porcentaje

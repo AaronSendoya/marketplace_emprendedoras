@@ -1,10 +1,13 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Button, clasesBoton } from "@/components/atoms/Button";
+import { ContrasenaTemporal } from "@/components/molecules/ContrasenaTemporal";
 import { CampoPassword } from "@/components/molecules/CampoPassword";
 import { restablecerPasswordAction, type EstadoRestablecerPassword } from "@/lib/admin/acciones";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
+import { useEnvioSinReinicio } from "@/lib/hooks/useEnvioSinReinicio";
 
 const ESTADO_INICIAL: EstadoRestablecerPassword = {};
 
@@ -19,8 +22,11 @@ interface PropsRestablecerPasswordModal {
 // El Admin restablece la contraseña de cualquier cuenta sin OTP (regla 5 y 15: el OTP es solo
 // para que la propia Emprendedora se recupere). Mismo patrón de accesibilidad que ConfirmModal.
 export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: PropsRestablecerPasswordModal) {
-  const [estado, accion, pendiente] = useActionState(restablecerPasswordAction.bind(null, usuarioId), ESTADO_INICIAL);
+  const { estado, alEnviar, pendiente } = useEnvioSinReinicio(restablecerPasswordAction.bind(null, usuarioId), ESTADO_INICIAL);
   const cerrarRef = useRef<HTMLButtonElement>(null);
+
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
 
   useEffect(() => {
     if (!abierto) return;
@@ -47,6 +53,8 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
         <div
           role="dialog"
           aria-modal="true"
+          ref={dialogoRef}
+          tabIndex={-1}
           aria-labelledby="password-lista-titulo"
           onClick={(evento) => evento.stopPropagation()}
           className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
@@ -60,7 +68,7 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
               <p className="font-cuerpo text-xs font-medium text-enfasis">
                 Contraseña temporal — se muestra una sola vez, cópiala ahora:
               </p>
-              <p className="font-titulo text-base font-bold text-texto select-all">{estado.resultado.passwordTemporal}</p>
+              <ContrasenaTemporal valor={estado.resultado.passwordTemporal} />
             </div>
           ) : (
             <p className="font-cuerpo text-sm text-texto-secundario">
@@ -83,6 +91,8 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
       <div
         role="dialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="restablecer-password-titulo"
         aria-describedby="restablecer-password-descripcion"
         onClick={(evento) => evento.stopPropagation()}
@@ -96,12 +106,12 @@ export function RestablecerPasswordModal({ usuarioId, abierto, onCerrar }: Props
           Podés escribir una contraseña nueva o dejar el campo vacío para que el sistema genere una temporal.
         </p>
 
-        <form action={accion} className="space-y-4">
+        <form onSubmit={alEnviar} className="space-y-4">
           <div className="space-y-1">
             <label htmlFor={`password-${usuarioId}`} className={CLASES_LABEL}>
               Contraseña nueva (opcional)
             </label>
-            <CampoPassword id={`password-${usuarioId}`} name="password" minLength={8} disabled={pendiente} />
+            <CampoPassword id={`password-${usuarioId}`} name="password" autoComplete="new-password" minLength={8} disabled={pendiente} />
           </div>
 
           {estado.error && (

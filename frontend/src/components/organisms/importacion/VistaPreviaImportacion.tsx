@@ -74,8 +74,7 @@ export function VistaPreviaImportacion({ archivo, filas, ciudades, rubros, dispa
               {archivo.ignoradas.length > 0 && (
                 <>
                   {" "}
-                  · {archivo.ignoradas.length} {archivo.ignoradas.length === 1 ? "columna ignorada" : "columnas ignoradas"} a propósito (marca temporal, fotos, logo
-                  y beneficio)
+                  · {archivo.ignoradas.length} {archivo.ignoradas.length === 1 ? "columna ignorada" : "columnas ignoradas"} a propósito (marca temporal y beneficio)
                 </>
               )}
             </p>

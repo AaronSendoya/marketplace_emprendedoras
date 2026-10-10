@@ -28,7 +28,7 @@ export default async function PaginaImportarEmprendedoras() {
 
       <EncabezadoPaginaAdmin
         titulo="Importar emprendedoras desde Excel"
-        descripcion="Arrastra el archivo de respuestas de Google Forms para crear varias cuentas y perfiles de una vez. Las fotos y los logos se suben después, desde cada emprendimiento."
+        descripcion="Arrastra el archivo de respuestas de Google Forms para crear varias cuentas y perfiles de una vez. Las fotos y los logos se cargan desde Drive si conectas una cuenta de Google con acceso a la carpeta."
       />
 
       <ImportadorEmprendedoras ciudades={ciudades} rubros={rubros} />

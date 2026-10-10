@@ -108,4 +108,15 @@ describe("EsquemaListarUsuariosQuery (regla 5: búsqueda y filtro de estado)", (
     expect(EsquemaListarUsuariosQuery.safeParse({ q: "" }).success).toBe(false);
     expect(EsquemaListarUsuariosQuery.safeParse({ estado: "pendiente" }).success).toBe(false);
   });
+
+  it("acepta el filtro por rol y por perfil (regla 18) y rechaza otros valores", () => {
+    expect(EsquemaListarUsuariosQuery.parse({ rol: "Emprendedor", perfil: "sin", estado: "activo" })).toMatchObject({
+      rol: "Emprendedor",
+      perfil: "sin",
+      estado: "activo",
+    });
+    expect(EsquemaListarUsuariosQuery.safeParse({ rol: "Superadmin" }).success).toBe(false);
+    expect(EsquemaListarUsuariosQuery.safeParse({ rol: "emprendedor" }).success).toBe(false);
+    expect(EsquemaListarUsuariosQuery.safeParse({ perfil: "todos" }).success).toBe(false);
+  });
 });

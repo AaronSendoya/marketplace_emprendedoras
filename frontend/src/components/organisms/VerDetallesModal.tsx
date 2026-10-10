@@ -5,6 +5,7 @@ import { Badge } from "@/components/atoms/Badge";
 import { clasesBoton } from "@/components/atoms/Button";
 import { formatearFecha } from "@/lib/formato/fecha";
 import type { Usuario } from "@/lib/api/tipos";
+import { useTrampaDeFoco } from "@/lib/hooks/useTrampaDeFoco";
 
 interface PropsVerDetallesModal {
   usuario: Usuario;
@@ -32,6 +33,9 @@ function Fila({ etiqueta, children }: PropsFila) {
 export function VerDetallesModal({ usuario, abierto, onCerrar }: PropsVerDetallesModal) {
   const cerrarRef = useRef<HTMLButtonElement>(null);
 
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  useTrampaDeFoco(dialogoRef, abierto);
+
   useEffect(() => {
     if (!abierto) return;
     cerrarRef.current?.focus();
@@ -56,6 +60,8 @@ export function VerDetallesModal({ usuario, abierto, onCerrar }: PropsVerDetalle
       <div
         role="dialog"
         aria-modal="true"
+        ref={dialogoRef}
+        tabIndex={-1}
         aria-labelledby="detalles-cuenta-titulo"
         onClick={(evento) => evento.stopPropagation()}
         className="max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-lg bg-superficie p-6 shadow-lg"
